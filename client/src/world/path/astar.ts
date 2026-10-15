@@ -51,6 +51,13 @@ export class PathFinder {
     const grid = this.grid;
     if (!grid.inside(sx, sy) || !grid.walkable(gx, gy)) return false;
     if (sx === gx && sy === gy) return true;
+    // daqui em diante, coordenadas da grade (origem na primeira célula)
+    const ox = grid.ox;
+    const oy = grid.oy;
+    sx -= ox;
+    sy -= oy;
+    gx -= ox;
+    gy -= oy;
     const w = grid.w;
     const cells = grid.cells;
     if (++this.gen >= 0xffffffff) {
@@ -72,7 +79,7 @@ export class PathFinder {
     while (this.heapSize > 0) {
       const cur = this.pop();
       if (cur === goal) {
-        this.reconstruct(goal, start, w, out);
+        this.reconstruct(goal, start, w, out, ox, oy);
         return true;
       }
       if (this.closed[cur] === gen) continue;
@@ -106,15 +113,15 @@ export class PathFinder {
     return false;
   }
 
-  private reconstruct(goal: number, start: number, w: number, out: number[]): void {
+  private reconstruct(goal: number, start: number, w: number, out: number[], ox: number, oy: number): void {
     let n = 0;
     for (let i = goal; i !== start && i >= 0; i = this.from[i]) n++;
     out.length = n * 2;
     let k = n - 1;
     for (let i = goal; i !== start && i >= 0; i = this.from[i]) {
       const x = i % w;
-      out[k * 2] = x;
-      out[k * 2 + 1] = (i - x) / w;
+      out[k * 2] = x + ox;
+      out[k * 2 + 1] = (i - x) / w + oy;
       k--;
     }
   }

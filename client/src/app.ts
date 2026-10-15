@@ -24,6 +24,12 @@ export function start(): void {
   const world = createWorld(document.getElementById('world') as HTMLCanvasElement, store);
   // ?embed=1: dentro do iframe de um painel com vários escritórios (ui/embed.ts).
   createUI(document.getElementById('ui') as HTMLElement, store, world, { embed: embedRequested(location.search) });
+  // Escritório combinado (várias máquinas): favicon e ícone de tela inicial do campus (server/federation/manifest.ts).
+  const offBrand = store.on('snapshot', (snap) => {
+    if ((snap.meta.machines?.length ?? 0) < 2) return;
+    offBrand();
+    useCampusIcons();
+  });
   // O que esta página pode fazer (porta local ou remota com login) chega antes do primeiro snapshot (ou desiste em
   // poucos segundos e fica a regra de antes).
   if (store.mock) store.connect();
@@ -42,4 +48,13 @@ export function start(): void {
 
   // Facilita a depuração pelo console do navegador.
   Object.assign(window, { habblaud: { store, world } });
+}
+
+function useCampusIcons(): void {
+  const base = '/assets/brand/campus/';
+  for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')) {
+    link.href = link.sizes.contains('16x16') ? `${base}favicon-16.png` : `${base}favicon-32.png`;
+  }
+  const touch = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+  if (touch) touch.href = `${base}apple-touch-icon.png`;
 }

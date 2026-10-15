@@ -42,6 +42,8 @@ export class RoomState {
    * e ser desmontado. Ninguém pertence a ela e ela não aparece no snapshot.
    */
   ghost = false;
+  /** Campus (escritório combinado): máquina dona da sala (o prédio onde ela fica). Vazio no prédio único. */
+  bld = '';
 
   constructor(info: RoomInfo, theme: RoomTheme, layout: AreaLayout, phase: RoomPhase, now: number, lit: boolean, slot: number) {
     this.info = info;

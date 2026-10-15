@@ -5,9 +5,11 @@
 //   POST /api/pty/:id/input|resize|close
 //   POST /api/agents/:id/stop          encerra o agente (aqui ou noutro terminal)
 //   POST /api/agents/:id/takeover      assume a sessão: encerra lá e retoma aqui
+// No escritório combinado, encerrar um agente de outra máquina vai ao par dono (que precisa do terminal interativo).
 // Quem controla um terminal destes executa comandos na máquina: só conexões do próprio computador, com Host
 // local e (quando o navegador manda) Origin da mesma origem. A borda (http/guard.ts) já exige JSON nos POST.
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { Federation } from '../federation/federation';
 import { PtyError, type PtyManager } from '../pty/manager';
 import { HttpError, readJson, sendJson } from './app';
 import { isLoopbackHost } from './guard';
@@ -43,7 +45,11 @@ export function ptyRequestProblem(req: IncomingMessage): string | null {
   return null;
 }
 
-export function createPtyRoutes(ptys: PtyManager): (req: IncomingMessage, res: ServerResponse, path: string) => void {
+export function createPtyRoutes(
+  ptys: PtyManager,
+  /** Escritório combinado: encerrar um agente de outra máquina vai ao par dono (federation/federation.ts). */
+  federation?: Pick<Federation, 'forward'>,
+): (req: IncomingMessage, res: ServerResponse, path: string) => void {
   const fail = (res: ServerResponse, err: unknown) => {
     if (res.headersSent) return void res.destroy();
     if (err instanceof HttpError || err instanceof PtyError) sendJson(res, err.status, { error: err.message });
@@ -72,6 +78,7 @@ export function createPtyRoutes(ptys: PtyManager): (req: IncomingMessage, res: S
     const action = AGENT_ACTION_ROUTE.exec(path);
     if (action) {
       if (method !== 'POST') return notAllowed(res, 'POST');
+      if (federation?.forward(req, res, path)) return;
       const body = (await readJson(req)) as Record<string, unknown>;
       const id = decode(action[1]);
       if (action[2] === 'stop') {

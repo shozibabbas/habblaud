@@ -10,7 +10,10 @@ import { isTruthy, loadConfig, messagesOffReason, terminalOffReason } from './co
 import { createApiHandler, sendJson } from './http/app';
 import { createRequestGuard, isLoopbackHost } from './http/guard';
 import { createRemoteGate, isRemoteRequest, loadSecret, RemoteSessions, startRemoteListener, type RemoteListener } from './http/remote';
+import { campusManifest } from './federation/manifest';
+import { readFileSync } from 'node:fs';
 import { Federation } from './federation/federation';
+import { RemotePresence } from './federation/presence';
 import { Hub } from './http/sse';
 import { createStaticHandler } from './http/static';
 import { TerminalStreams } from './http/terminal';
@@ -118,7 +121,12 @@ const codexLive: CodexLive | undefined = codex;
 late.office = office;
 late.agents = agents;
 // Escritório combinado (HABBLAUD_PEERS): os escritórios dos pares entram neste, com a etiqueta da máquina.
-const federation = config.peers.length ? new Federation({ machineName: config.machineName, peers: config.peers }) : undefined;
+// Cada par fica sabendo quantas páginas daqui podem responder os pedidos dele (com o responder pelo escritório ligado).
+const federation = config.peers.length
+  ? new Federation({ machineName: config.machineName, peers: config.peers, viewers: () => (late.permissions ? hub.localSize : 0) })
+  : undefined;
+// Quem olha este escritório por um escritório combinado noutra máquina (POST /api/federation/presence).
+const presence = new RemotePresence();
 // Página que pode responder pelo escritório: Host local na porta local; na remota, só com permissions liberado.
 const hub = new Hub(office, {
   federation,
@@ -173,7 +181,7 @@ if (timeline) hub.onSnapshot((snap) => timeline.ingest(snap));
 const permissions = config.terminal
   ? new PermissionRegistry({
       office,
-      viewers: () => hub.localSize,
+      viewers: () => hub.localSize + presence.count(),
       answerLater: () => !!config.remote?.allow.has('permissions'),
       // Só o Claude Code: a busca da resposta dada no terminal lê o formato do transcript dele.
       transcriptPathOf: (id) => claude.transcriptPathOf(id),
@@ -281,6 +289,7 @@ const ticker = setInterval(() => {
 
 const api = createApiHandler({
   federation,
+  presence,
   renameRoom: (id, name) => {
     const path = office.roomPath(id);
     if (!path) return undefined;
@@ -300,7 +309,7 @@ const api = createApiHandler({
   timeline: createTimelineHandler({ dir: timelineDir, recording: !!timeline }),
   permissions: permissions ? createPermissionRoutes(permissions) : undefined,
   messages: messages ? createMessageRoutes(messages) : undefined,
-  pty: ptys ? createPtyRoutes(ptys) : undefined,
+  pty: ptys ? createPtyRoutes(ptys, federation) : undefined,
   spawn,
   attachments,
   dictation,
@@ -344,7 +353,28 @@ if (config.dev) {
   fallback = (req, res) => vite.middlewares(req, res);
 } else {
   const serveStatic = createStaticHandler(join(config.rootDir, 'dist', 'client'), { frameAncestors: config.frameAncestors });
-  fallback = (req, res, url) => serveStatic(req, res, url.pathname);
+  // Escritório combinado: o manifest do app instalável vem com o nome e o ícone do campus (federation/manifest.ts).
+  const manifestPath = join(config.rootDir, 'dist', 'client', 'manifest.webmanifest');
+  fallback = (req, res, url) => {
+    if (federation && url.pathname === '/manifest.webmanifest' && (req.method === 'GET' || req.method === 'HEAD')) {
+      let base: Record<string, unknown> = {};
+      try {
+        base = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+      } catch {
+        // Sem o manifest do build: o do campus sozinho já basta para instalar.
+      }
+      const body = JSON.stringify(campusManifest(base, [config.machineName, ...federation.peers.map((p) => p.name)]));
+      res.writeHead(200, {
+        'Content-Type': 'application/manifest+json; charset=utf-8',
+        'Content-Length': Buffer.byteLength(body),
+        'Cache-Control': 'no-cache',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      res.end(req.method === 'HEAD' ? undefined : body);
+      return;
+    }
+    serveStatic(req, res, url.pathname);
+  };
 }
 
 // Host/Origin/Content-Type: barra DNS rebinding e CSRF antes de qualquer rota (inclusive o Vite).

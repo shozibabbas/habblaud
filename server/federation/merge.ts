@@ -1,7 +1,18 @@
 // Escritório combinado: funções puras que trazem o estado de um par para o escritório local.
 // Os ids do par ganham o prefixo "<par>~" (agentes, salas, contas, atividades, avisos), as salas e contas ganham a
 // etiqueta da máquina no nome e as vagas (slot) são renumeradas para todas as salas caberem no mesmo prédio.
-import type { AccountInfo, AgentDetail, AgentInfo, FeedItem, MachineRef, Notice, RoomInfo } from '../../shared/types';
+import type {
+  AccountInfo,
+  AgentDetail,
+  AgentInfo,
+  FeedItem,
+  MachineRef,
+  Notice,
+  OutboxMessage,
+  PermissionRequestInfo,
+  RoomInfo,
+  TerminalInit,
+} from '../../shared/types';
 import { PEER_SEP } from './config';
 
 export function prefixId(peer: string, id: string): string {
@@ -41,8 +52,24 @@ export function peerAgent(a: AgentInfo, m: MachineRef): AgentInfo {
     account: prefixId(p, a.account),
     activity: a.activity && prefixActivityId(p, a.activity),
     recent: a.recent.map((x) => prefixActivityId(p, x)),
+    permission: a.permission && peerPermission(a.permission, m),
     machine: m,
   };
+}
+
+/** Pedido de permissão do par (no snapshot e em GET /api/permissions/:id): a decisão volta pelo id prefixado. */
+export function peerPermission(p: PermissionRequestInfo, m: MachineRef): PermissionRequestInfo {
+  return { ...p, id: prefixId(m.id, p.id) };
+}
+
+/** Mensagem mandada a um agente do par (POST /api/messages, GET /api/messages/:id): a situação volta pelo id prefixado. */
+export function peerOutbox(o: OutboxMessage, m: MachineRef): OutboxMessage {
+  return { ...o, id: prefixId(m.id, o.id), agentId: prefixId(m.id, o.agentId) };
+}
+
+/** Evento `init` do terminal de um agente do par. */
+export function peerTerminalInit(t: TerminalInit, m: MachineRef): TerminalInit {
+  return { ...t, agentId: prefixId(m.id, t.agentId) };
 }
 
 export function peerAccount(acc: AccountInfo, m: MachineRef): AccountInfo {

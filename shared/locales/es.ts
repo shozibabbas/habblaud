@@ -2590,4 +2590,10 @@ export const ES: Readonly<Record<string, string>> = {
   "   HABBLAUD_PEERS: \"{0}\" ignorado (use id=http://host:porta; id com letras minúsculas, números e -).": "   HABBLAUD_PEERS: \"{0}\" ignorado (usa id=http://host:puerto; id con minúsculas, números y -).",
   "a máquina do agente não respondeu ({0})": "la máquina del agente no respondió ({0})",
   "este computador": "este equipo",
+  "assumir a sessão só funciona no computador onde ela roda": "tomar el control de la sesión solo funciona en el equipo donde se ejecuta",
+  "resposta inválida da máquina do agente": "respuesta inválida de la máquina del agente",
+  "só pelo próprio computador": "solo desde este equipo",
+  "esperado {from, viewers}": "se esperaba {from, viewers}",
+  "Reunião": "Reunión",
+  "offline": "sin conexión",
 };

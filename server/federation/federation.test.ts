@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AgentInfo, FeedItem, OfficeSnapshot, RoomInfo } from '../../shared/types';
 import { machineName, normalizeOrigin, parsePeers } from './config';
 import { Federation, OFFLINE_GRACE_MS } from './federation';
-import { peerAgent, prefixId, SlotAllocator, splitId } from './merge';
+import { peerAgent, peerOutbox, peerTerminalInit, prefixId, SlotAllocator, splitId } from './merge';
 import type { RequestFn } from './peer';
 
 const room = (id: string, slot: number, name = id.split('/').pop() ?? id): RoomInfo => ({ id, name, path: id, slot, seed: 1, createdAt: 0 });
@@ -97,6 +97,15 @@ describe('federation: ids e vagas', () => {
     const a = peerAgent(agent('.claude:1', '/srv', { parentId: '.claude:0' }), { id: 'alice', name: 'alice' });
     expect(a).toMatchObject({ id: 'alice~.claude:1', parentId: 'alice~.claude:0', roomId: 'alice~/srv', account: 'alice~.claude', machine: { id: 'alice' } });
     expect(a.recent[0].id).toBe('alice~.claude:1#busy:1');
+  });
+
+  it('o que a página manda de volta também ganha o prefixo: pedido de permissão, mensagem e terminal', () => {
+    const m = { id: 'alice', name: 'alice' };
+    const permission = { id: 'p-1', tool: 'Bash', title: 'Bash(ls)', text: 't', icon: 'x', createdAt: 0, expiresAt: 1 };
+    expect(peerAgent(agent('.claude:1', '/srv', { permission }), m).permission).toEqual({ ...permission, id: 'alice~p-1' });
+    expect(peerAgent(agent('.claude:1', '/srv'), m).permission).toBeUndefined();
+    expect(peerOutbox({ id: 'm-1', agentId: '.claude:1', status: 'queued', createdAt: 0, updatedAt: 0 }, m)).toMatchObject({ id: 'alice~m-1', agentId: 'alice~.claude:1' });
+    expect(peerTerminalInit({ agentId: '.claude:1', entries: [], truncated: false }, m).agentId).toBe('alice~.claude:1');
   });
 
   it('vagas estáveis, menor livre, e espera antes de reaproveitar', () => {

@@ -2,7 +2,7 @@
 // que o render transforma em pixels e a simulação usa para caminhos e pontos de interesse.
 import type { Dir, FloorKind, FurnitureKind, WallStyle } from '../../art/api';
 
-export type AreaKind = 'reception' | 'restroom' | 'cafe' | 'lounge' | 'room' | 'corridor';
+export type AreaKind = 'reception' | 'restroom' | 'cafe' | 'lounge' | 'room' | 'corridor' | 'meeting';
 
 /** Retângulo em tiles (coordenadas absolutas do mundo). */
 export interface TileRect {
@@ -152,6 +152,15 @@ export interface AreaLayout {
   shade?: { x: number; y: number; w: number; h: number };
   /** Retângulo (px) da placa com o nome. */
   signId?: string;
+  /**
+   * Fachada externa da área: 'north' = parede norte dá para o gramado (janelas), 'south' = mureta sul dá para
+   * o jardim. Sem o campo, vale a regra do prédio único (y = 0 ao norte, fim do prédio ao sul).
+   */
+  edge?: 'north' | 'south';
+  /** Campus (escritório combinado): prédio da máquina a que a área pertence (ausente = Commons/prédio único). */
+  bld?: string;
+  /** Texto da placa de uma área comum (ex.: o nome da máquina no saguão do prédio dela). */
+  signText?: string;
 }
 
 /** Elemento decorativo externo (árvore, arbusto, poste...) desenhado pelo próprio mundo. */
@@ -165,4 +174,6 @@ export interface ExteriorProp {
   slot?: number;
   /** O contrário: só aparece quando HÁ sala neste slot (ex.: cerca viva que fecha o caminho do jardim). */
   whenRoom?: number;
+  /** Campus: prédio (máquina) a que `slot`/`whenRoom` se referem. */
+  bld?: string;
 }

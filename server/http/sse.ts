@@ -3,6 +3,7 @@
 // Snapshots saem com throttle (~200 ms); feed e avisos vão em lote logo depois do snapshot.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { OfficeSnapshot } from '../../shared/types';
+import { FEDERATION_HEADER } from '../federation/config';
 import type { Federation } from '../federation/federation';
 import type { Office } from '../model/office';
 import { isLoopbackHost } from './guard';
@@ -67,7 +68,10 @@ export class Hub {
     return () => void this.snapshotCbs.delete(cb);
   }
 
-  /** Páginas conectadas por um Host local (localhost/127.x): quem pode responder pelo escritório. */
+  /**
+   * Páginas conectadas por um Host local (localhost/127.x): quem pode responder pelo escritório. O stream de um
+   * escritório combinado (FEDERATION_HEADER) não conta: ele informa à parte quem olha por lá (federation/presence.ts).
+   */
   get localSize(): number {
     let n = 0;
     for (const c of this.clients) if (this.local.has(c) && !c.destroyed && !c.writableEnded) n++;
@@ -89,7 +93,7 @@ export class Hub {
     res.write(frame('snapshot', snapshot));
     res.write(frame('feed', this.federation ? this.federation.recentFeed(this.office.recentFeed(50), 50) : this.office.recentFeed(50)));
     this.clients.add(res);
-    if (this.canAnswer(req)) this.local.add(res);
+    if (this.canAnswer(req) && !req.headers[FEDERATION_HEADER]) this.local.add(res);
     const drop = () => this.clients.delete(res);
     req.on('close', drop);
     res.on('close', drop);

@@ -1,11 +1,13 @@
 // Rotas da API (/api/*). Respostas JSON; rotas desconhecidas -> 404 JSON.
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { PassThrough } from 'node:stream';
 import { NAME_MAX, parseAppearanceParts, parseCharacterName, parseSeed } from '../../shared/appearance';
 import type { AccessInfo, AgentInfo, ModSummary, OfficeSnapshot, SourceInfo, UpdateStatus } from '../../shared/types';
 import type { AccountsService } from '../accounts/service';
 import { handleCodexEvent } from '../codex/http';
 import type { DayStatsService } from '../history/daystats';
 import type { Federation } from '../federation/federation';
+import { parsePresence, type RemotePresence } from '../federation/presence';
 import type { Office } from '../model/office';
 import type { CodexLive } from '../sources/codex/live';
 import type { SessionLookup } from '../sources/source';
@@ -26,8 +28,13 @@ import { HOST_WAIT_MS } from '../host-wait';
 
 export interface ApiDeps {
   office: Office;
-  /** Escritório combinado (HABBLAUD_PEERS): agentes dos pares são buscados no par dono deles. */
+  /**
+   * Escritório combinado (HABBLAUD_PEERS): os detalhes e as ações sobre o que é de um par (pedidos de permissão,
+   * mensagens, terminal, personagem, renomear a sala) vão ao par dono, depois da mesma trava local de sempre.
+   */
   federation?: Federation;
+  /** Quem olha este escritório por um escritório combinado (POST /api/federation/presence, federation/presence.ts). */
+  presence?: RemotePresence;
   hub: Hub;
   accounts: AccountsService;
   sources: () => SourceInfo[];
@@ -123,7 +130,8 @@ function isLocalOnlyPath(path: string): boolean {
     path === '/api/mod/inbox' ||
     path === '/api/mod/inbox/ack' ||
     path.startsWith('/api/codex/') ||
-    path.startsWith('/api/host/')
+    path.startsWith('/api/host/') ||
+    path === '/api/federation/presence'
   );
 }
 
@@ -207,6 +215,13 @@ export function readJson(req: IncomingMessage, max = MAX_BODY): Promise<unknown>
     });
     req.on('error', fail);
   });
+}
+
+/** Uma cópia da requisição com o corpo JSON já lido, para a rota que lê o corpo de novo (readJson). */
+function replayJson(req: IncomingMessage, body: unknown): IncomingMessage {
+  const copy = Object.assign(new PassThrough(), { headers: req.headers, method: req.method, url: req.url, socket: req.socket });
+  copy.end(JSON.stringify(body));
+  return copy as unknown as IncomingMessage;
 }
 
 /** Resumo da verificação de versão nova para o /api/health. */
@@ -405,7 +420,7 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
         sendJson(res, 403, { error: tr('terminal desligado: ele só funciona com o Habblaud acessível apenas pelo próprio computador') });
       } else if (!trusted(req, 'terminal')) {
         sendJson(res, 403, { error: denied(req, tr('o terminal só abre pelo próprio computador (http://localhost ou http://127.0.0.1)')) });
-      } else {
+      } else if (!deps.federation?.forward(req, res, path)) {
         let id: string;
         try {
           id = decodeURIComponent(terminalMatch[1]);
@@ -431,7 +446,7 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
         sendJson(res, 403, { error: tr('responder pelo escritório desligado: só funciona com o Habblaud acessível apenas pelo próprio computador') });
       } else if (!trusted(req, 'permissions')) {
         sendJson(res, 403, { error: denied(req, tr('pedidos de permissão só são respondidos pelo próprio computador (http://localhost ou http://127.0.0.1)')) });
-      } else {
+      } else if (!deps.federation?.forward(req, res, path)) {
         deps.permissions(req, res, path);
       }
       return true;
@@ -452,7 +467,7 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
         sendJson(res, 403, { error: tr('editar o personagem desligado: só funciona com o Habblaud acessível apenas pelo próprio computador') });
       } else if (!trusted(req)) {
         sendJson(res, 403, { error: denied(req, tr('o personagem só é editado pelo próprio computador (http://localhost ou http://127.0.0.1)')) });
-      } else {
+      } else if (!deps.federation?.forward(req, res, path)) {
         let id: string;
         try {
           id = decodeURIComponent(characterMatch[1]);
@@ -625,7 +640,16 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
         });
       } else if (!trusted(req, 'messages')) {
         sendJson(res, 403, { error: denied(req, tr('mensagens só são mandadas pelo próprio computador (http://localhost ou http://127.0.0.1)')) });
-      } else {
+      } else if (deps.federation && path === '/api/messages' && method === 'POST') {
+        // O destinatário vem no corpo: lido aqui, vai ao par dono ou volta para a rota local.
+        const fed = deps.federation;
+        const messages = deps.messages;
+        readJson(req)
+          .then((body) => {
+            if (!fed.forwardMessage(res, body)) messages(replayJson(req, body), res, path);
+          })
+          .catch((err) => fail(res, err));
+      } else if (!deps.federation?.forward(req, res, path)) {
         deps.messages(req, res, path);
       }
       return true;
@@ -667,9 +691,28 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
           .then((body) => {
             const b = body as { id?: unknown; name?: unknown };
             if (typeof b?.id !== 'string' || typeof b.name !== 'string') throw new HttpError(400, tr('esperado {id, name}'));
+            if (deps.federation?.forwardRename(res, b)) return;
             const name = deps.renameRoom?.(b.id, b.name);
             if (name === undefined) throw new HttpError(404, tr('sala não encontrada'));
             sendJson(res, 200, { name });
+          })
+          .catch((err) => fail(res, err));
+      return true;
+    }
+    if (path === '/api/federation/presence') {
+      // Um escritório combinado informa quantas páginas olham por lá (federation/presence.ts): pelo túnel até o
+      // loopback deste computador, como as outras ações dele.
+      const presence = deps.presence;
+      if (method !== 'POST') methodNotAllowed(res, 'POST');
+      else if (!presence) sendJson(res, 404, { error: tr('rota desconhecida') });
+      else if (!trusted(req)) sendJson(res, 403, { error: denied(req, tr('só pelo próprio computador')) });
+      else
+        readJson(req)
+          .then((body) => {
+            const r = parsePresence(body);
+            if (!r) throw new HttpError(400, tr('esperado {from, viewers}'));
+            presence.report(r);
+            sendJson(res, 200, { ok: true });
           })
           .catch((err) => fail(res, err));
       return true;

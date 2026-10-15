@@ -1,5 +1,7 @@
 // Grade de caminhabilidade do prédio (1 célula por tile).
 //   0 = bloqueado, 1 = livre, 2 = livre porém evitado (assentos: o A* só passa se precisar).
+// A origem (ox, oy) é o tile do mundo da primeira célula: 0,0 no prédio único; no campus (escritório
+// combinado) a ala oeste cresce para x negativo.
 
 export const BLOCKED = 0;
 export const FREE = 1;
@@ -12,20 +14,27 @@ export class WalkGrid {
     readonly w: number,
     readonly h: number,
     readonly version = 0,
+    readonly ox = 0,
+    readonly oy = 0,
   ) {
     this.cells = new Uint8Array(w * h);
   }
 
   inside(x: number, y: number): boolean {
-    return x >= 0 && y >= 0 && x < this.w && y < this.h;
+    return x >= this.ox && y >= this.oy && x < this.ox + this.w && y < this.oy + this.h;
+  }
+
+  /** Índice da célula de um tile do mundo (também serve de chave única por tile). */
+  key(x: number, y: number): number {
+    return (y - this.oy) * this.w + (x - this.ox);
   }
 
   get(x: number, y: number): number {
-    return this.inside(x, y) ? this.cells[y * this.w + x] : BLOCKED;
+    return this.inside(x, y) ? this.cells[this.key(x, y)] : BLOCKED;
   }
 
   set(x: number, y: number, v: number): void {
-    if (this.inside(x, y)) this.cells[y * this.w + x] = v;
+    if (this.inside(x, y)) this.cells[this.key(x, y)] = v;
   }
 
   walkable(x: number, y: number): boolean {
@@ -58,24 +67,24 @@ export class WalkGrid {
     return null;
   }
 
-  /** BFS: conjunto de índices alcançáveis a partir de (x, y). */
+  /** BFS: conjunto de índices (ver key) alcançáveis a partir de (x, y). */
   reachableFrom(x: number, y: number): Uint8Array {
     const seen = new Uint8Array(this.w * this.h);
     if (!this.walkable(x, y)) return seen;
     const queue = new Int32Array(this.w * this.h);
     let head = 0;
     let tail = 0;
-    queue[tail++] = y * this.w + x;
-    seen[y * this.w + x] = 1;
+    queue[tail++] = this.key(x, y);
+    seen[this.key(x, y)] = 1;
     while (head < tail) {
       const i = queue[head++];
-      const cx = i % this.w;
-      const cy = (i - cx) / this.w;
+      const cx = (i % this.w) + this.ox;
+      const cy = Math.floor(i / this.w) + this.oy;
       for (let k = 0; k < 4; k++) {
         const nx = cx + (k === 0 ? 1 : k === 1 ? -1 : 0);
         const ny = cy + (k === 2 ? 1 : k === 3 ? -1 : 0);
         if (!this.walkable(nx, ny)) continue;
-        const j = ny * this.w + nx;
+        const j = this.key(nx, ny);
         if (seen[j]) continue;
         seen[j] = 1;
         queue[tail++] = j;

@@ -55,6 +55,8 @@ export type { SocialEvent } from '../api';
 export const SHELL_SOCIAL_MIN_MS = 40_000;
 /** Quem não chega ao lugar da roda em tanto tempo desiste (a roda acontece sem ele ou não acontece). */
 const GATHER_TIMEOUT_MS = 35_000;
+/** No campus (escritório combinado) a caminhada até o Commons pode levar meio minuto: espera mais. */
+const GATHER_TIMEOUT_CAMPUS_MS = 80_000;
 const SAY_MS = 2_600;
 const FLOATER_MS = 1_900;
 const MAX_FLOATERS = 24;
@@ -397,7 +399,7 @@ export class Social {
     const cy = spots.reduce((a, s) => a + s.ty, 0) / spots.length;
     const grid = this.sim.building.grid;
     const busy = this.sim.busyTiles(ch.id);
-    const taken = new Set(g.members.filter((m) => m.tile && !m.left).map((m) => m.tile!.y * grid.w + m.tile!.x));
+    const taken = new Set(g.members.filter((m) => m.tile && !m.left).map((m) => grid.key(m.tile!.x, m.tile!.y)));
     let best: { x: number; y: number } | null = null;
     let bestD = Infinity;
     // de preferência na fileira de trás (rosto para a câmera, olhando a partida); depois dos lados
@@ -406,7 +408,7 @@ export class Social {
       for (let dx = -2; dx <= 3; dx++) {
         const x = Math.round(cx) + dx;
         const y = Math.round(cy) + dy;
-        const k = y * grid.w + x;
+        const k = grid.key(x, y);
         if (grid.get(x, y) !== FREE || busy.has(k) || taken.has(k)) continue;
         if (spots.some((s) => s.tx === x && s.ty === y)) continue;
         // bem atrás de um jogador, some atrás dele
@@ -462,7 +464,8 @@ export class Social {
       }
       case 'talk':
       case 'rps': {
-        const g = spots.findFreeGroup('talk', { rng: ch.rng, filter: (grp) => grp.every(free) });
+        // no campus, papo no Commons ou no prédio de quem puxa a conversa (nunca no corredor de outra máquina)
+        const g = spots.findFreeGroup('talk', { rng: ch.rng, filter: (grp) => grp.every(free) && this.sim.spotAllowed(grp[0], ch) });
         if (!g) return null;
         return { seats: [...g], pool: [...g] };
       }
@@ -676,7 +679,7 @@ export class Social {
     const ready = need.filter((m) => m.arrived);
     const min = g.kind === 'mirror' ? 1 : KINDS[g.kind].min;
     if (ready.length === need.length && ready.length >= min) return this.begin(g, now);
-    if (now - g.createdAt < GATHER_TIMEOUT_MS) return;
+    if (now - g.createdAt < (this.sim.machines ? GATHER_TIMEOUT_CAMPUS_MS : GATHER_TIMEOUT_MS)) return;
     // alguém não chegou: segue com quem está lá (se der) ou desfaz
     if (!KINDS[g.kind].match && ready.length >= min) {
       for (const m of need) if (!m.arrived) this.dropMember(g, m);

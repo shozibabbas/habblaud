@@ -6,7 +6,7 @@
 import { request as httpRequest, type ClientRequest, type IncomingMessage, type RequestOptions } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import type { FeedItem, Notice, OfficeSnapshot } from '../../shared/types';
-import type { PeerConfig } from './config';
+import { FEDERATION_HEADER, type PeerConfig } from './config';
 
 /** Sem nada do par (nem o ping de 15 s) por este tempo: a conexão é dada como morta e refeita. */
 const STALL_MS = 45_000;
@@ -21,7 +21,7 @@ export const defaultRequest: RequestFn = (url, opts, cb) => (url.protocol === 'h
 
 /** Cabeçalhos de todo pedido a um par. */
 export function peerHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  return { Host: 'localhost', 'User-Agent': 'habblaud-federation', ...extra };
+  return { Host: 'localhost', 'User-Agent': 'habblaud-federation', [FEDERATION_HEADER]: '1', ...extra };
 }
 
 export interface PeerState {
@@ -203,16 +203,21 @@ function isSnapshot(v: unknown): v is OfficeSnapshot {
   return !!s && typeof s === 'object' && Array.isArray(s.rooms) && Array.isArray(s.agents) && Array.isArray(s.accounts) && !!s.meta;
 }
 
-/** GET de JSON num par (detalhes de um agente etc.), com prazo. */
+/** Pedido JSON a um par (GET dos detalhes de um agente, POST da presença...), com prazo. */
 export function fetchPeerJson(
   peer: PeerConfig,
   path: string,
-  opts: { request?: RequestFn; timeoutMs?: number } = {},
+  opts: { request?: RequestFn; timeoutMs?: number; method?: string; body?: unknown } = {},
 ): Promise<{ status: number; body: unknown }> {
   const request = opts.request ?? defaultRequest;
+  const data = opts.body === undefined ? undefined : JSON.stringify(opts.body);
+  const headers = peerHeaders({
+    Accept: 'application/json',
+    ...(data === undefined ? {} : { 'Content-Type': 'application/json', 'Content-Length': String(Buffer.byteLength(data)) }),
+  });
   return new Promise((resolve, reject) => {
     const url = new URL(path, peer.url);
-    const req = request(url, { method: 'GET', headers: peerHeaders({ Accept: 'application/json' }) }, (res) => {
+    const req = request(url, { method: opts.method ?? 'GET', headers }, (res) => {
       res.setEncoding('utf8');
       let raw = '';
       res.on('data', (c: string) => {
@@ -230,6 +235,6 @@ export function fetchPeerJson(
     });
     req.setTimeout(opts.timeoutMs ?? 5_000, () => req.destroy(new Error('o par não respondeu a tempo')));
     req.on('error', reject);
-    req.end();
+    req.end(data);
   });
 }

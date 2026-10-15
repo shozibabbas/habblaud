@@ -7,8 +7,8 @@ import { DEFAULT_WORLD_OPTIONS, seasonalThemeFor, type Selection, type SocialEve
 import { loadWorldAssets, type WorldAssets } from './assets';
 import { Camera, overviewFrame } from './camera';
 import { createDebug, type WorldDebug } from './debug';
-import { BUILDING_H, COL_W } from './constants';
-import { inRect } from './layout/geometry';
+import { campusMockFrom, mockCampusSnapshot } from './campus-mock';
+import { inRect, rectPx } from './layout/geometry';
 import { attachInput, type Hit } from './input';
 import { rebaseSnapshot } from './playback';
 import { Overlay } from './render/overlay';
@@ -46,7 +46,9 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
   let hiddenAt = 0;
   let userMoved = false;
   let framed = false;
-  let lastCols = -1;
+  let lastKey = '';
+  /** Demonstração do campus no modo mock (?mock=1&machines=4). */
+  const campusMock = store.mock && typeof location !== 'undefined' ? campusMockFrom(location.search) : null;
   const abort = new AbortController();
 
   // ------------------------------------------------------------------ tamanho/DPR
@@ -65,7 +67,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     updateBounds();
   };
 
-  const buildingRect = () => ({ x: 0, y: 0, w: sim.building.cols * COL_W * TILE, h: BUILDING_H * TILE });
+  // o prédio (no campus: todos os prédios e os caminhos entre eles)
+  const buildingRect = () => rectPx(sim.building.rect);
 
   const updateBounds = () => {
     const b = buildingRect();
@@ -199,8 +202,9 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
   // ------------------------------------------------------------------ dados
 
   const onSnapshot = () => {
-    const snap = store.snapshot;
-    if (!snap) return;
+    const raw = store.snapshot;
+    if (!raw) return;
+    const snap = campusMock ? mockCampusSnapshot(raw, campusMock) : raw;
     try {
       // No timelapse, os horários do snapshot vão para o relógio do mundo (world/playback.ts).
       if (playback) sim.applySnapshot(rebaseSnapshot(snap, worldNow - snap.serverTime), worldNow);
@@ -244,8 +248,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
         events.length = 0;
       }
       renderer.sync(seasonalThemeFor(options.theme, new Date()));
-      if (sim.building.cols !== lastCols) {
-        lastCols = sim.building.cols;
+      if (sim.building.key !== lastKey) {
+        lastKey = sim.building.key;
         updateBounds();
         if (!framed && sim.initialized) {
           overview(false);
@@ -330,7 +334,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     overlay = new Overlay(renderer.ctx, sim, renderer, camera);
     debug = createDebug(sim, renderer, camera, markMoved);
     cues = new SoundCues(sim, camera);
-    lastCols = -1;
+    lastKey = '';
     setHover(null);
   };
 

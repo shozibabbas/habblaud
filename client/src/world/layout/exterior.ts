@@ -22,6 +22,10 @@ export interface ExteriorLayout {
 /** Fechamento do corredor e pátio de um slot sem sala. */
 export interface SlotShell {
   slot: number;
+  /** Lado do corredor do slot. */
+  side: 'north' | 'south';
+  /** Campus: prédio (máquina) do slot. */
+  bld?: string;
   rect: TileRect;
   walls: WallSegment[];
   windows: WallItemPlacement[];
@@ -108,8 +112,11 @@ export function layoutExterior(cols: number): ExteriorLayout {
   };
 }
 
-/** Parede externa + jardim de um slot vazio: deck de madeira com mesas e guarda-sóis, canteiros e caminho. */
-export function slotShell(slot: number, lastColumn: boolean): SlotShell {
+/**
+ * Parede externa + jardim de um slot vazio: deck de madeira com mesas e guarda-sóis, canteiros e caminho.
+ * `capWest`: o fim do prédio fica a oeste (ala oeste do campus, que cresce para a esquerda).
+ */
+export function slotShell(slot: number, lastColumn: boolean, capWest = false): SlotShell {
   const col = slotColumn(slot);
   const side = slotSide(slot);
   const rect = cellRect(col, side);
@@ -135,7 +142,7 @@ export function slotShell(slot: number, lastColumn: boolean): SlotShell {
     [3, 8, 13].forEach((cx, i) =>
       windows.push({ id: `shell:${slot}:janela${i}`, kind: 'window', cx: x0 + cx * TILE, baseY: CORRIDOR_Y * TILE, on: 'face', order: 0 }),
     );
-    if (lastColumn) walls.push({ kind: 'cap', x: x0 + W - TILE / 2, y: fy, w: TILE / 2, h: 2 * TILE, style: EXTERIOR_WALL });
+    if (lastColumn) walls.push({ kind: 'cap', x: capWest ? x0 : x0 + W - TILE / 2, y: fy, w: TILE / 2, h: 2 * TILE, style: EXTERIOR_WALL });
     // caminho do gramado até o deck, deck no meio e canteiros sob as janelas
     floors.push({ kind: 'sidewalk', x: x0 + T(7), y: T(rect.y), w: T(2), h: T(3), seed: slot });
     deck(3, 3, 10, 5);
@@ -151,7 +158,7 @@ export function slotShell(slot: number, lastColumn: boolean): SlotShell {
   } else {
     // mureta externa fechando o corredor (linha 17) e jardim abaixo, ligado à calçada da rua
     walls.push({ kind: 'south', x: x0, y: SOUTH_Y * TILE, w: W, style: EXTERIOR_WALL });
-    if (lastColumn) walls.push({ kind: 'cap', x: x0 + W - TILE / 2, y: SOUTH_Y * TILE, w: TILE / 2, h: TILE, style: EXTERIOR_WALL });
+    if (lastColumn) walls.push({ kind: 'cap', x: capWest ? x0 : x0 + W - TILE / 2, y: SOUTH_Y * TILE, w: TILE / 2, h: TILE, style: EXTERIOR_WALL });
     floors.push({ kind: 'sidewalk', x: x0 + T(7), y: T(rect.y + 1), w: T(2), h: T(rect.h - 1), seed: slot });
     // trecho entre a fachada e a calçada: só existe enquanto o slot está vazio (a cerca viva fecha)
     props.push({ kind: 'paving', x: x0 + T(7), y: T(BUILDING_H), seed: slot, slot });
@@ -167,5 +174,5 @@ export function slotShell(slot: number, lastColumn: boolean): SlotShell {
     props.push({ kind: rng() < 0.5 ? 'pine' : 'tree', x: x0 + T(15) - 6, y: T(rect.y + 11) + 4, seed: seed(), slot });
     props.push({ kind: 'rock', x: x0 + T(14), y: T(rect.y + 2) + 4, seed: slot + 3, slot });
   }
-  return { slot, rect, walls, windows, floors, props };
+  return { slot, side, rect, walls, windows, floors, props };
 }

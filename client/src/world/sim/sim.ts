@@ -1,15 +1,17 @@
 // Simulação do escritório: concilia snapshots do servidor com os personagens e salas do mundo,
 // planeja comportamentos e executa as filas de passos a cada frame.
 import { partsKey } from '../../../../shared/appearance';
-import type { AgentInfo, OfficeSnapshot, Provider, RoomInfo } from '../../../../shared/types';
+import type { AgentInfo, MachineStatus, OfficeSnapshot, Provider, RoomInfo } from '../../../../shared/types';
 import type { ArtModule, Dir, RoomTheme } from '../../art/api';
 import type { WorldOptions } from '../api';
-import { COL_W, COMPACT_DELAY_MS, DISMANTLE_DELAY_MS, FOOT_DX, FOOT_DY, MISSING_DEBOUNCE_MS, RUN_SPEED, TILE, WALK_SPEED } from '../constants';
+import { COL_W, COMPACT_DELAY_MS, CORE_COLS, DISMANTLE_DELAY_MS, FOOT_DX, FOOT_DY, MISSING_DEBOUNCE_MS, RUN_SPEED, TILE, WALK_SPEED } from '../constants';
 import { assembleBuilding, type BuildingLayout } from '../layout/building';
+import { assembleCampus, campusBuilding, layoutCampus, roomOffset, type CampusBuilding, type CampusMachineInput } from '../layout/campus';
 import { RECEPTION_ID } from '../layout/core';
 import { columnsFor, inRect } from '../layout/geometry';
 import { layoutProjectRoom } from '../layout/room';
-import type { SpotDef, SpotKind } from '../layout/types';
+import { translateArea } from '../layout/translate';
+import type { AreaLayout, SpotDef, SpotKind } from '../layout/types';
 import { PathFinder } from '../path/astar';
 import { BLOCKED, FREE, SEAT } from '../path/grid';
 import { PROGRAM_SEED } from '../social/gathering';
@@ -114,8 +116,15 @@ export class Sim {
   /** Festa e alarme das salas (eventos do GitHub; sim/github.ts). */
   readonly roomFx = new RoomFxState();
   private lastSnapshot: OfficeSnapshot | null = null;
-  /** Desde quando há uma vaga livre antes da última sala (0 = não há). */
-  private gapSince = 0;
+  /**
+   * Campus (escritório combinado com 2+ máquinas em meta.machines): as máquinas, na ordem do snapshot. null =
+   * prédio único (o escritório de sempre).
+   */
+  machines: Map<string, MachineStatus> | null = null;
+  /** Lugar fixo de cada máquina no campus (ver layout/campus.ts): não muda enquanto a máquina existir. */
+  private places = new Map<string, number>();
+  /** Desde quando há uma vaga livre antes da última sala, por prédio (0 = não há). */
+  private gapSince = new Map<string, number>();
   private moveSeq = 0;
   private shrinkPending = false;
   private nextHousekeeping = 0;
@@ -147,8 +156,9 @@ export class Sim {
     this.initialized = true;
     this.accounts = new Map(snap.accounts.map((a) => [a.id, { short: a.short, color: a.color, name: a.name, ...(a.provider === 'codex' ? { provider: a.provider } : {}) }]));
 
+    // ---- campus (escritório combinado): máquinas e lugares antes das salas, que dependem deles
+    let layoutDirty = this.syncMachines(snap, now);
     // ---- salas
-    let layoutDirty = false;
     const listed = new Set<string>();
     // na ordem de chegada (slot do servidor): na carga inicial as salas ocupam as vagas 0, 1, 2... nessa ordem
     for (const r of [...snap.rooms].sort((a, b) => a.slot - b.slot)) {
@@ -231,21 +241,140 @@ export class Sim {
     } catch {
       theme = FALLBACK_THEME;
     }
-    // a primeira vaga livre do prédio (o slot do servidor só dá a ordem de chegada)
-    const slot = this.freeSlot();
-    const layout = layoutProjectRoom({ id: r.id, slot, seed: r.seed }, theme);
+    // a primeira vaga livre do prédio (o slot do servidor só dá a ordem de chegada); no campus, do prédio da máquina
+    const bld = this.roomBld(r);
+    const slot = this.freeSlot(bld);
+    const layout = this.roomLayout(r.id, slot, r.seed, theme, bld);
     const rs = new RoomState(r, theme, layout, first ? 'ready' : 'building', now, first, slot);
+    rs.bld = bld;
     this.rooms.set(r.id, rs);
     return rs;
   }
 
-  /** Menor vaga sem sala (contando as que ainda estão desmontando). */
-  private freeSlot(): number {
+  /** Menor vaga sem sala no prédio `bld` (contando as que ainda estão desmontando). */
+  private freeSlot(bld = ''): number {
     const used = new Set<number>();
-    for (const r of this.rooms.values()) if (r.phase !== 'gone') used.add(r.slot);
+    for (const r of this.rooms.values()) if (r.phase !== 'gone' && r.bld === bld) used.add(r.slot);
     let slot = 0;
     while (used.has(slot)) slot++;
     return slot;
+  }
+
+  // =================================================================== campus (escritório combinado)
+
+  /** Máquina local (dona das salas sem `machine`). */
+  private localMachine(): string {
+    if (this.machines) for (const m of this.machines.values()) if (m.local) return m.id;
+    return 'local';
+  }
+
+  /** Prédio de uma sala: a máquina dela no campus; '' no prédio único. */
+  private roomBld(r: RoomInfo): string {
+    return this.machines ? (r.machine?.id ?? this.localMachine()) : '';
+  }
+
+  /** Prédio (máquina) de um personagem: o da sala dele (ou o da máquina do agente). '' no prédio único. */
+  charBld(ch: Character): string {
+    if (!this.machines) return '';
+    return this.rooms.get(ch.roomId)?.bld || ch.info.machine?.id || this.localMachine();
+  }
+
+  /** Máquina desconectada (o prédio fica apagado e os agentes dela, esmaecidos). */
+  machineOffline(bld: string): boolean {
+    return !!bld && this.machines?.get(bld)?.online === false;
+  }
+
+  /** Campus: o lugar de um spot não é o prédio de outra máquina (passeios, rodas de conversa). */
+  spotAllowed(s: SpotDef, ch: Character): boolean {
+    if (!this.machines) return true;
+    const bld = this.areaBld.get(s.areaId);
+    return !bld || bld === this.charBld(ch);
+  }
+
+  /** Prédio de cada área fixa e sala (campus). */
+  private areaBld = new Map<string, string>();
+
+  /** Moldura (posição) do prédio de uma máquina; a largura não importa para deslocar salas. */
+  private frameOf(bld: string): CampusBuilding {
+    const m = this.machines?.get(bld);
+    return campusBuilding({ id: bld, name: m?.name ?? bld, local: !!m?.local, online: m?.online !== false, place: this.places.get(bld) ?? 0, cols: 1 });
+  }
+
+  /** Layout de uma sala de projeto: no campus, deslocado para a coluna certa do prédio da máquina. */
+  private roomLayout(id: string, slot: number, seed: number, theme: RoomTheme, bld: string): AreaLayout {
+    const base = layoutProjectRoom({ id, slot, seed }, theme);
+    if (!this.machines || !bld) return base;
+    const { dx, dy } = roomOffset(this.frameOf(bld), slot);
+    const a = translateArea(base, dx, dy);
+    a.bld = bld;
+    return a;
+  }
+
+  /**
+   * Máquinas do snapshot: com 2+ em meta.machines o mundo vira um campus (Commons + um prédio por máquina). Cada
+   * máquina ganha um lugar fixo (a local, o 0: leste do Commons). Retorna true se a forma do campus mudou.
+   */
+  private syncMachines(snap: OfficeSnapshot, now: number): boolean {
+    const list = snap.meta?.machines;
+    const was = this.machines !== null;
+    if (!list || list.length < 2) {
+      if (!was) return false;
+      this.machines = null;
+      this.places.clear();
+      this.switchMode(now);
+      return true;
+    }
+    const next = new Map<string, MachineStatus>();
+    for (const m of list) next.set(m.id, m);
+    for (const r of snap.rooms) if (r.machine && !next.has(r.machine.id)) next.set(r.machine.id, { ...r.machine, online: true, since: now });
+    // máquina que saiu da lista mas ainda tem sala montada: o prédio fica (apagado) até a última sala sair
+    for (const r of this.rooms.values()) {
+      if (r.present && r.bld && !next.has(r.bld)) next.set(r.bld, { id: r.bld, name: r.info.machine?.name ?? r.bld, online: false, since: now });
+    }
+    for (const id of [...this.places.keys()]) if (!next.has(id)) this.places.delete(id);
+    for (const m of [...next.values()].sort((a, b) => Number(!!b.local) - Number(!!a.local))) {
+      if (this.places.has(m.id)) continue;
+      const used = new Set(this.places.values());
+      let p = 0;
+      while (used.has(p)) p++;
+      this.places.set(m.id, p);
+    }
+    const sig = (ms: Map<string, MachineStatus>) => [...ms.values()].map((m) => `${m.id}:${m.name}:${m.online ? 1 : 0}`).join('|');
+    const changed = !was || sig(next) !== sig(this.machines!);
+    this.machines = next;
+    if (!was) this.switchMode(now);
+    return changed;
+  }
+
+  /**
+   * O escritório passou de prédio único para campus (ou o contrário): as salas são remontadas no lugar novo e todos
+   * vão direto para os seus lugares (como ao voltar de uma aba oculta). Na carga inicial não há ninguém ainda.
+   */
+  private switchMode(now: number): void {
+    for (const [id, r] of this.rooms) {
+      if (r.ghost) {
+        this.rooms.delete(id);
+        continue;
+      }
+      r.bld = this.roomBld(r.info);
+    }
+    // vagas de novo, na ordem de chegada, sem buracos (cada prédio a partir do 0)
+    const next = new Map<string, number>();
+    for (const r of [...this.rooms.values()].sort((a, b) => a.slot - b.slot)) {
+      const k = next.get(r.bld) ?? 0;
+      next.set(r.bld, k + 1);
+      r.slot = k;
+      r.layout = this.roomLayout(r.id, r.slot, r.seed, r.theme, r.bld);
+      r.version++;
+    }
+    this.elevators.length = 0;
+    this.relayout(true);
+    if (this.chars.size) this.fastForward(now);
+  }
+
+  /** Elevadores novos (prédios que surgiram no campus); os existentes mantêm o índice. */
+  private syncElevators(): void {
+    for (const s of this.spots.ofKind('elevator')) if (!this.elevators.some((e) => e.spotId === s.id)) this.elevators.push(new Elevator(this.elevators.length, s.id));
   }
 
   private updateAgent(ch: Character, a: AgentInfo, now: number): void {
@@ -482,9 +611,25 @@ export class Sim {
   }
 
   private pickElevator(ch: Character): Elevator {
+    if (this.machines) return this.pickCampusElevator(ch);
     let best = this.elevators[0];
     for (const e of this.elevators) if (e.load < best.load || (e.load === best.load && ch.rng() < 0.5)) best = e;
     return best;
+  }
+
+  /** Campus: um dos elevadores do saguão do prédio da máquina do personagem. */
+  private pickCampusElevator(ch: Character): Elevator {
+    const lobby = this.frameOf(this.charBld(ch)).lobbyId;
+    let best: Elevator | null = null;
+    let any: Elevator | null = null;
+    for (const e of this.elevators) {
+      const s = this.spots.get(e.spotId);
+      if (!s) continue;
+      any ??= e;
+      if (s.areaId !== lobby) continue;
+      if (!best || e.load < best.load || (e.load === best.load && ch.rng() < 0.5)) best = e;
+    }
+    return best ?? any ?? this.elevators[0];
   }
 
   // =================================================================== layout
@@ -492,6 +637,10 @@ export class Sim {
   /** Recalcula o prédio (largura, grade, spots) a partir das salas presentes. */
   relayout(force = false): void {
     const present = [...this.rooms.values()].filter((r) => r.present);
+    if (this.machines) {
+      this.applyBuilding(this.campusLayout(present, force));
+      return;
+    }
     let cols = columnsFor(present.map((r) => r.slot));
     const cur = this.building.cols;
     if (cols < cur && !force) {
@@ -502,15 +651,49 @@ export class Sim {
         this.shrinkPending = true;
       } else this.shrinkPending = false;
     } else this.shrinkPending = false;
-    const building = assembleBuilding(
-      cols,
+    this.applyBuilding(
+      assembleBuilding(
+        cols,
+        present.map((r) => r.layout),
+        this.layoutVersion + 1,
+      ),
+    );
+  }
+
+  /** Campus: largura de cada prédio pelas salas dele (só encolhe quando ninguém está na ponta que some). */
+  private campusLayout(present: RoomState[], force: boolean): BuildingLayout {
+    this.shrinkPending = false;
+    const inputs: CampusMachineInput[] = [];
+    for (const m of this.machines!.values()) {
+      let cols = columnsFor(present.filter((r) => r.bld === m.id).map((r) => r.slot)) - CORE_COLS;
+      const input: CampusMachineInput = { id: m.id, name: m.name, local: !!m.local, online: m.online !== false, place: this.places.get(m.id) ?? 0, cols };
+      const cur = this.building.campus?.buildings.find((b) => b.id === m.id);
+      if (cur && cur.place === input.place && cols < cur.cols && !force) {
+        const nb = campusBuilding(input);
+        const lost = cur.wing === 'east' ? { x: nb.rect.x + nb.rect.w - 1, y: cur.y, w: cur.rect.w - nb.rect.w + 1, h: cur.rect.h } : { x: cur.rect.x, y: cur.y, w: cur.rect.w - nb.rect.w + 1, h: cur.rect.h };
+        if ([...this.chars.values()].some((c) => !c.gone && inRect(lost, c.tx, c.ty))) {
+          cols = cur.cols;
+          this.shrinkPending = true;
+        }
+      }
+      inputs.push({ ...input, cols });
+    }
+    return assembleCampus(
+      layoutCampus(inputs),
       present.map((r) => r.layout),
       this.layoutVersion + 1,
     );
+  }
+
+  /** Troca o prédio (ou campus) pronto: grade, spots, elevadores e planos que ficaram velhos. */
+  private applyBuilding(building: BuildingLayout): void {
     this.building = building;
+    this.areaBld.clear();
+    for (const a of [...building.areas, ...building.rooms]) if (a.bld) this.areaBld.set(a.id, a.bld);
     this.layoutVersion++;
     this.finder.setGrid(building.grid);
     const lost = this.spots.setSpots(building.spots);
+    this.syncElevators();
     for (const { owner } of lost) {
       const ch = this.chars.get(owner);
       if (!ch) continue;
@@ -619,18 +802,25 @@ export class Sim {
    * vez, só sala pronta e com a sessão aberta; o prédio encolhe quando o endereço antigo é desmontado.
    */
   private compact(now: number): void {
-    const free = this.freeSlot();
+    if (!this.machines) return this.compactIn('', now);
+    // no campus, cada prédio compacta as próprias salas
+    for (const id of this.machines.keys()) this.compactIn(id, now);
+  }
+
+  private compactIn(bld: string, now: number): void {
+    const free = this.freeSlot(bld);
     let far: RoomState | null = null;
     for (const r of this.rooms.values()) {
-      if (r.slot > free && !r.ghost && r.listed && r.phase === 'ready' && (!far || r.slot > far.slot)) far = r;
+      if (r.bld === bld && r.slot > free && !r.ghost && r.listed && r.phase === 'ready' && (!far || r.slot > far.slot)) far = r;
     }
     if (!far) {
-      this.gapSince = 0;
+      this.gapSince.set(bld, 0);
       return;
     }
-    if (!this.gapSince) this.gapSince = now;
-    if (now - this.gapSince < COMPACT_DELAY_MS) return;
-    this.gapSince = 0;
+    const since = this.gapSince.get(bld) || now;
+    this.gapSince.set(bld, since);
+    if (now - since < COMPACT_DELAY_MS) return;
+    this.gapSince.set(bld, 0);
     this.moveRoom(far, free, now);
   }
 
@@ -643,8 +833,9 @@ export class Sim {
   moveRoom(room: RoomState, slot: number, now: number): void {
     const before = room.layout;
     const ghostId = `${room.id}#mudança${++this.moveSeq}`;
-    const ghostLayout = layoutProjectRoom({ id: ghostId, slot: room.slot, seed: room.seed }, room.theme);
+    const ghostLayout = this.roomLayout(ghostId, room.slot, room.seed, room.theme, room.bld);
     const ghost = new RoomState({ ...room.info, id: ghostId, seed: room.seed }, room.theme, ghostLayout, 'ready', now, false, room.slot);
+    ghost.bld = room.bld;
     ghost.ghost = true;
     ghost.listed = false;
     ghost.unlistedAt = now;
@@ -659,7 +850,7 @@ export class Sim {
     });
 
     room.slot = slot;
-    room.layout = layoutProjectRoom({ id: room.id, slot, seed: room.seed }, room.theme);
+    room.layout = this.roomLayout(room.id, slot, room.seed, room.theme, room.bld);
     room.setPhase('building', now);
     room.lightOn = false;
     room.lightAt = -1e9;
@@ -935,7 +1126,13 @@ export class Sim {
 
   private stepElevOut(ch: Character, s: Extract<Step, { t: 'elevOut' }>, dt: number, now: number): boolean {
     const el = this.elevators[s.elev] ?? this.elevators[0];
-    const spot = this.spots.get(el.spotId)!;
+    const spot = el && this.spots.get(el.spotId);
+    if (!spot) {
+      // o prédio do elevador sumiu (campus): aparece onde está
+      ch.alpha = 1;
+      ch.inside = false;
+      return true;
+    }
     ch.dir = 'down';
     if (s.phase === 0) {
       ch.alpha = 0;
@@ -981,7 +1178,11 @@ export class Sim {
 
   private stepElevIn(ch: Character, s: Extract<Step, { t: 'elevIn' }>, dt: number, now: number): boolean {
     const el = this.elevators[s.elev] ?? this.elevators[0];
-    const spot = this.spots.get(el.spotId)!;
+    const spot = el && this.spots.get(el.spotId);
+    if (!spot) {
+      ch.inside = true;
+      return true;
+    }
     if (s.phase === 0) {
       ch.dir = 'up';
       ch.setPose('stand');
@@ -1255,7 +1456,7 @@ export class Sim {
   /** Tile livre para alguém ficar em pé (sem assento, sem spot e sem outra pessoa). */
   private overflowFree(x: number, y: number, ch: Character, busy = this.busyTiles(ch.id)): boolean {
     const grid = this.building.grid;
-    if (grid.get(x, y) !== FREE || busy.has(y * grid.w + x)) return false;
+    if (grid.get(x, y) !== FREE || busy.has(grid.key(x, y))) return false;
     for (const s of this.spots.all()) if (s.tx === x && s.ty === y) return false;
     return true;
   }
@@ -1281,7 +1482,7 @@ export class Sim {
           [-1, 0],
           [0, 1],
           [0, -1],
-        ] as const) if (busy.has((y + dy) * grid.w + x + dx)) crowd++;
+        ] as const) if (busy.has(grid.key(x + dx, y + dy))) crowd++;
         const backed = solidAt(0, -1) || solidAt(0, 1) ? 2 : solidAt(1, 0) || solidAt(-1, 0) ? 1 : 0;
         const squeezed = (solidAt(1, 0) && solidAt(-1, 0)) || (solidAt(0, 1) && solidAt(0, -1)) ? 3 : 0;
         const score = backed - squeezed - crowd * 3 - (Math.abs(x - ch.tx) + Math.abs(y - ch.ty)) * 0.05 + ch.rng() * 0.8;
@@ -1295,7 +1496,9 @@ export class Sim {
   }
 
   private lobbyTile(ch: Character): { x: number; y: number } {
-    const reception = this.building.core.find((a) => a.id === RECEPTION_ID)!;
+    // no campus, o saguão do prédio da própria máquina
+    const lobby = this.machines ? this.building.areas.find((a) => a.id === this.frameOf(this.charBld(ch)).lobbyId) : undefined;
+    const reception = lobby ?? this.building.core.find((a) => a.id === RECEPTION_ID)!;
     const r = reception.rect;
     for (let k = 0; k < 20; k++) {
       const x = r.x + 2 + Math.floor(ch.rng() * 12);
@@ -1418,7 +1621,7 @@ export class Sim {
       const y = target.ty + dy;
       const cell = grid.get(x, y);
       if (cell === 0) continue;
-      const d = Math.abs(x - from.tx) + Math.abs(y - from.ty) + (cell === SEAT ? 20 : 0) + (busy.has(y * grid.w + x) ? 40 : 0) + (dx && dy ? 3 : 0);
+      const d = Math.abs(x - from.tx) + Math.abs(y - from.ty) + (cell === SEAT ? 20 : 0) + (busy.has(grid.key(x, y)) ? 40 : 0) + (dx && dy ? 3 : 0);
       if (d < bestD) {
         bestD = d;
         best = { x, y };
@@ -1429,21 +1632,21 @@ export class Sim {
 
   /** Tiles (índice y*w+x) onde há alguém parado ou indo parar, exceto `a` e `b`. */
   busyTiles(a: string, b?: string): Set<number> {
-    const w = this.building.grid.w;
+    const grid = this.building.grid;
     const out = new Set<number>();
     for (const c of this.chars.values()) {
       if (c.gone || c.id === a || c.id === b) continue;
-      out.add(c.ty * w + c.tx);
+      out.add(grid.key(c.tx, c.ty));
       const go = c.step?.t === 'go' ? c.step : c.queue.find((s): s is Extract<Step, { t: 'go' }> => s.t === 'go');
-      if (go) out.add(go.ty * w + go.tx);
-      if (c.standTile) out.add(c.standTile.y * w + c.standTile.x);
+      if (go) out.add(grid.key(go.tx, go.ty));
+      if (c.standTile) out.add(grid.key(c.standTile.x, c.standTile.y));
     }
     return out;
   }
 
   private randomFree(kinds: SpotKind[], ch: Character): SpotDef | null {
     const cands: SpotDef[] = [];
-    for (const k of kinds) for (const s of this.spots.ofKind(k)) if (this.spots.isFree(s.id, ch.id)) cands.push(s);
+    for (const k of kinds) for (const s of this.spots.ofKind(k)) if (this.spots.isFree(s.id, ch.id) && this.spotAllowed(s, ch)) cands.push(s);
     if (!cands.length) return null;
     return cands[Math.floor(ch.rng() * cands.length)];
   }

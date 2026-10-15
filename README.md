@@ -699,8 +699,16 @@ In Docker, put both in `.env` and use `http://host.docker.internal:<port>` for t
 - Clicking an agent from another computer fetches its details from that computer.
 - A computer that disconnects stays in the office (with its last known state) for 90 seconds, then leaves; it comes back
   on its own when the connection returns. `meta.machines` in the snapshot says which ones are connected.
-- For now the agents of other computers are read-only here: answer them in their own office (or in the hub). Answering,
-  messages and the terminal across computers are next.
+- **Actions work across computers.** Answering permission requests and questions, sending messages, the live terminal,
+  editing a character, renaming a room and stopping an agent are passed on to the computer the agent lives on. This
+  office applies its own checks first (opened from `localhost`, feature turned on), exactly as for its own agents; the
+  other computer then applies its checks too, so a feature turned off there stays off. Stopping an agent needs the
+  interactive terminal (`HABBLAUD_PTY=1`) on both sides; taking over a session only works on its own computer.
+- **Stays per computer:** session history, deliveries, *New agent*, dictation, the Codex bridge and *My day* stats show
+  this computer only.
+- Permission requests are only diverted from a terminal when someone can answer them. Each computer counts the pages
+  open on it plus the pages open on the combined office (which reports its count every 10 seconds), so a computer whose
+  agents nobody is watching keeps asking in the terminal. All computers must run this version for that count.
 
 ## Accounts and usage (5-hour and weekly)
 

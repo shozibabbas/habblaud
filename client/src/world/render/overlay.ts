@@ -8,6 +8,8 @@ import { TILE } from '../../art/api';
 import type { WorldOptions } from '../api';
 import type { Camera } from '../camera';
 import { COL_W, CORRIDOR_Y, SOUTH_Y } from '../constants';
+import { ROW_PITCH, type CampusBuilding } from '../layout/campus';
+import type { RoomState } from '../sim/room-state';
 import type { Character } from '../sim/character';
 import { shellAgeKey, shellBubbleAlpha, shellBubbleText, STORM_LIFT, unitHash } from '../sim/shell';
 import type { Sim } from '../sim/sim';
@@ -28,6 +30,8 @@ const BADGE_FONT = `700 8px ${UI_FONT}`;
 const ROOM_FONT = `700 12px ${UI_FONT}`;
 const CORE_FONT = `600 11px ${UI_FONT}`;
 const CORE_FONT_SMALL = `600 9.5px ${UI_FONT}`;
+const PLATE_FONT = `800 13px ${UI_FONT}`;
+const PLATE_TAG_FONT = `700 9px ${UI_FONT}`;
 const signFont = (size: number) => `700 ${size}px ${UI_FONT}`;
 
 /** Largura máxima dos balões (o de alerta é maior: o motivo é a informação acionável). */
@@ -52,6 +56,9 @@ const CORE_NAMES: Record<string, string> = {
   'core:copa': tr('Copa'),
   'core:lounge': tr('Lounge'),
 };
+/** Campus: sala de reunião ao sul do saguão de cada prédio e a etiqueta de máquina desconectada. */
+const MEETING_NAME = tr('Reunião');
+const OFFLINE_TEXT = tr('offline');
 
 /** 'shell' = espera de shell: balão escuro de terminal com texto verde. 'say' = fala das rodas (papo, torcida, apostas). */
 type Tone = 'info' | 'alert' | 'deliver' | 'shell' | 'say';
@@ -395,7 +402,10 @@ export class Overlay {
       if (it.type !== 'bubble' || (it.tone !== 'info' && it.tone !== 'shell' && it.tone !== 'say') || it.prio >= 75) continue;
       // por área FÍSICA (onde o personagem está agora), que é o que polui a tela
       const ch = it.ch;
-      rin.push({ room: `${Math.floor(ch.tx / COL_W)}:${ch.ty < CORRIDOR_Y ? 'n' : ch.ty < SOUTH_Y ? 'c' : 's'}`, prio: it.prio, changedAt: it.changedAt });
+      // (no campus, a linha de prédios entra na chave: cada linha tem o seu norte/corredor/sul)
+      const row = Math.floor(ch.ty / ROW_PITCH);
+      const ly = ch.ty - row * ROW_PITCH;
+      rin.push({ room: `${Math.floor(ch.tx / COL_W)}:${row}:${ly < CORRIDOR_Y ? 'n' : ly < SOUTH_Y ? 'c' : 's'}`, prio: it.prio, changedAt: it.changedAt });
       idx.push(it);
     }
     if (!idx.length) return;
@@ -411,14 +421,17 @@ export class Overlay {
     const vh = camera.viewH;
     // largura de uma coluna na tela: as pílulas não podem invadir a vizinha
     const colW = COL_W * TILE * zoom;
+    const campus = this.sim.building.campus;
+    const plates = campus ? new Map(campus.buildings.map((b) => [b.lobbyId, b])) : null;
     for (const vis of this.renderer.areas.values()) {
       const room = vis.room;
       const r = vis.layout.rect;
       const anim = room ? buildAnim(room.phase, room.progress(now)) : null;
       // texto da placa quando ela fica grande o bastante para ler; senão, o nome flutuante
       const rect = this.renderer.signRect(vis);
-      const text = room ? room.info.name : vis.id === 'core:recepcao' ? 'Habblaud' : null;
+      const text = room ? this.roomName(room) : (vis.layout.signText ?? (vis.id === 'core:recepcao' ? 'Habblaud' : null));
       const readable = !!rect && rect.h * zoom >= SIGN_MIN_PX;
+      const plate = plates?.get(vis.id);
       if (readable && rect && text && (!anim || anim.sign >= 1)) {
         const ax = this.sx(rect.x);
         const ay = this.sy(rect.y);
@@ -427,20 +440,98 @@ export class Overlay {
         if (ax + w > 0 && ax < vw && ay + h > 0 && ay < vh) {
           this.drawSignText(text, ax, ay, w, h, this.renderer.signIsDark(vis), room?.accounts ?? []);
           this.place(ax, ay, w, h);
+          if (plate && !plate.online) this.drawOfflineTag(ax + w / 2, ay + h + 3);
         }
       }
-      if (room ? readable : zoom >= 1.4) continue;
+      if (room || plate ? readable : zoom >= 1.4) continue;
       const cx = this.sx((r.x + r.w / 2) * TILE);
       const cy = this.sy(r.y * TILE + 6);
       if (cx < -200 || cx > vw + 200 || cy < -40 || cy > vh + 40) continue;
       if (room) {
         // endereço antigo de uma mudança: o nome já está na sala nova
         if (!room.present || room.ghost || (anim && anim.walls < 0.6)) continue;
-        this.drawRoomPill(room.info.name, cx, cy, colW - 8, room.accounts, this.countIn(room.id), room.theme.accent, room.lightOn);
+        this.drawRoomPill(this.roomName(room), cx, cy, colW - 8, room.accounts, this.countIn(room.id), room.theme.accent, room.lightOn);
+      } else if (plate) {
+        this.drawBuildingPlate(plate, cx, cy);
       } else if (CORE_NAMES[vis.id]) {
         this.drawCorePill(CORE_NAMES[vis.id], cx, cy, colW - 8);
+      } else if (vis.layout.kind === 'meeting') {
+        this.drawCorePill(MEETING_NAME, cx, cy, colW - 8);
       }
     }
+  }
+
+  /** Nome da sala: no campus, sem a etiqueta da máquina (o prédio já diz de qual máquina ela é). */
+  private roomName(room: RoomState): string {
+    return this.sim.building.campus ? (room.info.baseName ?? room.info.name) : room.info.name;
+  }
+
+  /**
+   * Placa flutuante de um prédio do campus (sobre o saguão): faixa na cor da máquina, o nome, quantos agentes
+   * estão lá e, se a máquina caiu, a etiqueta "offline".
+   */
+  private drawBuildingPlate(b: CampusBuilding, cx: number, cy: number): void {
+    const { ctx } = this;
+    let agents = 0;
+    for (const c of this.sim.chars.values()) if (!c.leaving && this.sim.charBld(c) === b.id) agents++;
+    const name = this.fit(PLATE_FONT, b.name, 200);
+    const tag = b.online ? (agents > 0 ? String(agents) : '') : OFFLINE_TEXT;
+    const tw = this.measure(PLATE_FONT, name);
+    const gw = tag ? this.measure(PLATE_TAG_FONT, tag) + 12 : 0;
+    const w = Math.round(tw + 30 + gw);
+    const h = 26;
+    const x = Math.round(cx - w / 2);
+    const y = Math.round(cy - h - 4);
+    ctx.save();
+    ctx.fillStyle = 'rgba(16,20,32,0.3)';
+    ctx.beginPath();
+    ctx.roundRect(x, y + 2, w, h, 8);
+    ctx.fill();
+    ctx.fillStyle = b.online ? 'rgba(22,27,40,0.94)' : 'rgba(46,50,60,0.94)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 8);
+    ctx.fill();
+    ctx.fillStyle = b.online ? b.accent : '#6b7280';
+    ctx.beginPath();
+    ctx.roundRect(x, y, 6, h, [8, 0, 0, 8]);
+    ctx.fill();
+    // bolinha de status: verde conectada, cinza desconectada
+    ctx.fillStyle = b.online ? '#4ade80' : '#9ca3af';
+    ctx.beginPath();
+    ctx.arc(x + 15, y + h / 2, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = PLATE_FONT;
+    ctx.fillStyle = b.online ? '#f3f5fa' : '#c4c8d0';
+    ctx.fillText(name, x + 23, y + h / 2 + 1);
+    if (tag) {
+      const gx = x + 23 + tw + 6;
+      ctx.fillStyle = b.online ? 'rgba(255,255,255,0.14)' : 'rgba(239,68,68,0.85)';
+      ctx.beginPath();
+      ctx.roundRect(gx, y + 6, gw - 4, h - 12, 5);
+      ctx.fill();
+      ctx.font = PLATE_TAG_FONT;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(tag, gx + 4, y + h / 2 + 0.5);
+    }
+    ctx.restore();
+    this.place(x, y, w, h);
+  }
+
+  /** Etiqueta "offline" sob a placa do saguão de uma máquina desconectada (zoom de perto). */
+  private drawOfflineTag(cx: number, y: number): void {
+    const { ctx } = this;
+    const tw = this.measure(PLATE_TAG_FONT, OFFLINE_TEXT);
+    const w = Math.round(tw + 10);
+    const h = 14;
+    const x = Math.round(cx - w / 2);
+    ctx.fillStyle = 'rgba(239,68,68,0.9)';
+    ctx.beginPath();
+    ctx.roundRect(x, Math.round(y), w, h, 4);
+    ctx.fill();
+    ctx.font = PLATE_TAG_FONT;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(OFFLINE_TEXT, x + 5, Math.round(y) + h / 2 + 0.5);
+    this.place(x, y, w, h);
   }
 
   /** Altura dos ícones sobre a cabeça, contando o balão "!" de quem viu o CI falhar (render/github-fx.ts). */

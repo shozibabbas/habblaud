@@ -7,7 +7,7 @@
 // montagem de salas); por frame, um drawImage em 'multiply' e alguns sprites de brilho em cache.
 import { TILE, type ArtModule, type ScreenMode } from '../../art/api';
 import { mulberry32 } from '../../../../shared/hash';
-import { BUILDING_H, COL_W, CORRIDOR_H, CORRIDOR_Y } from '../constants';
+import { BUILDING_H, CORRIDOR_H, ROOM_H } from '../constants';
 import type { ExteriorLayout, SlotShell } from '../layout/exterior';
 import type { RoomState } from '../sim/room-state';
 import type { Sim } from '../sim/sim';
@@ -37,8 +37,23 @@ export interface LightScene {
   readonly shells: readonly SlotShell[];
   readonly shellWindows: readonly WallVis[];
   readonly cars: readonly { x: number; y: number; dir: 1 | -1 }[];
-  roomInSlot(slot: number): RoomState | undefined;
+  roomInSlot(slot: number, bld?: string): RoomState | undefined;
+  /** Pátio (slot vazio) de uma janela de fachada. */
+  shellFor(w: WallVis): SlotShell | undefined;
   deskScreen(f: FurnVis, area: AreaVis): ScreenMode;
+}
+
+/** A parede norte da área dá para o gramado (janelas com sol e luz vazando à noite). */
+export function northFacing(vis: AreaVis): boolean {
+  const l = vis.layout;
+  return l.edge ? l.edge === 'north' : l.side ? l.side === 'north' : l.rect.y === 0;
+}
+
+/** A mureta sul da área dá para o jardim. */
+function southFacing(vis: AreaVis): boolean {
+  const l = vis.layout;
+  if (l.kind === 'corridor') return false;
+  return l.edge ? l.edge === 'south' : l.side ? l.side === 'south' : l.rect.y + l.rect.h >= BUILDING_H;
 }
 
 /** Retângulo visível (px de mundo). */
@@ -250,6 +265,12 @@ export class Lighting {
     }
   }
 
+  /** Campus: área (ou sala) do prédio de uma máquina desconectada. */
+  private offline(vis: AreaVis): boolean {
+    const bld = vis.room?.bld || vis.layout.bld;
+    return !!bld && this.sim.machineOffline(bld);
+  }
+
   /** Copa, lounge e banheiros: luz por presença. Recepção e corredor ficam sempre acesos. */
   private presenceLit(vis: AreaVis): boolean {
     const kind = vis.layout.kind;
@@ -267,6 +288,8 @@ export class Lighting {
   /** Luz (0..1) e cobertura (montagem/desmontagem) de uma área. */
   private areaLight(vis: AreaVis, now: number): { lit: number; cover: number } {
     const room = vis.room;
+    // campus: o prédio de uma máquina desconectada fica apagado
+    if (this.offline(vis)) return { lit: 0, cover: room && (room.phase === 'building' || room.phase === 'dismantling') ? buildAnim(room.phase, room.progress(now)).floor : 1 };
     if (room) {
       const cover = room.phase === 'building' || room.phase === 'dismantling' ? buildAnim(room.phase, room.progress(now)).floor : 1;
       return { lit: room.light(now), cover };
@@ -279,7 +302,10 @@ export class Lighting {
   private areaColor(vis: AreaVis, lit: number, cover: number): Rgb {
     const amb = this.ambient;
     let c: Rgb;
-    if (vis.room) {
+    if (this.offline(vis)) {
+      // prédio de máquina desconectada: tudo na penumbra, sala ou não
+      c = amb.dim;
+    } else if (vis.room) {
       // sala apagada fica neutra no mapa: o escurecimento dela é a sombra da sala (renderer)
       c = mixRgb(WHITE, amb.inside, lit);
     } else if (vis.layout.kind === 'corridor') {
@@ -320,12 +346,12 @@ export class Lighting {
   /** Tudo o que muda o mapa, em passos discretos (evita refazê-lo a cada frame). */
   private lightKey(scene: LightScene, now: number): string {
     const a = this.ambient;
-    let k = `${Math.round(a.night * 200)}|${a.outside.join(',')}|${a.inside.join(',')}|${a.dim.join(',')}|${this.sim.building.cols}`;
+    let k = `${Math.round(a.night * 200)}|${a.outside.join(',')}|${a.inside.join(',')}|${a.dim.join(',')}|${this.sim.building.key}`;
     for (const vis of scene.areas.values()) {
       const { lit, cover } = this.areaLight(vis, now);
       k += `|${vis.id}:${Math.round(lit * 24)}:${Math.round(cover * 20)}`;
     }
-    for (const sh of scene.shells) if (scene.roomInSlot(sh.slot)) k += `|s${sh.slot}`;
+    for (const sh of scene.shells) if (scene.roomInSlot(sh.slot, sh.bld)) k += `|s${sh.bld ?? ''}${sh.slot}`;
     return k;
   }
 
@@ -342,10 +368,10 @@ export class Lighting {
     const corridorLit = rgbCss(mixRgb(amb.inside, amb.dim, 0.18));
     // fechamentos do corredor nos slots vazios (fachada com janelas ao norte, mureta ao sul)
     for (const sh of scene.shells) {
-      if (scene.roomInSlot(sh.slot)) continue;
+      if (scene.roomInSlot(sh.slot, sh.bld)) continue;
       const r = sh.rect;
-      m.fillStyle = corridorLit;
-      if (r.y === 0) m.fillRect(r.x * TILE, (r.y + r.h - 2) * TILE, r.w * TILE, 2 * TILE);
+      m.fillStyle = sh.bld && this.sim.machineOffline(sh.bld) ? rgbCss(amb.dim) : corridorLit;
+      if (sh.side === 'north') m.fillRect(r.x * TILE, (r.y + r.h - 2) * TILE, r.w * TILE, 2 * TILE);
       else m.fillRect(r.x * TILE, r.y * TILE, r.w * TILE, TILE);
     }
     const lit = new Map<AreaVis, number>();
@@ -353,7 +379,8 @@ export class Lighting {
       const l = this.areaLight(vis, now);
       if (l.cover <= 0.01) continue;
       // quanto de luz a área "irradia" (janelas): salas pela luz, áreas comuns vazias na penumbra
-      lit.set(vis, vis.room ? l.lit * l.cover : this.presenceLit(vis) ? 0.4 + 0.6 * l.lit : 1);
+      const off = this.offline(vis);
+      lit.set(vis, off ? 0 : vis.room ? l.lit * l.cover : this.presenceLit(vis) ? 0.4 + 0.6 * l.lit : 1);
       const p = vis.px;
       const shade = vis.room ? vis.layout.shade : undefined;
       if (shade && l.cover >= 1) {
@@ -367,7 +394,7 @@ export class Lighting {
         m.fillRect(p.x, p.y, p.w, p.h);
       }
       // à noite, o centro das salas acesas fica mais claro que os cantos (luz do teto)
-      const glow = (vis.room ? l.lit : this.presenceLit(vis) ? l.lit : vis.layout.kind === 'corridor' ? 0 : 1) * l.cover * n;
+      const glow = off ? 0 : (vis.room ? l.lit : this.presenceLit(vis) ? l.lit : vis.layout.kind === 'corridor' ? 0 : 1) * l.cover * n;
       if (glow > 0.05) {
         const r = shade ?? p;
         m.globalCompositeOperation = 'multiply';
@@ -396,7 +423,7 @@ export class Lighting {
     for (const [vis, l] of lit) {
       // nas salas, só com a luz acesa; nas áreas comuns, abajures e máquinas ficam sempre ligados
       // (luz de vigia quando não há ninguém)
-      const on = vis.room ? vis.room.lightOn && l >= 0.3 : true;
+      const on = this.offline(vis) ? false : vis.room ? vis.room.lightOn && l >= 0.3 : true;
       if (!on) continue;
       const a = vis.room ? k * l : k;
       for (const f of vis.furniture) {
@@ -425,27 +452,27 @@ export class Lighting {
     halo: (img: HTMLCanvasElement, cx: number, cy: number, w: number, h: number, a: number) => void,
     warm: HTMLCanvasElement,
   ): void {
-    const bw = this.sim.building.cols * COL_W * TILE;
-    const bh = BUILDING_H * TILE;
     for (const [vis, l] of lit) {
-      if (l < 0.3) continue;
+      if (l < 0.3 || this.offline(vis)) continue;
       const r = vis.layout.rect;
-      if (r.y === 0) {
+      if (northFacing(vis)) {
         // janelas da parede norte -> gramado ao norte do prédio
-        for (const w of vis.wallItems) if (w.kind === 'window') halo(warm, w.cx, -12, 58, 30, 0.55 * k * l);
-      } else if (vis.layout.kind !== 'corridor' && r.y + r.h >= BUILDING_H) {
+        for (const w of vis.wallItems) if (w.kind === 'window') halo(warm, w.cx, r.y * TILE - 12, 58, 30, 0.55 * k * l);
+      } else if (southFacing(vis)) {
         // salas ao sul: brilho suave sobre a cerca viva e a calçada
-        for (const fx of [0.25, 0.75]) halo(warm, (r.x + r.w * fx) * TILE, bh + 16, 96, 30, 0.35 * k * l);
+        for (const fx of [0.25, 0.75]) halo(warm, (r.x + r.w * fx) * TILE, (r.y + r.h) * TILE + 16, 96, 30, 0.35 * k * l);
+      }
+      if (vis.layout.kind === 'corridor') {
+        // fachadas de vidro do corredor (entrada a oeste e ponta leste)
+        const cy = (r.y + CORRIDOR_H / 2) * TILE;
+        halo(warm, r.x * TILE - 20, cy, 56, 92, 0.6 * k);
+        halo(warm, (r.x + r.w) * TILE + 20, cy, 56, 92, 0.45 * k);
       }
     }
-    // fachadas de vidro do corredor (entrada a oeste e ponta leste)
-    const cy = (CORRIDOR_Y + CORRIDOR_H / 2) * TILE;
-    halo(warm, -20, cy, 56, 92, 0.6 * k);
-    halo(warm, bw + 20, cy, 56, 92, 0.45 * k);
     // janelas do corredor que dão para os pátios dos slots vazios
     for (const w of scene.shellWindows) {
-      const slot = Number(w.areaId.slice(6));
-      if (scene.roomInSlot(slot)) continue;
+      const sh = scene.shellFor(w);
+      if (!sh || scene.roomInSlot(sh.slot, sh.bld) || (sh.bld && this.sim.machineOffline(sh.bld))) continue;
       halo(warm, w.cx, w.baseY - 2 * TILE - 14, 52, 28, 0.5 * k);
     }
   }
@@ -464,6 +491,8 @@ export class Lighting {
       const p = vis.px;
       if (p.x > view.x1 + 40 || p.x + p.w < view.x0 - 40 || p.y > view.y1 + 40 || p.y + p.h < view.y0 - 40) continue;
       const room = vis.room;
+      // prédio de máquina desconectada: telas, luminárias e máquinas apagadas
+      if (this.offline(vis)) continue;
       const dark = room ? 1 - room.light(now) : 0;
       const k = Math.max(n, dark);
       if (k < 0.2) continue;
@@ -537,7 +566,7 @@ export class Lighting {
       ctx.restore();
     };
     for (const vis of scene.areas.values()) {
-      if (vis.layout.rect.y !== 0) continue;
+      if (!northFacing(vis)) continue;
       if (vis.room && vis.room.phase !== 'ready') continue;
       const ws = vis.wallItems.filter((w) => w.kind === 'window');
       if (!ws.length) continue;
@@ -545,9 +574,9 @@ export class Lighting {
       draw(ws, { x: p.x, y: p.y + 2 * TILE, w: p.w, h: p.h - 3 * TILE });
     }
     for (const sh of scene.shells) {
-      if (sh.rect.y !== 0 || scene.roomInSlot(sh.slot)) continue;
-      const ws = scene.shellWindows.filter((w) => w.areaId === `shell:${sh.slot}`);
-      draw(ws, { x: sh.rect.x * TILE, y: CORRIDOR_Y * TILE, w: sh.rect.w * TILE, h: CORRIDOR_H * TILE });
+      if (sh.side !== 'north' || scene.roomInSlot(sh.slot, sh.bld)) continue;
+      const ws = scene.shellWindows.filter((w) => scene.shellFor(w) === sh);
+      draw(ws, { x: sh.rect.x * TILE, y: (sh.rect.y + ROOM_H) * TILE, w: sh.rect.w * TILE, h: CORRIDOR_H * TILE });
     }
   }
 

@@ -90,6 +90,7 @@ festa) ou 10 min. Push só avisa. O mesmo CI visto de novo em 2 min não repete 
 | `GET /api/messages/:id` | (página) situação da mensagem (`OutboxMessage`: `queued` \| `sent` \| `delivered` \| `failed`) |
 | `POST /api/mod/inbox` | (plugin `habblaud-mensagens`) `{session, account?}`: marca a presença da sessão e entrega `{messages: InboxMessage[]}` |
 | `POST /api/mod/inbox/ack` | (plugin) `{session, results: [{id, ok, error?}]}`: confirma cada mensagem entregue (ou a falha) |
+| `POST /api/federation/presence` | (escritório combinado) `{from, viewers}`: quantas páginas olham este escritório por outra máquina; vale 30 s; só pelo próprio computador |
 
 O snapshot (SSE e `GET /api/snapshot`) leva só as últimas 8 atividades de cada agente em `recent`; o histórico
 de até 200 (inclusive o começo de transcripts longos, lido em segundo plano) vem de `GET /api/agents/:id`.
@@ -98,6 +99,18 @@ Borda (`http/guard.ts`, vale para API, estáticos e Vite): `Host` precisa ser `l
 ou um nome de `HABBLAUD_ALLOWED_HOSTS` (contra DNS rebinding) → senão 403; `POST` em `/api/*` exige
 `Content-Type: application/json` (415) e `Origin` da mesma origem ou local (403), contra CSRF. Respostas JSON
 saem com `nosniff` e `Cross-Origin-Resource-Policy: same-origin`, sem CORS.
+
+Escritório combinado (`HABBLAUD_PEERS`, `federation/`): os ids do que vem de um par ganham o prefixo `<par>~`
+(agentes, salas, contas, atividades, avisos, `permission.id` dos agentes). As ações com um id prefixado vão ao par
+dono depois da mesma trava local de sempre (`federation/forward.ts`): `GET /api/agents/:id` e `/terminal` (o stream
+SSE repassado evento a evento), `PUT|DELETE /api/agents/:id/character`, `POST /api/agents/:id/stop` (precisa do
+terminal interativo aqui e no par), `GET /api/permissions/:id` e `/decision`, `POST /api/messages` (pelo `agentId`
+do corpo) e `GET /api/messages/:id`, `POST /api/rooms/rename` (pelo `id` do corpo). O pedido sai com `Host: localhost`
+e `X-Habblaud-Federation: 1`; a resposta volta com os ids prefixados. Ficam só locais: histórico de sessões, entregas,
+Novo agente, ditado, o auxiliar do Codex e as estatísticas. O stream que o escritório combinado segue não conta como
+página olhando o par; ele informa a cada 10 s (ou quando muda) quantas páginas daqui podem responder
+(`POST /api/federation/presence`), e o par desvia os pedidos de permissão do terminal se as páginas dele mais esses
+informes somarem alguém.
 
 ## Versão nova
 

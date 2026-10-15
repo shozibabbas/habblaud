@@ -22,6 +22,11 @@ export interface PeersParse {
 
 /** Separador entre o id do par e o id original (agentes, salas, contas). Nunca aparece nos ids do Habblaud. */
 export const PEER_SEP = '~';
+/**
+ * Cabeçalho dos pedidos que um escritório combinado faz a um par. O stream que ele segue não conta como uma página
+ * olhando o par: quem olha por lá é informado à parte (POST /api/federation/presence, ver presence.ts).
+ */
+export const FEDERATION_HEADER = 'x-habblaud-federation';
 /** Id da máquina local no escritório combinado. */
 export const LOCAL_MACHINE = 'local';
 

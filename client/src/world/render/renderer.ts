@@ -5,7 +5,10 @@ import { TILE, type ArtModule, type CharacterFrameRequest, type IconName, type S
 import type { SeasonalTheme, WorldOptions } from '../api';
 import type { WorldAssets } from '../assets';
 import type { Camera } from '../camera';
-import { BUILDING_H, COL_W, CORE_COLS, CORRIDOR_Y } from '../constants';
+import { CORE_COLS, CORRIDOR_Y } from '../constants';
+import type { BuildingLayout } from '../layout/building';
+import { buildingShells, PATH_DY, PATH_H } from '../layout/campus';
+import { layoutCampusExterior } from '../layout/campus-exterior';
 import { layoutExterior, slotShell, type ExteriorLayout, type SlotShell } from '../layout/exterior';
 import { slotAt } from '../layout/geometry';
 import type { ExteriorProp } from '../layout/types';
@@ -74,6 +77,16 @@ const WEB_MAX_OUT = 9;
 /** Tom das bordas da área externa (vinheta) e do gramado além dela. */
 const VIGNETTE_ALPHA = 0.2;
 const VIGNETTE_EDGE = `rgba(18,40,26,${VIGNETTE_ALPHA})`;
+/** Campus: opacidade de quem é de uma máquina desconectada (esmaecido, "congelado" no último estado). */
+const OFFLINE_ALPHA = 0.5;
+
+/** Área externa do prédio único ou do campus. */
+function exteriorFor(b: BuildingLayout): ExteriorLayout {
+  return b.campus ? layoutCampusExterior(b.campus) : layoutExterior(b.cols);
+}
+
+/** Chave de um slot (no campus, cada prédio tem os seus). */
+const slotKey = (slot: number, bld?: string): string => (bld ? `${bld}:${slot}` : `${slot}`);
 
 export class Renderer {
   readonly ctx: CanvasRenderingContext2D;
@@ -85,7 +98,7 @@ export class Renderer {
   private base: HTMLCanvasElement | null = null;
   private baseX = 0;
   private baseY = 0;
-  private baseCols = -1;
+  private baseKey = '';
   private layoutVersion = -1;
   private assetsVersion = 0;
   private builtAssetsVersion = 0;
@@ -102,8 +115,11 @@ export class Renderer {
   /** dt do frame atual (s), para as partículas emitidas durante o desenho. */
   private dt = 0;
   private iconCount = 0;
-  private elevatorVis: WallVis[] = [];
-  private occupiedSlots = new Set<number>();
+  /** Item de parede de cada elevador -> índice em sim.elevators. */
+  private elevatorOf = new Map<string, number>();
+  private occupiedSlots = new Set<string>();
+  /** Pátio de cada janela de fachada (slots vazios). */
+  private shellOfWindow = new Map<WallVis, SlotShell>();
   /** Hora forçada (?hora=21:30 na URL ou depuração) ou null para a hora local. */
   hourOverride: number | null = parseHourParam(typeof location === 'undefined' ? '' : location.search);
   /** Relógio da hora do dia (céu, iluminação, relógio de parede); o timelapse troca pelo instante reproduzido. */
@@ -124,7 +140,7 @@ export class Renderer {
     private readonly camera: Camera,
   ) {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
-    this.exterior = layoutExterior(sim.building.cols);
+    this.exterior = exteriorFor(sim.building);
     this.lighting = new Lighting(art, sim);
   }
 
@@ -141,11 +157,11 @@ export class Renderer {
     const themeChanged = theme !== this.theme;
     this.theme = theme;
     const assetsChanged = this.builtAssetsVersion !== this.assetsVersion || themeChanged;
-    if (this.baseCols !== sim.building.cols || assetsChanged) this.buildBase();
+    if (this.baseKey !== sim.building.key || assetsChanged) this.buildBase();
     if (this.layoutVersion !== sim.layoutVersion || assetsChanged) {
       this.layoutVersion = sim.layoutVersion;
       const want = new Set<string>();
-      for (const a of [...sim.building.core, sim.building.corridor]) {
+      for (const a of sim.building.areas) {
         want.add(a.id);
         const cur = this.areas.get(a.id);
         if (!cur || cur.layout !== a || assetsChanged) this.areas.set(a.id, buildAreaVis(this.art, a, undefined, this.assets, theme));
@@ -155,13 +171,24 @@ export class Renderer {
         want.add(room.id);
       }
       for (const id of [...this.areas.keys()]) if (!want.has(id)) this.areas.delete(id);
-      this.elevatorVis = this.areas.get('core:recepcao')?.wallItems.filter((w) => w.kind === 'elevator') ?? [];
+      // cada porta de elevador desenhada segue o elevador da simulação no mesmo ponto
+      this.elevatorOf.clear();
+      for (const vis of this.areas.values()) {
+        for (const w of vis.wallItems) {
+          if (w.kind !== 'elevator') continue;
+          const i = sim.elevators.findIndex((e) => {
+            const sp = sim.spots.get(e.spotId);
+            return !!sp && sp.areaId === vis.id && Math.abs(sp.x - w.cx) < 2;
+          });
+          if (i >= 0) this.elevatorOf.set(w.id, i);
+        }
+      }
     }
     // salas: (re)constrói quando surgem, mudam de layout ou de versão (nome/tema)
     this.occupiedSlots.clear();
     for (const room of sim.rooms.values()) {
       if (!room.present) continue;
-      this.occupiedSlots.add(room.slot);
+      this.occupiedSlots.add(slotKey(room.slot, room.bld));
       const cur = this.areas.get(room.id);
       if (!cur || cur.layout !== room.layout || cur.version !== room.version || assetsChanged) {
         this.areas.set(room.id, buildAreaVis(this.art, room.layout, room, this.assets, theme));
@@ -173,9 +200,10 @@ export class Renderer {
 
   /** Camada base: área externa, pátios dos slots e fechamentos do corredor. */
   private buildBase(): void {
-    const cols = this.sim.building.cols;
-    this.baseCols = cols;
-    this.exterior = layoutExterior(cols);
+    const building = this.sim.building;
+    const cols = building.cols;
+    this.baseKey = building.key;
+    this.exterior = exteriorFor(building);
     const b = this.exterior.bounds;
     this.baseX = b.x * TILE;
     this.baseY = b.y * TILE;
@@ -192,12 +220,17 @@ export class Renderer {
     for (let x = this.baseX + 4; x < this.baseX + c.width; x += 24) ctx.fillRect(x, ly, 12, 2);
     this.shells = [];
     this.shellWindows = [];
-    for (let col = CORE_COLS; col < cols; col++) {
-      for (const side of ['north', 'south'] as const) {
-        const sh = slotShell(slotAt(col, side), col === cols - 1);
-        this.shells.push(sh);
-        paintShell(this.art, ctx, sh.floors, sh.walls);
-        for (const w of sh.windows) this.shellWindows.push(toWallVis(w, `shell:${sh.slot}`));
+    this.shellOfWindow.clear();
+    const shells: SlotShell[] = [];
+    if (building.campus) for (const b of building.campus.buildings) shells.push(...buildingShells(b));
+    else for (let col = CORE_COLS; col < cols; col++) for (const side of ['north', 'south'] as const) shells.push(slotShell(slotAt(col, side), col === cols - 1));
+    for (const sh of shells) {
+      this.shells.push(sh);
+      paintShell(this.art, ctx, sh.floors, sh.walls);
+      for (const w of sh.windows) {
+        const vis = toWallVis(w, `shell:${slotKey(sh.slot, sh.bld)}`);
+        this.shellWindows.push(vis);
+        this.shellOfWindow.set(vis, sh);
       }
     }
     this.desaturate(ctx);
@@ -246,7 +279,7 @@ export class Renderer {
       this.grass = null;
       this.clearColor = '#6f9a5a';
     }
-    this.finishBase(ctx, cols);
+    this.finishBase(ctx);
     this.base = c;
   }
 
@@ -265,16 +298,18 @@ export class Renderer {
   }
 
   /** Acabamento da camada externa: bordas levemente mais escuras (vinheta) e o capacho da entrada. */
-  private finishBase(ctx: CanvasRenderingContext2D, cols: number): void {
+  private finishBase(ctx: CanvasRenderingContext2D): void {
     const b = this.exterior.bounds;
     const x0 = b.x * TILE;
     const y0 = b.y * TILE;
     const w = b.w * TILE;
     const h = b.h * TILE;
     ctx.save();
-    // vinheta: escurece com a distância ao prédio e chega ao tom da grama "de fora" exatamente na
-    // borda da área desenhada (máscara de 1 px por tile, ampliada com suavização)
-    const bwT = cols * COL_W;
+    // vinheta: escurece com a distância ao prédio (no campus, ao conjunto de prédios) e chega ao tom da grama
+    // "de fora" exatamente na borda da área desenhada (máscara de 1 px por tile, ampliada com suavização)
+    const r = this.sim.building.rect;
+    const rx1 = r.x + r.w;
+    const ry1 = r.y + r.h;
     const smooth = (a: number, z: number, v: number) => {
       const t = Math.max(0, Math.min(1, (v - a) / Math.max(1e-6, z - a)));
       return t * t * (3 - 2 * t);
@@ -289,8 +324,8 @@ export class Renderer {
         for (let tx = 0; tx < b.w; tx++) {
           const wx = b.x + tx + 0.5;
           const wy = b.y + ty + 0.5;
-          const fx = wx < 0 ? smooth(6, -b.x, -wx) : wx > bwT ? smooth(6, b.x + b.w - bwT, wx - bwT) : 0;
-          const fy = wy < 0 ? smooth(5, -b.y, -wy) : wy > BUILDING_H ? smooth(12, b.y + b.h - BUILDING_H, wy - BUILDING_H) : 0;
+          const fx = wx < r.x ? smooth(6, r.x - b.x, r.x - wx) : wx > rx1 ? smooth(6, b.x + b.w - rx1, wx - rx1) : 0;
+          const fy = wy < r.y ? smooth(5, r.y - b.y, r.y - wy) : wy > ry1 ? smooth(12, b.y + b.h - ry1, wy - ry1) : 0;
           const i = (ty * b.w + tx) * 4;
           img.data[i] = 18;
           img.data[i + 1] = 40;
@@ -305,14 +340,15 @@ export class Renderer {
     } catch {
       // sem vinheta
     }
-    // capacho diante da fachada de vidro da entrada (oeste do corredor)
-    const my = (CORRIDOR_Y + 1.25) * TILE;
-    ctx.fillStyle = '#3f4652';
-    ctx.fillRect(-1.75 * TILE, my, 1.5 * TILE, 2.5 * TILE);
-    ctx.fillStyle = '#596170';
-    ctx.fillRect(-1.75 * TILE + 2, my + 2, 1.5 * TILE - 4, 2.5 * TILE - 4);
-    ctx.fillStyle = '#4b525f';
-    for (let y = my + 4; y < my + 2.5 * TILE - 4; y += 3) ctx.fillRect(-1.75 * TILE + 3, y, 1.5 * TILE - 6, 1);
+    // capacho diante da fachada de vidro da entrada (oeste do corredor); no campus, em cada entrada
+    const campus = this.sim.building.campus;
+    if (!campus) drawDoormat(ctx, -1.75 * TILE, (CORRIDOR_Y + 1.25) * TILE);
+    else {
+      const my = (PATH_DY + PATH_H / 2) * TILE - 1.25 * TILE;
+      drawDoormat(ctx, (campus.commons.x - 1.75) * TILE, my);
+      drawDoormat(ctx, (campus.commons.x + campus.commons.w + 0.25) * TILE, my);
+      for (const bd of campus.buildings) drawDoormat(ctx, (bd.wing === 'east' ? bd.lobbyX - 1.75 : bd.lobbyX + 16.25) * TILE, bd.y * TILE + my);
+    }
     ctx.restore();
   }
 
@@ -367,8 +403,8 @@ export class Renderer {
 
     // janelas da fachada nos slots vazios
     for (const w of this.shellWindows) {
-      const slot = Number(w.areaId.slice(6));
-      const room = this.roomInSlot(slot);
+      const sh = this.shellOfWindow.get(w);
+      const room = sh && this.roomInSlot(sh.slot, sh.bld);
       if (room && room.phase === 'ready') continue;
       if (!visible(w.cx - 24, w.baseY - 40, 48, 44)) continue;
       this.drawWindow(w, hour, t, 1);
@@ -438,7 +474,7 @@ export class Renderer {
       let alpha = 1;
       if (prop.whenRoom !== undefined) {
         // ex.: cerca viva diante do caminho do jardim — surge junto com a sala
-        const room = this.roomInSlot(prop.whenRoom);
+        const room = this.roomInSlot(prop.whenRoom, prop.bld);
         if (!room) continue;
         if (room.phase === 'building' || room.phase === 'dismantling') {
           const pr = room.progress(now);
@@ -449,7 +485,7 @@ export class Renderer {
       push(K.Prop, prop.y, prop, null, alpha);
     }
     for (const sh of this.shells) {
-      const room = this.roomInSlot(sh.slot);
+      const room = this.roomInSlot(sh.slot, sh.bld);
       let alpha = 1;
       if (room) {
         if (room.phase !== 'building' && room.phase !== 'dismantling') continue;
@@ -535,10 +571,15 @@ export class Renderer {
     for (const id of this.heads.keys()) if (!this.sim.chars.has(id)) this.heads.delete(id);
   }
 
-  roomInSlot(slot: number): RoomState | undefined {
-    if (!this.occupiedSlots.has(slot)) return undefined;
-    for (const r of this.sim.rooms.values()) if (r.slot === slot && r.present) return r;
+  roomInSlot(slot: number, bld?: string): RoomState | undefined {
+    if (!this.occupiedSlots.has(slotKey(slot, bld))) return undefined;
+    for (const r of this.sim.rooms.values()) if (r.slot === slot && r.present && r.bld === (bld ?? '')) return r;
     return undefined;
+  }
+
+  /** Janela de fachada -> pátio (slot vazio) a que pertence. */
+  shellFor(w: WallVis): SlotShell | undefined {
+    return this.shellOfWindow.get(w);
   }
 
   // =================================================================== áreas
@@ -588,7 +629,7 @@ export class Renderer {
         this.drawWindow(w, hour, now, 1, rise);
         return;
       case 'elevator': {
-        const idx = this.elevatorVis.indexOf(w);
+        const idx = this.elevatorOf.get(w.id) ?? -1;
         const state = this.sim.elevators[idx]?.state ?? 0;
         const s = wallSprites(this.art, 'elevator', w.variant, state, w.seed);
         if (!s) return;
@@ -779,6 +820,7 @@ export class Renderer {
   deskScreen(f: FurnVis, area: AreaVis): ScreenMode {
     const room = area.room;
     if (room && room.light(this.sim.now) < 0.3) return 'off';
+    if (room?.bld && this.sim.machineOffline(room.bld)) return 'off';
     const owner = f.seatSpot ? this.sim.spots.ownerOf(f.seatSpot) : undefined;
     const ch = owner ? this.sim.chars.get(owner) : undefined;
     if (!ch || ch.leaving) return 'off';
@@ -810,7 +852,7 @@ export class Renderer {
     // faixa lateral de quem anda (dois no mesmo caminho não viram um boneco de duas cabeças)
     const x = Math.round(ch.x + ch.offX);
     const y = Math.round(ch.y + ch.offY);
-    ctx.globalAlpha = ch.alpha;
+    ctx.globalAlpha = this.sim.machines && this.sim.machineOffline(this.sim.charBld(ch)) ? ch.alpha * OFFLINE_ALPHA : ch.alpha;
     // anéis no chão (seleção, hover, alerta)
     if (ch.mode === 'wait') this.drawAlertRing(x, y, now);
     if (sel.agent === ch.id) this.drawRing(x, y, '#7fe3ff', now, true);
@@ -1195,6 +1237,17 @@ export class Renderer {
       ctx.fillStyle = `rgba(8,12,36,${dark})`;
       ctx.fillRect(s.x, s.y, s.w, s.h);
     }
+    // campus: o prédio de uma máquina desconectada fica todo apagado (de dia também); os pátios, não
+    if (this.sim.machines) {
+      ctx.fillStyle = `rgba(14,18,40,${0.5 + 0.1 * n})`;
+      for (const vis of this.areas.values()) {
+        const bld = vis.room?.bld || vis.layout.bld;
+        if (!bld || !this.sim.machineOffline(bld)) continue;
+        const p = vis.px;
+        if (p.x > vx1 || p.x + p.w < vx0 || p.y > vy1 || p.y + p.h < vy0) continue;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+      }
+    }
     this.lighting.drawGlows(ctx, this, view, now);
   }
 
@@ -1207,4 +1260,14 @@ export class Renderer {
   }
 
 
+}
+
+/** Capacho diante de uma entrada de vidro (px de mundo do canto superior esquerdo). */
+function drawDoormat(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.fillStyle = '#3f4652';
+  ctx.fillRect(x, y, 1.5 * TILE, 2.5 * TILE);
+  ctx.fillStyle = '#596170';
+  ctx.fillRect(x + 2, y + 2, 1.5 * TILE - 4, 2.5 * TILE - 4);
+  ctx.fillStyle = '#4b525f';
+  for (let yy = y + 4; yy < y + 2.5 * TILE - 4; yy += 3) ctx.fillRect(x + 3, yy, 1.5 * TILE - 6, 1);
 }

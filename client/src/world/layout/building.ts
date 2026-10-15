@@ -6,16 +6,24 @@ import { furnitureBlocks, furnitureIsSeat } from './builder';
 import { layoutCafe, layoutLounge, layoutReception, layoutRestroom } from './core';
 import { layoutCorridor } from './corridor';
 import { buildingRect } from './geometry';
+import type { CampusLayout } from './campus';
 import type { AreaLayout, SpotDef, TileRect } from './types';
 
 export interface BuildingLayout {
   cols: number;
+  /** Retângulo do prédio (no campus: dos prédios e caminhos). */
   rect: TileRect;
   core: AreaLayout[];
   corridor: AreaLayout;
   rooms: AreaLayout[];
+  /** Áreas fixas (tudo menos as salas de projeto): no prédio único, o núcleo e o corredor. */
+  areas: AreaLayout[];
   grid: WalkGrid;
   spots: SpotDef[];
+  /** Muda quando a forma do mundo muda (largura do prédio; no campus, prédios e larguras). */
+  key: string;
+  /** Escritório combinado com 2+ máquinas: o campus (Commons + um prédio por máquina). */
+  campus?: CampusLayout;
 }
 
 let coreCache: AreaLayout[] | null = null;
@@ -53,5 +61,5 @@ export function assembleBuilding(cols: number, rooms: readonly AreaLayout[], ver
   const grid = buildWalkGrid(cols, all, version);
   const spots: SpotDef[] = [];
   for (const a of all) spots.push(...a.spots);
-  return { cols, rect: buildingRect(cols), core, corridor, rooms: [...rooms], grid, spots };
+  return { cols, rect: buildingRect(cols), core, corridor, rooms: [...rooms], areas: [...core, corridor], grid, spots, key: `${cols}` };
 }
