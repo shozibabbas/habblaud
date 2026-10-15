@@ -21,7 +21,8 @@ export type TraitId =
   | 'economia'
   | 'sonecas'
   | 'calma'
-  | 'leitura';
+  | 'leitura'
+  | 'fumo';
 
 export interface Trait {
   id: TraitId;
@@ -46,10 +47,18 @@ export const TRAITS: Readonly<Record<TraitId, Trait>> = {
   sonecas: { id: 'sonecas', emoji: '😴', label: tr('Sonecas'), desc: tr('Qualquer sofá ou puff vira cama.') },
   calma: { id: 'calma', emoji: '🧘', label: tr('Calma'), desc: tr('Zen: alongamentos, janela e conversas tranquilas.') },
   leitura: { id: 'leitura', emoji: '📚', label: tr('Leitura'), desc: tr('Sempre com um livro da estante (ou o celular) na mão.') },
+  fumo: { id: 'fumo', emoji: '🚬', label: tr('Cigarro'), desc: tr('Fuma: nos intervalos vai à área de fumantes do campus (e às vezes leva alguém para conversar).') },
 };
 
-/** Ordem fixa (o sorteio depende dela: não reordene). */
-export const TRAIT_IDS = Object.keys(TRAITS) as TraitId[];
+/**
+ * Traços sorteados entre os 2–3 de cada um. Ordem fixa (o sorteio depende dela: não reordene). O fumo fica de
+ * fora: é um traço à parte, com sorteio próprio (ver SMOKER_CHANCE), para não mudar a personalidade de ninguém.
+ */
+export const TRAIT_IDS = (Object.keys(TRAITS) as TraitId[]).filter((t) => t !== 'fumo');
+
+/** Fração de fumantes (minoria; quem é do esporte fuma bem menos). */
+export const SMOKER_CHANCE = 0.18;
+const SMOKER_CHANCE_SPORT = 0.08;
 
 /** Pares que não combinam na mesma pessoa. */
 const CLASHES: readonly (readonly [TraitId, TraitId])[] = [
@@ -120,6 +129,8 @@ export function personaFor(seed: number): Persona {
   if (traits.includes('esporte')) skill += 0.15;
   if (traits.includes('sonecas')) skill -= 0.1;
   const catchphrase = CATCHPHRASES[Math.floor(rng() * CATCHPHRASES.length) % CATCHPHRASES.length];
+  // fumante: sorteio separado (mesma semente = mesma pessoa), depois dos outros traços
+  if (mulberry32(mix(seed ^ 0x51c0ffee))() < (traits.includes('esporte') ? SMOKER_CHANCE_SPORT : SMOKER_CHANCE)) traits.push('fumo');
   const p: Persona = { traits, sociability: clamp01(sociability), skill: clamp01(skill), catchphrase };
   if (cache.size > 500) cache.clear();
   cache.set(seed, p);

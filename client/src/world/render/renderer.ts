@@ -23,6 +23,7 @@ import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
 import { Particles } from './particles';
 import { carSprite, propSprite, shadowSprite } from './props';
+import { drawPodSleepers, drawRallies, drawScoreboard, drawSmoke, paintCourt } from './recreation';
 import { countBadge, fallbackIcon } from './shell-sprites';
 import { decorateElevator, drawEidSparkle, drawSeasonalLights, drawSeasonalWindow, seasonalFurniture, seasonalTableTop } from './seasonal';
 import { buildAreaVis, furnitureSprites, opaqueBounds, paintShell, toWallVis, WALL_MARGIN, wallItemOrigin, wallSprites, type AreaVis, type FurnVis, type WallVis } from './scene';
@@ -216,6 +217,8 @@ export class Renderer {
     ctx.imageSmoothingEnabled = false;
     ctx.translate(-this.baseX, -this.baseY);
     paintShell(this.art, ctx, this.exterior.floors, []);
+    // campus: o piso da quadra de tênis da faixa de recreação
+    if (building.campus) paintCourt(ctx, building.campus.recreation);
     // faixas da rua
     const ly = this.exterior.streetY + Math.round(this.exterior.streetH / 2) - 1;
     ctx.fillStyle = 'rgba(255,236,170,0.75)';
@@ -524,7 +527,9 @@ export class Renderer {
           break;
       }
     }
-    this.drawPingPong(now);
+    // ralis (bola e placar das mesas/quadra) e a fumaça dos cigarros
+    drawRallies(ctx, this.sim, now, view);
+    drawSmoke(ctx, this.sim, this.heads, now, view);
     // ---- espera de shell: teias de aranha, confete/pipoca/chuva (por cima das entidades)
     this.drawCobwebs(now);
     this.drainEffects(now);
@@ -545,6 +550,8 @@ export class Renderer {
     // giroflex e balão "!" do alarme de CI (brilham também no escuro)
     this.roomFx.drawLights(ctx, this.sim, this.heads, now, view);
 
+    // "Zzz" das cápsulas ocupadas (por cima da escuridão, como os ícones)
+    drawPodSleepers(ctx, this.sim, this.areas.values(), this.icon('zzz'), now, view);
     // ---- ícones sobre as cabeças (por cima da escuridão)
     for (let i = 0; i < this.iconCount; i++) {
       const ic = this.icons[i];
@@ -782,6 +789,7 @@ export class Renderer {
   private furnState(f: FurnVis, now: number): number {
     if (f.kind === 'coffee_machine') return (this.sim.machineUntil.get(f.id) ?? 0) > now ? 1 : 0;
     if (f.kind === 'toilet_stall') return this.sim.stallBusy.has(f.id) ? 1 : 0;
+    if (f.kind === 'sleep_pod') return this.sim.podBusy.has(f.id) ? 1 : 0;
     return 0;
   }
 
@@ -805,6 +813,10 @@ export class Renderer {
     if (!front) {
       for (const it of seasonalTableTop(this.theme, f.kind, area.layout, f.seed, this.hour)) {
         ctx.drawImage(it.sprite.canvas, Math.round(f.ax + it.dx - it.sprite.ax), Math.round(f.ay + it.dy - it.sprite.ay));
+      }
+      if (f.kind === 'scoreboard' && s.rects?.screen) {
+        const r = s.rects.screen;
+        drawScoreboard(ctx, { x: dx + r.x, y: dy + r.y, w: r.w, h: r.h }, this.sim);
       }
       if (f.kind === 'desk' && s.rects?.screen) {
         const r = s.rects.screen;
@@ -1178,33 +1190,6 @@ export class Renderer {
     }
     for (const c of this.cars) c.x += c.dir * c.speed * Math.min(dt, 0.1);
     if (this.cars.length) this.cars = this.cars.filter((c) => c.x >= x0 - 10 && c.x <= x1 + 10);
-  }
-
-  private drawPingPong(now: number): void {
-    const { ctx } = this;
-    for (const g of this.sim.social.gatherings) {
-      if (g.kind !== 'pingpong' || g.phase !== 'run') continue;
-      let a: Character | undefined;
-      let b: Character | undefined;
-      for (const m of g.members) {
-        if (m.role !== 'player' || m.left) continue;
-        if (!a) a = this.sim.chars.get(m.id);
-        else b = this.sim.chars.get(m.id);
-      }
-      if (!a || !b) continue;
-      const left = a.x < b.x ? a : b;
-      const right = a.x < b.x ? b : a;
-      const period = 1100;
-      const ph = ((now - g.startAt) % (period * 2)) / period;
-      const u = ph < 1 ? ph : 2 - ph;
-      const x = left.x + 9 + (right.x - left.x - 18) * u;
-      const baseY = (left.y + right.y) / 2 - 9;
-      const arc = Math.sin(Math.PI * ((u * 2) % 1)) * 6;
-      ctx.fillStyle = 'rgba(30,40,60,0.35)';
-      ctx.fillRect(Math.round(x) - 1, Math.round(baseY) + 1, 2, 1);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(Math.round(x) - 1, Math.round(baseY - arc) - 1, 2, 2);
-    }
   }
 
   private icon(name: IconName): Sprite | null {

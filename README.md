@@ -369,7 +369,7 @@ uninstallers leave `settings.json.habblaud-backup-<data>` copies in each account
 | **Working** | At the desk, typing. The monitor and a bubble show the activity: 📖 reading, ✏️ editing, 💻 terminal, 🧪 tests, 🌐 searching… |
 | **Needs you** | Rushes to the desk and raises a hand, with a blinking alert: it's waiting for a permission or an answer in the terminal. |
 | **Waiting on shell** | Finished its turn but left a command running (tests, build, deploy…), so it stays at the desk with an hourglass flipping over its head and the terminal in progress: it eats popcorn while watching, after 3 min it crosses its arms and spins in its chair, after 10 min it gathers cobwebs and after 25 min it dozes off; when the command finishes, it stands up and celebrates with confetti (or gets a rain cloud, if it failed). After 40 s, if there are coworkers with nothing to do, it may head out to a hangout — with the hourglass over its head. |
-| **Idle** | Finished its turn and wanders around: coffee in the kitchen, the water cooler, the restroom, the lounge couch, the phone on the beanbag, the mirror. With idle coworkers around, it joins a hangout: TV, video games, ping-pong, a kitchen chat, rock-paper-scissors (see [Social life](#social-life)). After 10 min without moving, it dozes off — but a coworker may wake it up for a hangout. |
+| **Idle** | Finished its turn and wanders around: coffee in the kitchen, the water cooler, the restroom, the lounge couch, the phone on the beanbag, the mirror. With idle coworkers around, it joins a hangout: TV, video games, ping-pong, a kitchen chat, rock-paper-scissors (see [Social life](#social-life)). After 10 min without moving, it dozes off (in the combined office, in a sleeping pod) — but a coworker may wake it up for a hangout. |
 | **Subagent done** | Walks over to the agent that called it, delivers the result and leaves by elevator. |
 | **Session ended** | Leaves; if it was the last one in the room, it turns off the lights on the way out. |
 
@@ -1186,7 +1186,9 @@ a new request to someone — it lets the group know ("Oops, they're calling me! 
 | 📺 | **TV in the lounge** | Soccer, a soap opera or cartoons, with popcorn on the couch. During soccer the fans cheer along with the "GOL" flashing on the screen (or groan at the other team's goal); during the soap opera, little hearts and "No way! 😱". Nap lovers end up falling asleep on the couch. |
 | 🎮 | **Video games** | Two on the couch with controllers, the TV in split screen (racing or fighting), best of 3, trash talk ("What's with this lag?!") and fans. |
 | 👾 | **Arcade** | A duel at the lounge's two machines, a single match. |
-| 🏓 | **Ping-pong** | Up to 5 points, with the ball going back and forth, the score in the bubbles ("3 × 2 🏓") and fans behind the table. |
+| 🏓 | **Ping-pong** | Up to 5 points, with the ball going back and forth, the score in the bubbles ("3 × 2 🏓") and fans behind the table. In the combined office's games hall it's **doubles** whenever four are free (partners alternate shots, friends play together, rivals end up on the other side); otherwise singles. |
+| 🎾 | **Tennis** *(combined office)* | Singles or doubles on the outdoor court: serves from the baseline, the ball arcing over the net with its shadow on the court, players covering their halves, "30–15", "Deuce!", games up to 2 on the scoreboard and fans on the benches. Floodlights at night. |
+| 🚬 | **Smoke break** *(combined office)* | Two smokers chatting by an ash bin in the smoking area, puffing away while the smoke drifts with the wind. Only agents with the Smoking trait go there. |
 | ☕ | **Kitchen chat** | Each one grabs a coffee (or water) and sits at the table: gossip with coworkers' names ("Did you see Rafaela's commit? 👀"), jokes (the group cracks up), work talk ("Deploy on a Friday? 😈") and topics about the day and the time ("TGIF! 🎉"). |
 | 💬 | **Chat** | Two coworkers standing in a corner of the lobby, the kitchen or the lounge. |
 | ✊ | **Rock-paper-scissors for coins** | "Jo… Ken… Po!", the hand signs appear over their heads, the winner celebrates and the coins fly from one to the other; the loser gets upset and, if competitive, asks for a rematch. A tie goes again. Anyone walking by may stop to watch. |
@@ -1211,12 +1213,30 @@ a new request to someone — it lets the group know ("Oops, they're calling me! 
   </tr>
 </table>
 
+### Campus recreation (combined office)
+
+In the combined office a recreation strip runs north of the first row of buildings, reached by a promenade that goes up
+from both ends of the Commons corridor:
+
+- **Games hall** — four table-tennis tables (singles or doubles, with a live score over each table and fans around it),
+  benches, a water cooler and a snack machine.
+- **Rest room** — capsule pods. An agent idle for more than 10 minutes walks to a free pod, climbs in and sleeps behind a
+  closed visor ("Zzz" over the pod, a dim light at night) instead of dozing at the desk. It wakes up and runs back when
+  work arrives, or stretches and walks back after a few minutes. Busy agents never sleep; with every pod taken (or in a
+  single-computer office) the old desk nap stays.
+- **Tennis court** — fenced, with benches, a scoreboard and floodlights (see the table above).
+- **Smoking area** — away from the entrances: a shelter with benches, ash bins and a sign. Smokers come alone (a few
+  drags, standing or sitting) or in pairs to chat.
+
 ### Personalities
 
 Each agent has 2 or 3 traits, drawn from its seed (it's always the same person, in any browser):
 
 🏆 Competition · 🎲 Betting · 🎮 Games · 📺 TV & shows · 🗣️ Gossip · 💄 Vanity · ☕ Caffeine · 😂 Jokes · 🏓 Sports ·
 🙈 Shyness · 💰 Thrift · 😴 Naps · 🧘 Calm · 📚 Reading
+
+On top of those, a minority (about 1 in 6, fewer among sports lovers) has 🚬 **Smoking**, from a separate draw on the
+same seed: in the combined office they spend some breaks in the smoking area.
 
 The traits change what each one chooses (TV lovers turn on the TV, sports lovers call people over for ping-pong), whom
 they call (friends look for each other; rivals challenge each other in games), what they say and even who plays better. Each one also has a

@@ -7,6 +7,7 @@ import { hash32 } from '../../../shared/hash';
 import { TILE } from '../art/api';
 import type { Camera } from './camera';
 import type { Renderer } from './render/renderer';
+import { planNap, planSmoke } from './sim/recreation';
 import { oldestShell } from './sim/shell';
 import type { Sim } from './sim/sim';
 import type { GatherKind } from './social/gathering';
@@ -66,6 +67,10 @@ export interface WorldDebug {
   socialize(kind: GatherKind, ids?: string[]): string[] | null;
   /** Rodas em andamento: tipo, fase, participantes, placar e aposta. */
   gatherings(): unknown;
+  /** Campus: manda o agente dormir numa cápsula agora (mesmo sem estar ocioso há muito tempo). */
+  nap(agentId: string): boolean;
+  /** Campus: manda o agente fumar um cigarro na área de fumantes agora (mesmo sem o traço). */
+  smoke(agentId: string): boolean;
   /** Soma (ou tira) moedinhas da carteira de um agente. Retorna o saldo. */
   coins(agentId: string, delta: number): number;
   /**
@@ -340,6 +345,20 @@ export function createDebug(sim: Sim, renderer: Renderer, camera: Camera, onCame
     socialize: (kind, ids) => {
       sim.fastForward(now());
       return sim.social.force(kind, now(), ids);
+    },
+
+    nap: (id) => {
+      const ch = sim.chars.get(id);
+      if (!ch) return false;
+      sim.clearPlan(ch);
+      return planNap(sim, ch, now(), true);
+    },
+
+    smoke: (id) => {
+      const ch = sim.chars.get(id);
+      if (!ch) return false;
+      sim.clearPlan(ch);
+      return planSmoke(sim, ch, true);
     },
 
     gatherings: () =>

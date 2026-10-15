@@ -14,6 +14,7 @@ import type { Sim } from '../sim/sim';
 import { buildAnim } from './anim';
 import { ambientAt, ambientDistance, approachAmbient, effectiveHour, isNeutral, mixRgb, rgbCss, sunbeamAt, WHITE, type Ambient, type DaylightMode, type Rgb } from './daylight';
 import { glowSprite } from './props';
+import { drawRecreationGlows, recreationHalos } from './recreation';
 import { furnitureSprites, wallItemOrigin, wallSprites, type AreaVis, type FurnVis, type WallVis } from './scene';
 
 /** O nível de luz é recalculado no máximo a cada isto (ms). */
@@ -28,6 +29,8 @@ const LAMP_WARM: Rgb = [255, 236, 196];
 const STREET_WARM: Rgb = [255, 214, 150];
 const SCREEN_COOL: Rgb = [196, 222, 255];
 const ARCADE_GLOW: Rgb = [236, 190, 255];
+/** Refletores da quadra de tênis (branco frio-quente, bem forte). */
+const FLOOD: Rgb = [244, 240, 222];
 const FIREFLIES = 26;
 
 /** O que a iluminação precisa do renderer (satisfeito pelo próprio Renderer). */
@@ -294,6 +297,8 @@ export class Lighting {
       const cover = room.phase === 'building' || room.phase === 'dismantling' ? buildAnim(room.phase, room.progress(now)).floor : 1;
       return { lit: room.light(now), cover };
     }
+    // sala de descanso: penumbra sempre (as cápsulas têm a própria luz baixa)
+    if (vis.layout.rec === 'rest') return { lit: Math.min(0.25, this.coreLevel.get(vis.id) ?? 0), cover: 1 };
     if (this.presenceLit(vis)) return { lit: this.coreLevel.get(vis.id) ?? 0, cover: 1 };
     return { lit: 1, cover: 1 };
   }
@@ -376,6 +381,8 @@ export class Lighting {
     }
     const lit = new Map<AreaVis, number>();
     for (const vis of scene.areas.values()) {
+      // recreação ao ar livre (quadra, fumantes): é gramado, só os refletores e postes clareiam
+      if (vis.layout.rec === 'court' || vis.layout.rec === 'smoking') continue;
       const l = this.areaLight(vis, now);
       if (l.cover <= 0.01) continue;
       // quanto de luz a área "irradia" (janelas): salas pela luz, áreas comuns vazias na penumbra
@@ -438,6 +445,7 @@ export class Lighting {
         halo(street, prop.x, prop.y - 30, 30, 24, 0.7 * k);
       } else if (prop.kind === 'totem') halo(cool, prop.x, prop.y - 4, 34, 22, 0.6 * k);
     }
+    recreationHalos(scene.areas.values(), (cx, cy, w, h, a) => halo(haloSprite(FLOOD, 64), cx, cy, w, h, a), k);
     this.paintWindowSpill(scene, lit, k, halo, street);
     m.globalAlpha = 1;
     m.globalCompositeOperation = 'source-over';
@@ -524,6 +532,8 @@ export class Lighting {
       }
     }
     this.drawSunbeams(ctx, scene, view);
+    drawRecreationGlows(ctx, this.sim, scene.areas.values(), n, view);
+    ctx.globalCompositeOperation = 'lighter';
     if (n > 0.2) {
       for (const prop of scene.exterior.props) {
         if (prop.kind !== 'lamp' || !inView(prop.x, prop.y, 64)) continue;

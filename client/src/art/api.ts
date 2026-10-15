@@ -65,7 +65,10 @@ export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book
   | 'scissors' // pose 'rps': indicador e médio em V (tesoura)
   | 'phone' // celular (com 'read' ou 'sit': olhando a tela, polegar rolando; tela acesa azulada)
   | 'lipstick' // batom (pose 'groom')
-  | 'comb'; // pente (pose 'groom')
+  | 'comb' // pente (pose 'groom')
+  // --- recreação do campus (aditivo)
+  | 'racket' // raquete de tênis (pose 'play': a mesma rotina da raquete de ping-pong, cabo mais longo e aro com cordas)
+  | 'cigarette'; // cigarro aceso entre os dedos (pose 'drink' leva à boca; 'stand'/'sit' segura ao lado). A fumaça é do mundo
 
 export type HairStyle =
   | 'short' | 'buzz' | 'spiky' | 'side_part' | 'curly' | 'afro' | 'bob' | 'long' | 'ponytail' | 'bun' | 'pigtails'
@@ -197,7 +200,16 @@ export type FurnitureKind =
   | 'sink' // 1x1 pia com gabinete (encostada na parede norte; use 'mirror' na parede acima).
   // --- recepção
   | 'reception_desk' // 3x1 balcão de recepção.
-  | 'bench'; // 2x1 banco de espera (assento, olhando para baixo).
+  | 'bench' // 2x1 banco de espera (assento, olhando para baixo).
+  // --- recreação do campus (aditivo; art/furniture/recreation.ts)
+  | 'sleep_pod' // 2x1 cápsula de dormir com a abertura ao SUL. state 0 = livre (visor aberto, colchão à mostra), 1 = ocupada (visor fechado, luz baixa por dentro).
+  | 'tennis_net' // 1x11 rede da quadra de tênis (corre norte-sul; postes nas pontas). Use dx = TILE/2 para centrar na linha do meio.
+  | 'court_fence' // 1x1 alambrado da quadra. variants: 'h' (leste-oeste) | 'v' (norte-sul) | 'post' (quina/batente do portão)
+  | 'floodlight' // 1x1 poste alto de refletor (cabeça virada para a quadra). rects.glow = lâmpadas.
+  | 'scoreboard' // 2x1 placar de pé. rects.screen = mostrador (o mundo escreve o placar).
+  | 'ash_bin' // 1x1 lixeira-cinzeiro de inox com areia no topo.
+  | 'smoking_shelter' // 4x1 abrigo da área de fumantes: painel de vidro ao fundo e cobertura (quem senta fica à frente/sul).
+  | 'rec_sign' // 1x1 placa num poste. variants: 'smoking' (cigarro) | 'tennis' (raquete e bola)
 
 export interface FurnitureDef {
   mount: 'floor' | 'wall';
@@ -271,6 +283,14 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   sink: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   reception_desk: { mount: 'floor', footprint: { w: 3, h: 1 }, blocks: true },
   bench: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: false, seat: true },
+  sleep_pod: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true, states: 2 },
+  tennis_net: { mount: 'floor', footprint: { w: 1, h: 11 }, blocks: true },
+  court_fence: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['h', 'v', 'post'] },
+  floodlight: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  scoreboard: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true },
+  ash_bin: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  smoking_shelter: { mount: 'floor', footprint: { w: 4, h: 1 }, blocks: true },
+  rec_sign: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['smoking', 'tennis'] },
 };
 
 export type FloorKind =

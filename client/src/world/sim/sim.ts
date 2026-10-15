@@ -33,6 +33,7 @@ import {
 import { Character, dirOf, facing } from './character';
 import { Elevator } from './elevator';
 import { RoomFxState } from './github';
+import { planNap, planSmoke, SMOKE_OUTING_CHANCE, stepPod, wakeUp } from './recreation';
 import { RoomState } from './room-state';
 import { countShells, latestShellDone, shellLabel, shellStage, shellWaitSince, spinDir, spinPhase, yawnPhase } from './shell';
 import { SpotRegistry } from './spots';
@@ -100,6 +101,8 @@ export class Sim {
   readonly machineUntil = new Map<string, number>();
   /** Cabines ocupadas (furnitureId). */
   readonly stallBusy = new Set<string>();
+  /** Campus: cápsulas de dormir ocupadas (furnitureId) — sim/recreation.ts. */
+  readonly podBusy = new Set<string>();
   /** Vida social: rodas dos ociosos, personalidades e carteiras (social/social.ts). */
   readonly social: Social;
   /** Depuração: agentes forçados a encerrar e salas forçadas a sumir do snapshot. */
@@ -1041,6 +1044,8 @@ export class Sim {
         return this.stepElevIn(ch, s, dt, now);
       case 'stall':
         return this.stepStall(ch, s, dt, now);
+      case 'pod':
+        return stepPod(this, ch, s, dt, now);
       case 'switch':
         return this.stepSwitch(ch, s, now);
       case 'gather':
@@ -1321,6 +1326,8 @@ export class Sim {
 
   /** Descarta a fila (e sai da roda, se estiver numa). */
   clearPlan(ch: Character): void {
+    // dentro de uma cápsula (sim/recreation.ts): sai na hora, senão ficaria invisível e a cápsula, ocupada
+    if (ch.step?.t === 'pod') wakeUp(this, ch, ch.step.spot);
     ch.queue.length = 0;
     ch.step = null;
     ch.thinkAt = 0;
@@ -1380,6 +1387,8 @@ export class Sim {
         ch.nextOutingAt = now + idleSitMs(ch.rng, this.options().liveliness);
       }
     }
+    // campus: quem está ocioso há muito tempo vai dormir numa cápsula (sem cápsula livre, cochila na mesa)
+    if (ch.mode === 'idle' && isLongIdle(ch.info.status, ch.info.statusSince, now) && planNap(this, ch, now)) return true;
     // esperando um shell: só sai da mesa para uma roda (sozinho, fica na pipoca)
     if (ch.mode === 'shell') {
       if (!ch.nextSocialAt) ch.nextSocialAt = now + idleSitMs(ch.rng, this.options().liveliness) * 1.3;
@@ -1657,6 +1666,8 @@ export class Sim {
     const persona = personaFor(ch.info.seed);
     // colegas à toa: a vontade é de companhia (a personalidade dosa) — TV, jogo, papo, aposta...
     if (this.social.hasCompany(ch, now) && rng() < 0.45 + persona.sociability * 0.4 && this.social.tryInitiate(ch, now, false)) return true;
+    // fumante (campus): um cigarro na área de fumantes
+    if (rng() < SMOKE_OUTING_CHANCE && planSmoke(this, ch)) return true;
     const avail: Partial<Record<IdleActivity, boolean>> = {
       coffee: !!this.spots.findFree('coffee', { by: ch.id }),
       water: !!this.spots.findFree('water', { by: ch.id }),
@@ -1938,6 +1949,7 @@ export class Sim {
       room.switchClaim = null;
     }
     this.stallBusy.clear();
+    this.podBusy.clear();
   }
 
   private finishStep(ch: Character, s: Step, now: number): void {
@@ -1974,6 +1986,9 @@ export class Sim {
         if (spot) ch.placeAtTile(spot.tx, spot.ty);
         break;
       }
+      case 'pod':
+        wakeUp(this, ch, s.spot);
+        break;
       case 'elevOut': {
         const el = this.elevators[s.elev] ?? this.elevators[0];
         const spot = this.spots.get(el.spotId);

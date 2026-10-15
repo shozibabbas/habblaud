@@ -14,12 +14,16 @@ export const INVITE = {
   arcade: [tr('Fliperama? 👾'), tr('Aposto que bato teu recorde 👾'), tr('Bora no fliperama?')],
   pingpong: [tr('Pingue-pongue? 🏓'), tr('Bora uma partidinha? 🏓'), tr('Vem jogar ping-pong!')],
   pingpongRival: [tr('Vem tomar uma surra no ping-pong 😏'), tr('Revanche no ping-pong? 🏓')],
+  pingpongDoubles: [tr('Duplas no pingue-pongue? 🏓'), tr('Bora uma dupla no salão de jogos? 🏓'), tr('Fecha uma dupla comigo? 🏓')],
+  tennis: [tr('Bora um tênis? 🎾'), tr('Partida na quadra? 🎾'), tr('Tênis? Tô com a raquete aqui 🎾')],
+  tennisDoubles: [tr('Duplas no tênis? 🎾'), tr('Bora fechar duas duplas na quadra? 🎾')],
   kitchen: [tr('Bora tomar um café? ☕'), tr('Pausa pro café? ☕'), tr('Bora dar uma pausa na copa?')],
   kitchenGossip: [tr('Tenho uma fofoca… 👀'), tr('Copa. Agora. Tenho novidade 👀')],
   talk: [tr('E aí, tudo certo?'), tr('Ei, {nome}!'), tr('Bora trocar uma ideia?'), tr('Opa, {nome}! Beleza?')],
   rps: [tr('Jokenpô valendo 🪙{v}?'), tr('Aposto 🪙{v} no jokenpô!'), tr('Pedra, papel e tesoura? 🪙{v}!')],
   rpsHonor: [tr('Jokenpô? Só pela honra 😅'), tr('Jokenpô valendo nada?')],
   mirror: [tr('Bora dar um tapa no visual? 💄'), tr('Espelho? Preciso me arrumar ✨')],
+  smoke: [tr('Bora um cigarro? 🚬'), tr('Pausa pro cigarro?'), tr('Vamos lá fora fumar um?')],
 } satisfies Record<string, Pool>;
 
 export const ACCEPT: Pool = [tr('Bora!'), tr('Partiu!'), 'Fechado! 🤝', tr('Só se for agora!'), tr('Opa!'), tr('Já é!'), tr('Demorou!')];
@@ -60,6 +64,12 @@ export const PINGPONG = {
   final: ['{a} a {b}! 🏆', tr('Ganhei de {a} a {b}! 🏆')],
 };
 
+export const TENNIS = {
+  point: [tr('Ace! 🎾'), tr('Que voleio!'), tr('Na linha!'), tr('Foi fora? 🤔'), tr('Que passada!'), tr('Smash! 💥')],
+  cheer: [tr('Boa, {nome}!'), tr('Que backhand!'), tr('Uooou!'), tr('Vai, {nome}! 🎾')],
+  final: [tr('Game, set e partida! 🏆'), tr('Que partida! 🏆'), '{a} a {b}! 🎾🏆'],
+};
+
 export const RPS = {
   count: [tr('Jo…'), tr('Ken…'), tr('Pô!')],
   tie: [tr('Empate! De novo!'), tr('Pensamos igual 😂'), tr('De novo!')],
@@ -89,6 +99,7 @@ export const CHAT = {
   calma: [tr('Respira… tudo vai compilar 🧘'), tr('Um passo de cada vez.')],
   apostas: [tr('Quem topa um jokenpô depois? 🎲'), tr('Tô com sorte hoje 🍀')],
   economia: [tr('Tô juntando 🪙 pra férias'), tr('Café de graça é o melhor café')],
+  fumo: [tr('Preciso parar de fumar…'), tr('Esse é o último do dia, juro'), tr('Tem isqueiro aí? 🔥'), tr('Que vento hoje!'), tr('Lá dentro tá corrido, hein')],
   generic: [tr('E o fim de semana?'), tr('Preciso de férias 🏖️'), tr('Que dia, hein'), tr('Tá tudo corrido hoje')],
   react: ['KKKKK', tr('Sério?!'), tr('Não acredito 😮'), tr('Verdade!'), tr('Hahaha'), tr('Nem me fala…'), '👀', tr('Pois é'), tr('Mentira!'), tr('Que isso!')],
   laugh: ['KKKKK', tr('Hahaha!'), '😂😂😂'],
@@ -110,6 +121,7 @@ export const TRAIT_TOPICS: Partial<Record<TraitId, keyof typeof CHAT>> = {
   calma: 'calma',
   apostas: 'apostas',
   economia: 'economia',
+  fumo: 'fumo',
 };
 
 /** Fala ligada ao dia/hora local, quando houver (sexta, segunda, manhã, almoço, noite). */

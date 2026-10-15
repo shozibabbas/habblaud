@@ -4,6 +4,7 @@ import { FURNITURE, type FurnitureKind } from '../api';
 import { trim, type BufFurniture } from '../core/sprite';
 import * as C from './common';
 import * as O from './office';
+import * as R from './recreation';
 import * as W from './wall';
 
 /** Quantas variações de detalhes (seed) cada kind tem; os demais ignoram a seed. */
@@ -125,6 +126,22 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
       return C.receptionDesk(seed);
     case 'bench':
       return C.bench();
+    case 'sleep_pod':
+      return R.sleepPod(state);
+    case 'tennis_net':
+      return R.tennisNet();
+    case 'court_fence':
+      return R.courtFence(variant);
+    case 'floodlight':
+      return R.floodlight();
+    case 'scoreboard':
+      return R.scoreboard();
+    case 'ash_bin':
+      return R.ashBin();
+    case 'smoking_shelter':
+      return R.smokingShelter();
+    case 'rec_sign':
+      return R.recSign(variant);
   }
 }
 
