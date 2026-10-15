@@ -25,8 +25,9 @@ import { Lighting } from './lighting';
 import { drawWuduWater, MosqueRenderer } from './mosque';
 import { Particles } from './particles';
 import { carSprite, propSprite, shadowSprite } from './props';
+import { drawPodSleepers, drawRallies, drawScoreboard, drawSmoke, paintCourt } from './recreation';
 import { countBadge, fallbackIcon } from './shell-sprites';
-import { decorateElevator, drawSeasonalLights, drawSeasonalWindow, seasonalCostume, seasonalFurniture } from './seasonal';
+import { decorateElevator, drawEidSparkle, drawSeasonalLights, drawSeasonalWindow, seasonalFurniture, seasonalTableTop } from './seasonal';
 import { buildAreaVis, furnitureSprites, opaqueBounds, paintShell, toWallVis, WALL_MARGIN, wallItemOrigin, wallSprites, type AreaVis, type FurnVis, type WallVis } from './scene';
 
 const enum K {
@@ -136,6 +137,8 @@ export class Renderer {
   private clearColor = '#7fae62';
   private grass: CanvasPattern | null = null;
   private theme: SeasonalTheme = 'none';
+  /** Hora do ciclo dia/noite no quadro atual (iftar na copa). */
+  private hour = 12;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -218,6 +221,8 @@ export class Renderer {
     ctx.imageSmoothingEnabled = false;
     ctx.translate(-this.baseX, -this.baseY);
     paintShell(this.art, ctx, this.exterior.floors, []);
+    // campus: o piso da quadra de tênis da faixa de recreação
+    if (building.campus) paintCourt(ctx, building.campus.recreation);
     // faixas da rua
     const ly = this.exterior.streetY + Math.round(this.exterior.streetH / 2) - 1;
     ctx.fillStyle = 'rgba(255,236,170,0.75)';
@@ -403,6 +408,7 @@ export class Renderer {
       this.date.setHours(Math.floor(min / 60) % 24, min % 60);
     }
     const hour = this.lighting.update(now, daylightModeOf(opts), this.hourOverride, this.date);
+    this.hour = hour;
     const t = now;
 
     // janelas da fachada nos slots vazios
@@ -527,7 +533,9 @@ export class Renderer {
           break;
       }
     }
-    this.drawPingPong(now);
+    // ralis (bola e placar das mesas/quadra) e a fumaça dos cigarros
+    drawRallies(ctx, this.sim, now, view);
+    drawSmoke(ctx, this.sim, this.heads, now, view);
     // ---- espera de shell: teias de aranha, confete/pipoca/chuva (por cima das entidades)
     this.drawCobwebs(now);
     this.drainEffects(now);
@@ -543,12 +551,14 @@ export class Renderer {
       for (const vis of this.areas.values()) {
         if (vis.room && vis.room.phase !== 'ready') continue;
         if (!visible(vis.px.x, vis.px.y, vis.px.w, vis.px.h)) continue;
-        drawSeasonalLights(ctx, this.theme, vis.layout, vis.room ? vis.room.light(now) : 1);
+        drawSeasonalLights(ctx, this.theme, vis, vis.room ? vis.room.light(now) : 1, this.night, now);
       }
     }
     // giroflex e balão "!" do alarme de CI (brilham também no escuro)
     this.roomFx.drawLights(ctx, this.sim, this.heads, now, view);
 
+    // "Zzz" das cápsulas ocupadas (por cima da escuridão, como os ícones)
+    drawPodSleepers(ctx, this.sim, this.areas.values(), this.icon('zzz'), now, view);
     // ---- ícones sobre as cabeças (por cima da escuridão)
     for (let i = 0; i < this.iconCount; i++) {
       const ic = this.icons[i];
@@ -714,7 +724,7 @@ export class Renderer {
     }
     ctx.globalAlpha *= alpha;
     this.safe(() => this.art.drawWindowView(ctx, { x: o.x + r.x, y: o.y + rise + r.y, w: r.w, h: r.h }, hour, now, w.seed));
-    drawSeasonalWindow(ctx, this.theme, { x: o.x + r.x, y: o.y + rise + r.y, w: r.w, h: r.h }, now, w.seed);
+    drawSeasonalWindow(ctx, this.theme, { x: o.x + r.x, y: o.y + rise + r.y, w: r.w, h: r.h }, hour, now, w.seed);
     ctx.drawImage(s.base.canvas, o.x, o.y + rise);
   }
 
@@ -792,6 +802,7 @@ export class Renderer {
       const ch = owner ? this.sim.chars.get(owner) : undefined;
       return ch && ch.atSpot === f.seatSpot && ch.pose === 'wudu' ? 1 : 0;
     }
+    if (f.kind === 'sleep_pod') return this.sim.podBusy.has(f.id) ? 1 : 0;
     return 0;
   }
 
@@ -813,6 +824,13 @@ export class Renderer {
     }
     ctx.drawImage(s.canvas, dx, dy);
     if (!front) {
+      for (const it of seasonalTableTop(this.theme, f.kind, area.layout, f.seed, this.hour)) {
+        ctx.drawImage(it.sprite.canvas, Math.round(f.ax + it.dx - it.sprite.ax), Math.round(f.ay + it.dy - it.sprite.ay));
+      }
+      if (f.kind === 'scoreboard' && s.rects?.screen) {
+        const r = s.rects.screen;
+        drawScoreboard(ctx, { x: dx + r.x, y: dy + r.y, w: r.w, h: r.h }, this.sim);
+      }
       if (f.kind === 'desk' && s.rects?.screen) {
         const r = s.rects.screen;
         const mode = this.deskScreen(f, area);
@@ -883,8 +901,6 @@ export class Renderer {
     req.pose = ch.pose;
     req.held = ch.held;
     req.seated = ch.seated;
-    // na mesquita, sem fantasia sazonal
-    req.costume = ch.prayer ? undefined : seasonalCostume(this.theme, ch.info.seed);
     try {
       sprite = this.charSprite(req, ch.animT);
     } catch {
@@ -910,6 +926,7 @@ export class Renderer {
       head.bw = b.w;
       head.bh = b.h;
       head.y = sy + b.y;
+      drawEidSparkle(ctx, this.theme, sx + b.x + b.w + 1, sy + b.y + 3, now, ch.info.seed);
     } else {
       head.bx = x - 7;
       head.by = y - 26;
@@ -1085,7 +1102,6 @@ export class Renderer {
       req.pose = ch.pose === 'groom' ? 'groom' : 'stand';
       req.held = ch.pose === 'groom' ? ch.held : 'none';
       req.seated = false;
-      req.costume = seasonalCostume(this.theme, ch.info.seed);
       let s: Sprite;
       try {
         s = this.charSprite(req, ch.animT);
@@ -1189,33 +1205,6 @@ export class Renderer {
     }
     for (const c of this.cars) c.x += c.dir * c.speed * Math.min(dt, 0.1);
     if (this.cars.length) this.cars = this.cars.filter((c) => c.x >= x0 - 10 && c.x <= x1 + 10);
-  }
-
-  private drawPingPong(now: number): void {
-    const { ctx } = this;
-    for (const g of this.sim.social.gatherings) {
-      if (g.kind !== 'pingpong' || g.phase !== 'run') continue;
-      let a: Character | undefined;
-      let b: Character | undefined;
-      for (const m of g.members) {
-        if (m.role !== 'player' || m.left) continue;
-        if (!a) a = this.sim.chars.get(m.id);
-        else b = this.sim.chars.get(m.id);
-      }
-      if (!a || !b) continue;
-      const left = a.x < b.x ? a : b;
-      const right = a.x < b.x ? b : a;
-      const period = 1100;
-      const ph = ((now - g.startAt) % (period * 2)) / period;
-      const u = ph < 1 ? ph : 2 - ph;
-      const x = left.x + 9 + (right.x - left.x - 18) * u;
-      const baseY = (left.y + right.y) / 2 - 9;
-      const arc = Math.sin(Math.PI * ((u * 2) % 1)) * 6;
-      ctx.fillStyle = 'rgba(30,40,60,0.35)';
-      ctx.fillRect(Math.round(x) - 1, Math.round(baseY) + 1, 2, 1);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(Math.round(x) - 1, Math.round(baseY - arc) - 1, 2, 2);
-    }
   }
 
   private icon(name: IconName): Sprite | null {

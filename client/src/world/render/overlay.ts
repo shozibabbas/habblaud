@@ -460,8 +460,9 @@ export class Overlay {
         // uma fileira acima das pílulas das salas (que ficam na linha do topo do prédio): a placa de uma máquina de
         // nome comprido nunca cobre o nome da primeira sala ao lado do saguão
         this.drawBuildingPlate(plate, cx, cy - PLATE_LIFT);
-      } else if (CORE_NAMES[vis.id]) {
-        this.drawCorePill(CORE_NAMES[vis.id], cx, cy, colW - 8);
+      } else if (CORE_NAMES[vis.id] || vis.layout.rec) {
+        // áreas comuns do núcleo e a recreação do campus (salão de jogos, descanso, quadra, fumantes)
+        this.drawCorePill(CORE_NAMES[vis.id] ?? vis.layout.signText ?? '', cx, cy, colW - 8);
       } else if (vis.layout.kind === 'meeting') {
         this.drawCorePill(MEETING_NAME, cx, cy, colW - 8);
       }

@@ -1,7 +1,6 @@
 // Peças usadas só durante uma atividade (topi e hijab na mesquita, pés descalços depois da sapateira): camadas
 // sobrepostas à aparência do personagem NA HORA DO DESENHO. Nada disso é salvo nem muda `ch.appearance`; tirar a
 // camada devolve exatamente a aparência de antes. Puro (sem DOM).
-import { ACCESSORIES } from '../../../../shared/appearance';
 import type { Appearance } from '../../art/api';
 import { barefoot } from '../../art/character/prayer';
 
@@ -49,20 +48,11 @@ export function wornAppearance(ch: Wearer): Appearance {
   return a;
 }
 
-const KNOWN: ReadonlySet<string> = new Set<string>(ACCESSORIES);
 const CAP_WHITE = '#f4f2ee';
 
-/**
- * Cobertura de cabeça para rezar: topi branco (homens) ou hijab (mulheres). Enquanto o renderer não conhece
- * 'topi'/'hijab' (as roupas paquistanesas chegam em outro ramo), o homem usa um gorro branco ('beanie') e a
- * mulher um hijab desenhado provisoriamente pela arte (character/prayer.ts), com o cabelo escondido.
- */
+/** Cobertura de cabeça para rezar: topi branco (homens) ou hijab da cor do tecido (mulheres). */
 export function prayerHeadwear(look: 'm' | 'f', color: string): WearLook {
-  if (look === 'f') {
-    if (KNOWN.has('hijab')) return { accessory: 'hijab' as Appearance['accessory'], accessoryColor: color };
-    return { accessory: 'hijab' as Appearance['accessory'], accessoryColor: color, hairStyle: 'bald' };
-  }
-  return { accessory: (KNOWN.has('topi') ? 'topi' : 'beanie') as Appearance['accessory'], accessoryColor: CAP_WHITE };
+  return look === 'f' ? { accessory: 'hijab', accessoryColor: color } : { accessory: 'topi', accessoryColor: CAP_WHITE };
 }
 
 /** Sem sapatos (ficaram na sapateira): pés descalços/meias no tom da pele. */

@@ -166,9 +166,9 @@ describe('oração: seções e roupas', () => {
     expect(JSON.stringify(base)).toBe(snapshot);
   });
 
-  it('cobertura de oração: topi (ou gorro branco provisório) para homens, hijab para mulheres', () => {
+  it('cobertura de oração: topi branco para homens, hijab para mulheres', () => {
     const m = prayerHeadwear('m', '#123456');
-    expect(['topi', 'beanie']).toContain(m.accessory);
+    expect(m.accessory).toBe('topi');
     expect(m.accessoryColor).toBe('#f4f2ee');
     const f = prayerHeadwear('f', '#9fc0e4');
     expect(f.accessory).toBe('hijab');
@@ -236,7 +236,7 @@ describe('oração: mesquita no campus', () => {
         expect(ana.dir).toBe('left');
         const a = wornAppearance(ana);
         barefootPraying = a.shoes !== ana.appearance.shoes;
-        coveredPraying = (a.accessory as string) === 'hijab';
+        coveredPraying = a.accessory === 'hijab';
         if (!inRect(women, ana.tx, ana.ty)) inWomenHall = false;
       }
       if (ana.pose === 'wudu') wuduSeated = ana.seated;

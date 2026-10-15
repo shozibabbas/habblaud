@@ -13,9 +13,9 @@ const hit = (r: TileRect, x: number, y: number, m = 0) => x >= r.x - m && y >= r
 export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
   const inner = campus.inner;
   const bottom = inner.y + inner.h;
-  // o topo de `inner` é o da mesquita (com a cúpula), ao norte do Commons
-  const top = inner.y;
-  const bounds: TileRect = { x: inner.x - EXT_WEST, y: top - EXT_NORTH, w: inner.w + EXT_WEST + EXT_EAST, h: bottom - top + EXT_NORTH + EXT_SOUTH };
+  // topo do campus: 0, ou a faixa de recreação ao norte da linha 0 (recreation.ts); a mata sobe junto
+  const northY = inner.y;
+  const bounds: TileRect = { x: inner.x - EXT_WEST, y: northY - EXT_NORTH, w: inner.w + EXT_WEST + EXT_EAST, h: bottom - northY + EXT_NORTH + EXT_SOUTH };
   const px = (t: number) => t * TILE;
   const floors: FloorPatch[] = [];
   const props: ExteriorProp[] = [];
@@ -82,8 +82,8 @@ export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
 
   // árvores: bosque ao norte e nas laterais, e uma fileira no gramado entre as linhas de prédios
   for (let x = bounds.x + 1; x < bounds.x + bounds.w - 1; x += 4 + Math.floor(rng() * 3)) {
-    props.push({ kind: rng() < 0.25 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(top - 3) - Math.floor(rng() * 20), seed: seed() });
-    if (rng() < 0.6) props.push({ kind: 'bush', x: px(x + 2), y: px(top - 1) - 2, seed: seed() });
+    props.push({ kind: rng() < 0.25 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(northY - 3) - Math.floor(rng() * 20), seed: seed() });
+    if (rng() < 0.6) props.push({ kind: 'bush', x: px(x + 2), y: px(northY - 1) - 2, seed: seed() });
   }
   for (const [row, gap] of [
     [-6, 5],
@@ -91,13 +91,13 @@ export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
     [-14, 8],
   ] as const) {
     for (let x = bounds.x + 2; x < bounds.x + bounds.w - 1; x += gap + Math.floor(rng() * 4)) {
-      props.push({ kind: rng() < 0.3 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(top + row) - Math.floor(rng() * 12), seed: seed() });
+      props.push({ kind: rng() < 0.3 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(northY + row) - Math.floor(rng() * 12), seed: seed() });
     }
   }
   for (const side of [-1, 1]) {
     for (const band of [0, 7, 13]) {
       const baseX = side < 0 ? inner.x - 6 - band : inner.x + inner.w + 4 + band;
-      for (let y = top + 1; y < bottom; y += 3 + Math.floor(rng() * 3)) {
+      for (let y = northY + 1; y < bottom; y += 3 + Math.floor(rng() * 3)) {
         props.push({ kind: rng() < 0.3 ? 'pine' : 'tree', x: px(baseX + Math.floor(rng() * 5)), y: px(y + 1), seed: seed() });
       }
     }
@@ -153,10 +153,19 @@ export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
     props.push({ kind: 'bush', x: px(tx) + (b.wing === 'east' ? -2 : 2), y: px(b.y + PATH_DY + PATH_H) + 14, seed: seed() });
   }
 
-  // mesquita ao norte do Commons: caminhos, postes, bancos, canteiros e árvores (layout/mosque.ts)
+  // faixa de recreação: o piso dela, os enfeites e nada da mata em cima das áreas e caminhos
+  const rec = campus.recreation;
+  floors.push(...rec.floors);
+  const kept = props.filter((p) => !rec.keepOut.some((r) => hit(r, p.x / TILE, p.y / TILE)));
+  props.length = 0;
+  props.push(...kept, ...rec.props);
+  // mesquita ao norte da recreação: caminhos, postes, bancos, canteiros e árvores (layout/mosque.ts); a mata e os
+  // enfeites da recreação saem de cima do prédio, da cúpula e dos caminhos
   const grounds = mosqueGrounds(campus.mosque, rng);
   floors.push(...grounds.floors);
-  props.push(...grounds.props);
+  const clearOfMosque = props.filter((p) => !grounds.keepOut.some((r) => hit(r, p.x / TILE, p.y / TILE)));
+  props.length = 0;
+  props.push(...clearOfMosque, ...grounds.props);
 
   const streetY = px(bottom + 4);
   const streetH = px(5);

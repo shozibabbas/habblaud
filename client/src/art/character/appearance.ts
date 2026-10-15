@@ -2,7 +2,9 @@
 // `look` apenas enviesa as probabilidades de estilos; nada é exclusivo de um look, exceto barba ('m').
 import { ACCESSORIES, BOTTOM_STYLES, FACIAL_HAIR, HAIR_STYLES, PART_KEYS, TOP_STYLES, type AppearanceParts, type PartKey } from '../../../../shared/appearance';
 import { mulberry32 } from '../../../../shared/hash';
+import type { AppearanceProfile } from '../../../../shared/types';
 import type { Accessory, Appearance, HairStyle, TopStyle } from '../api';
+import { PROFILE_PK } from './profile-pk';
 
 export const SKINS = ['#ffe2cc', '#f6cfb0', '#eab894', '#d69f78', '#bd8560', '#9a6444', '#7a4a31', '#5a3623'] as const;
 
@@ -46,40 +48,94 @@ const ACC_COLORS: Record<Accessory, readonly string[]> = {
   beanie: ['#e2604f', '#efb54a', '#4bab72', '#8d66cf', '#3d4352', '#36b0b0'],
   earrings: ['#f2c14e', '#d9dde3'],
   bow: ['#e2604f', '#e47aa8', '#efb54a', '#4a86d8', '#8d66cf'],
+  // Dupatta: as mesmas cores fortes do detalhe do kameez.
+  dupatta: ['#f1e6cf', '#d9a42e', '#c43d6f', '#2a8c8c', '#f0a6c0', '#e4685a', '#3657a8', '#f6f4ee', '#8e2f45', '#a98bd1', '#2e7d4f'],
+  hijab: ['#26272e', '#2c3a5c', '#ede3cc', '#7a2f3a', '#d8c6dd', '#cfe0ef', '#e7cbc4', '#8a96a3', '#5a3e2b'],
+  // Branco/creme (gorro de oração) e cinza/preto (karakul).
+  topi: ['#f4f2ee', '#ede3cc', '#9a9ea6', '#4a4d55', '#26272e'],
 };
+// Roupas do sul da Ásia (shalwar kameez, kurta, colete): brancos, cremes, pastéis e tons escuros sóbrios na kurta;
+// cores mais vivas no kameez e na dupatta; coletes escuros.
+const KURTA_COLORS = [
+  '#f5f3ec', '#ede3cc', '#d9c7a3', '#cfe0ef', '#d5e6d3', '#f1d8c8', '#c9ced6', '#8a96a3', '#6b7346', '#7a2f3a', '#2c3a5c',
+  '#26272e', '#6b4a35',
+] as const;
+/** Gola, carcela e botões da kurta. */
+const KURTA_TRIM = ['#f5f3ec', '#ede3cc', '#d4af5a', '#c9ced6', '#2c3a5c', '#7a2f3a', '#26272e'] as const;
+const WAISTCOAT_COLORS = ['#26272e', '#3d4352', '#5a3e2b', '#2c3a5c', '#6d7480', '#3e4636'] as const;
+const KAMEEZ_COLORS = [
+  '#c43d6f', '#2a8c8c', '#d9a42e', '#2e7d4f', '#3657a8', '#8e2f45', '#f2a58a', '#a98bd1', '#e4685a', '#9fd8c2', '#f0a6c0',
+  '#f1e6cf', '#2b2b33',
+] as const;
+/** Shalwar: combina com a kurta ou com o kameez (no sorteio, sai da mesma cor da parte de cima). */
+const SHALWAR_COLORS = [...new Set<string>([...KURTA_COLORS, ...KAMEEZ_COLORS])];
+/** Tom da shalwar equivalente a cada cor de calça (jeans e marinho viram marinho, cáqui vira areia...). */
+const SHALWAR_OF_PANTS: Readonly<Record<string, string>> = {
+  '#3f5f8c': '#2c3a5c', '#2e3e5e': '#2c3a5c', '#2c2c35': '#26272e', '#b49c72': '#d9c7a3', '#6d7480': '#8a96a3', '#6e4c38': '#6b4a35',
+  '#5f6845': '#6b7346', '#2c3655': '#2c3a5c', '#7f9cc4': '#cfe0ef', '#e2ded5': '#ede3cc', '#9b3b3b': '#7a2f3a',
+};
+/** Batas até o joelho: cobrem o quadril e as coxas (render.ts). */
+export const LONG_TOPS: ReadonlySet<TopStyle> = new Set<TopStyle>(['kurta', 'shalwar_kameez', 'kurta_waistcoat']);
+
 const LANYARDS = ['#f2b33d', '#e2604f', '#4a86d8', '#4bab72', '#8d66cf', '#36b0b0'] as const;
 
-type Weights<T extends string> = Readonly<Record<T, number>>;
+/** Chapéus que só cabem em penteados rentes (boné, gorro, topi). */
+const HATS: readonly string[] = ['cap', 'beanie', 'topi'];
+const TALL_HAIR: readonly string[] = ['afro', 'bun', 'mohawk', 'pigtails'];
+
+export type Weights<T extends string> = Readonly<Record<T, number>>;
 
 const HAIR_W: Record<'f' | 'm', Weights<HairStyle>> = {
   m: {
     short: 16, buzz: 9, spiky: 9, side_part: 12, curly: 9, afro: 6, bob: 2, long: 4, ponytail: 3, bun: 4,
-    pigtails: 0.4, mohawk: 4, bald: 5, wavy: 9,
+    pigtails: 0.4, mohawk: 4, bald: 5, wavy: 9, braid: 0,
   },
   f: {
     short: 4, buzz: 1.2, spiky: 2, side_part: 4, curly: 9, afro: 7, bob: 13, long: 16, ponytail: 13, bun: 10,
-    pigtails: 6, mohawk: 1, bald: 0.4, wavy: 13,
+    pigtails: 6, mohawk: 1, bald: 0.4, wavy: 13, braid: 0,
   },
 };
 
+// Os estilos com peso 0 (no fim de cada tabela, para não mudar o sorteio de nenhuma semente) só aparecem quando
+// escolhidos no editor.
 const TOP_W: Record<'f' | 'm', Weights<TopStyle>> = {
-  m: { tshirt: 20, hoodie: 16, shirt_tie: 10, sweater: 13, jacket: 13, blouse: 2, polo: 14 },
-  f: { tshirt: 17, hoodie: 14, shirt_tie: 5, sweater: 14, jacket: 12, blouse: 20, polo: 8 },
+  m: { tshirt: 20, hoodie: 16, shirt_tie: 10, sweater: 13, jacket: 13, blouse: 2, polo: 14, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0 },
+  f: { tshirt: 17, hoodie: 14, shirt_tie: 5, sweater: 14, jacket: 12, blouse: 20, polo: 8, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0 },
 };
 
 const ACC_W: Record<'f' | 'm', Weights<Accessory>> = {
-  m: { none: 40, glasses: 18, sunglasses: 4, headphones: 13, cap: 7, beanie: 6, earrings: 2, bow: 0.3 },
-  f: { none: 36, glasses: 16, sunglasses: 4, headphones: 11, cap: 4, beanie: 5, earrings: 13, bow: 7 },
+  m: { none: 40, glasses: 18, sunglasses: 4, headphones: 13, cap: 7, beanie: 6, earrings: 2, bow: 0.3, dupatta: 0, hijab: 0, topi: 0 },
+  f: { none: 36, glasses: 16, sunglasses: 4, headphones: 11, cap: 4, beanie: 5, earrings: 13, bow: 7, dupatta: 0, hijab: 0, topi: 0 },
 };
 
 const FACIAL_W: Weights<FacialHair> = { none: 62, stubble: 12, beard: 13, mustache: 7, goatee: 6 };
 const BOTTOM_W: Record<'f' | 'm', Weights<BottomStyle>> = {
-  m: { pants: 88, shorts: 12, skirt: 0 },
-  f: { pants: 62, shorts: 10, skirt: 28 },
+  m: { pants: 88, shorts: 12, skirt: 0, shalwar: 0 },
+  f: { pants: 62, shorts: 10, skirt: 28, shalwar: 0 },
 };
 
 export type FacialHair = NonNullable<Appearance['facialHair']>;
 export type BottomStyle = NonNullable<Appearance['bottomStyle']>;
+
+type Pairs = readonly (readonly [string, number])[];
+
+/**
+ * Tabelas de um perfil regional (AgentInfo.appearance). Trocam as do padrão sem mudar a ordem nem a quantidade de
+ * sorteios: pele e olhos passam a ter pesos (um sorteio, como o `pick` do padrão) e o sorteio de cor "divertida" do
+ * cabelo cai na cor natural.
+ */
+export interface ProfileTables {
+  skins: Pairs;
+  hair: Pairs;
+  eyes: Pairs;
+  hairStyle: Record<'f' | 'm', Weights<HairStyle>>;
+  topStyle: Record<'f' | 'm', Weights<TopStyle>>;
+  accessory: Record<'f' | 'm', Weights<Accessory>>;
+  facialHair: Weights<FacialHair>;
+  bottomStyle: Record<'f' | 'm', Weights<BottomStyle>>;
+}
+
+const PROFILES: Readonly<Record<AppearanceProfile, ProfileTables>> = { pk: PROFILE_PK };
 
 /** Mistura a semente (sementes consecutivas viram sequências bem diferentes). */
 function scramble(seed: number): number {
@@ -89,7 +145,10 @@ function scramble(seed: number): number {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
-export function appearanceFromSeed(seed: number, opts: { look?: 'f' | 'm'; sub?: boolean; parts?: AppearanceParts } = {}): Appearance {
+export function appearanceFromSeed(
+  seed: number,
+  opts: { look?: 'f' | 'm'; sub?: boolean; parts?: AppearanceParts; profile?: AppearanceProfile } = {},
+): Appearance {
   const rnd = mulberry32(scramble(seed));
   const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length) % arr.length];
   const weighted = <T extends string>(w: Weights<T>): T => {
@@ -102,18 +161,19 @@ export function appearanceFromSeed(seed: number, opts: { look?: 'f' | 'm'; sub?:
     }
     return entries[entries.length - 1][0];
   };
-  const weightedPair = (arr: readonly (readonly [string, number])[]): string =>
-    weighted(Object.fromEntries(arr) as Weights<string>);
+  const weightedPair = (arr: Pairs): string => weighted(Object.fromEntries(arr) as Weights<string>);
+  // Perfil desconhecido (servidor mais novo) = o padrão.
+  const prof: ProfileTables | undefined = opts.profile ? PROFILES[opts.profile] : undefined;
 
   // A ordem dos sorteios é fixa: mudar a ordem muda todas as aparências.
   const lookRoll = rnd();
   const look: 'f' | 'm' = opts.look ?? (lookRoll < 0.5 ? 'f' : 'm');
-  const skin = pick(SKINS);
+  const skin = prof ? weightedPair(prof.skins) : pick(SKINS);
   const fun = rnd() < 0.08;
-  const hair = fun ? pick(HAIR_FUN) : weightedPair(HAIR_NATURAL);
-  let hairStyle = weighted(HAIR_W[look]);
-  const eyes = pick(EYES);
-  const topStyle = weighted(TOP_W[look]);
+  const hair = fun && !prof ? pick(HAIR_FUN) : weightedPair(prof?.hair ?? HAIR_NATURAL);
+  let hairStyle = weighted((prof?.hairStyle ?? HAIR_W)[look]);
+  const eyes = prof ? weightedPair(prof.eyes) : pick(EYES);
+  const topStyle = weighted((prof?.topStyle ?? TOP_W)[look]);
 
   let top: string;
   let topAccent: string;
@@ -131,27 +191,50 @@ export function appearanceFromSeed(seed: number, opts: { look?: 'f' | 'm'; sub?:
       top = pick(TOP_COLORS);
       topAccent = rnd() < 0.6 ? pick(LIGHT_ACCENTS) : pick(TOP_COLORS);
       break;
+    case 'kurta':
+      top = pick(KURTA_COLORS);
+      topAccent = pick(KURTA_TRIM);
+      break;
+    case 'kurta_waistcoat':
+      top = pick(KURTA_COLORS);
+      topAccent = pick(WAISTCOAT_COLORS);
+      break;
+    case 'shalwar_kameez':
+      top = pick(KAMEEZ_COLORS);
+      topAccent = pick(ACC_COLORS.dupatta);
+      break;
     default:
       top = pick(TOP_COLORS);
       topAccent = pick(TOP_COLORS);
   }
-  if (topAccent === top) topAccent = pick(LIGHT_ACCENTS);
+  // Nas batas o detalhe fica na paleta do estilo (colete escuro, dupatta...): a próxima cor dela, sem sorteio a mais.
+  if (topAccent === top) topAccent = LONG_TOPS.has(topStyle) ? topPalettes(topStyle).topAccent.find((c) => c !== top)! : pick(LIGHT_ACCENTS);
 
-  const bottom = weightedPair(BOTTOMS);
+  let bottom = weightedPair(BOTTOMS);
   const shoes = weightedPair(SHOES);
-  let accessory = weighted(ACC_W[look]);
-  // Bonés e gorros não combinam com penteados volumosos no topo.
-  if ((accessory === 'cap' || accessory === 'beanie') && (hairStyle === 'afro' || hairStyle === 'bun' || hairStyle === 'mohawk' || hairStyle === 'pigtails')) {
+  let accessory = weighted((prof?.accessory ?? ACC_W)[look]);
+  // Bonés, gorros e o topi não combinam com penteados volumosos no topo.
+  if (HATS.includes(accessory) && TALL_HAIR.includes(hairStyle)) {
     accessory = 'glasses';
   }
   if (accessory === 'bow' && (hairStyle === 'bald' || hairStyle === 'buzz')) accessory = 'earrings';
   const accessoryColor = pick(ACC_COLORS[accessory]);
   const lanyardRoll = rnd();
-  const facialRoll = weighted(FACIAL_W);
+  const facialRoll = weighted(prof?.facialHair ?? FACIAL_W);
   const facialHair: FacialHair = look === 'm' ? facialRoll : 'none';
-  const bottomStyle = weighted(BOTTOM_W[look]);
+  let bottomStyle = weighted((prof?.bottomStyle ?? BOTTOM_W)[look]);
+  // Perfis com roupas regionais: o shalwar kameez vem sempre com shalwar; a kurta, com shalwar ou calça (o que saiu);
+  // camisa, polo etc. nunca com shalwar, e bata longa não vai com saia. Sem sorteio a mais (o padrão não muda).
+  if (prof) {
+    if (topStyle === 'shalwar_kameez') bottomStyle = 'shalwar';
+    else if (!LONG_TOPS.has(topStyle) && bottomStyle === 'shalwar') bottomStyle = 'pants';
+    else if (LONG_TOPS.has(topStyle) && bottomStyle === 'skirt') bottomStyle = 'shalwar';
+  }
   // Cabelos raros e grisalhos pedem menos careca/raspado em looks femininos.
   if (look === 'f' && hairStyle === 'bald') hairStyle = 'buzz';
+  // Shalwar sai da cor da bata (o conjunto) ou, com outra parte de cima, no tom equivalente ao da calça sorteada (sem
+  // sorteio a mais).
+  if (bottomStyle === 'shalwar') bottom = SHALWAR_COLORS.includes(top) ? top : SHALWAR_OF_PANTS[bottom] ?? SHALWAR_COLORS[0];
 
   const a: Appearance = {
     skin,
@@ -199,6 +282,12 @@ function topPalettes(style: TopStyle): { top: readonly string[]; topAccent: read
       return { top: SHIRT_COLORS, topAccent: TIE_COLORS };
     case 'jacket':
       return { top: JACKET_COLORS, topAccent: ACCENTS };
+    case 'kurta':
+      return { top: KURTA_COLORS, topAccent: KURTA_TRIM };
+    case 'kurta_waistcoat':
+      return { top: KURTA_COLORS, topAccent: WAISTCOAT_COLORS };
+    case 'shalwar_kameez':
+      return { top: KAMEEZ_COLORS, topAccent: ACC_COLORS.dupatta };
     default:
       return { top: TOP_COLORS, topAccent: ACCENTS };
   }
@@ -217,7 +306,7 @@ export function editorOptions(a: Appearance): EditorOptions {
     top: top.top,
     topAccent: top.topAccent,
     topStyle: TOP_STYLES,
-    bottom: colorsOf(BOTTOMS),
+    bottom: a.bottomStyle === 'shalwar' ? SHALWAR_COLORS : colorsOf(BOTTOMS),
     bottomStyle: BOTTOM_STYLES,
     shoes: colorsOf(SHOES),
     accessory: ACCESSORIES,
@@ -226,17 +315,16 @@ export function editorOptions(a: Appearance): EditorOptions {
   };
 }
 
-const TALL_HAIR: readonly string[] = ['afro', 'bun', 'mohawk', 'pigtails'];
 const SHORT_HAIR: readonly string[] = ['bald', 'buzz'];
 
 /** Combinação que o sorteio evita (o editor desabilita a opção): devolve o motivo, ou undefined se pode. */
 export function editorConflict(a: Appearance, key: PartKey, value: string): string | undefined {
   if (key === 'accessory') {
-    if ((value === 'cap' || value === 'beanie') && TALL_HAIR.includes(a.hairStyle)) return 'Não combina com este cabelo';
+    if (HATS.includes(value) && TALL_HAIR.includes(a.hairStyle)) return 'Não combina com este cabelo';
     if (value === 'bow' && SHORT_HAIR.includes(a.hairStyle)) return 'Não combina com este cabelo';
   }
   if (key === 'hairStyle') {
-    if ((a.accessory === 'cap' || a.accessory === 'beanie') && TALL_HAIR.includes(value)) return 'Não combina com o boné ou o gorro';
+    if (HATS.includes(a.accessory) && TALL_HAIR.includes(value)) return 'Não combina com o boné ou o gorro';
     if (a.accessory === 'bow' && SHORT_HAIR.includes(value)) return 'Não combina com o laço';
   }
   return undefined;
@@ -246,5 +334,11 @@ export function editorConflict(a: Appearance, key: PartKey, value: string): stri
 export function fitToOptions(a: Appearance): Appearance {
   const o = editorOptions(a);
   const fit = (v: string, list: readonly string[]): string => (list.includes(v) ? v : list[0]);
-  return { ...a, top: fit(a.top, o.top), topAccent: fit(a.topAccent, o.topAccent), accessoryColor: fit(a.accessoryColor, o.accessoryColor) };
+  return {
+    ...a,
+    top: fit(a.top, o.top),
+    topAccent: fit(a.topAccent, o.topAccent),
+    bottom: fit(a.bottom, o.bottom),
+    accessoryColor: fit(a.accessoryColor, o.accessoryColor),
+  };
 }

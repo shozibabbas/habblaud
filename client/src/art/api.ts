@@ -23,6 +23,7 @@
 //   escuro (não preto); 3–4 tons por material; brilhos especulares; sombras de contato; muitos detalhes pequenos.
 
 import type { AppearanceParts } from '../../../shared/appearance';
+import type { AppearanceProfile } from '../../../shared/types';
 
 export const TILE = 16;
 
@@ -73,15 +74,27 @@ export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book
   | 'scissors' // pose 'rps': indicador e médio em V (tesoura)
   | 'phone' // celular (com 'read' ou 'sit': olhando a tela, polegar rolando; tela acesa azulada)
   | 'lipstick' // batom (pose 'groom')
-  | 'comb'; // pente (pose 'groom')
+  | 'comb' // pente (pose 'groom')
+  // --- recreação do campus (aditivo)
+  | 'racket' // raquete de tênis (pose 'play': a mesma rotina da raquete de ping-pong, cabo mais longo e aro com cordas)
+  | 'cigarette'; // cigarro aceso entre os dedos (pose 'drink' leva à boca; 'stand'/'sit' segura ao lado). A fumaça é do mundo
 
 export type HairStyle =
   | 'short' | 'buzz' | 'spiky' | 'side_part' | 'curly' | 'afro' | 'bob' | 'long' | 'ponytail' | 'bun' | 'pigtails'
-  | 'mohawk' | 'bald' | 'wavy';
+  | 'mohawk' | 'bald' | 'wavy'
+  | 'braid'; // (aditivo) trança única caindo nas costas
 
-export type TopStyle = 'tshirt' | 'hoodie' | 'shirt_tie' | 'sweater' | 'jacket' | 'blouse' | 'polo';
+export type TopStyle = 'tshirt' | 'hoodie' | 'shirt_tie' | 'sweater' | 'jacket' | 'blouse' | 'polo'
+  // --- roupas do sul da Ásia (aditivo): batas até o joelho, desenhadas por cima da parte de baixo
+  | 'kurta' // bata solta com gola curta, carcela e fendas laterais; topAccent = gola/botões
+  | 'shalwar_kameez' // kameez com barrado bordado e dupatta nos ombros, ambos em topAccent
+  | 'kurta_waistcoat'; // kurta (top) com colete sem mangas por cima (topAccent)
 
-export type Accessory = 'none' | 'glasses' | 'sunglasses' | 'headphones' | 'cap' | 'beanie' | 'earrings' | 'bow';
+export type Accessory = 'none' | 'glasses' | 'sunglasses' | 'headphones' | 'cap' | 'beanie' | 'earrings' | 'bow'
+  // --- (aditivo)
+  | 'dupatta' // lenço solto sobre a cabeça e os ombros (o cabelo da frente aparece)
+  | 'hijab' // cobre cabelo, orelhas e pescoço, emoldurando o rosto (o cabelo não é desenhado)
+  | 'topi'; // gorrinho redondo no alto da cabeça (de oração ou karakul)
 
 export interface Appearance {
   skin: string;
@@ -101,7 +114,7 @@ export interface Appearance {
   /** (Opcional, aditivo) Barba/bigode — só sorteado para look 'm'. Ausente = sem pelos faciais. */
   facialHair?: 'none' | 'stubble' | 'beard' | 'mustache' | 'goatee';
   /** (Opcional, aditivo) Parte de baixo da roupa. Ausente = calça. */
-  bottomStyle?: 'pants' | 'shorts' | 'skirt';
+  bottomStyle?: 'pants' | 'shorts' | 'skirt' | 'shalwar';
 }
 
 export interface Rect {
@@ -142,8 +155,6 @@ export interface CharacterFrameRequest {
   held?: HeldItem;
   /** Para poses que podem ser em pé ou sentado (raise_hand, read, talk). */
   seated?: boolean;
-  /** Acessório sazonal; ausente mantém a aparência original. */
-  costume?: 'santa' | 'witch' | 'pumpkin' | 'vampire';
 }
 
 export type FurnitureKind =
@@ -199,6 +210,15 @@ export type FurnitureKind =
   // --- recepção
   | 'reception_desk' // 3x1 balcão de recepção.
   | 'bench' // 2x1 banco de espera (assento, olhando para baixo).
+  // --- recreação do campus (aditivo; art/furniture/recreation.ts)
+  | 'sleep_pod' // 2x1 cápsula de dormir com a abertura ao SUL. state 0 = livre (visor aberto, colchão à mostra), 1 = ocupada (visor fechado, luz baixa por dentro).
+  | 'tennis_net' // 1x11 rede da quadra de tênis (corre norte-sul; postes nas pontas). Use dx = TILE/2 para centrar na linha do meio.
+  | 'court_fence' // 1x1 alambrado da quadra. variants: 'h' (leste-oeste) | 'v' (norte-sul) | 'post' (quina/batente do portão)
+  | 'floodlight' // 1x1 poste alto de refletor (cabeça virada para a quadra). rects.glow = lâmpadas.
+  | 'scoreboard' // 2x1 placar de pé. rects.screen = mostrador (o mundo escreve o placar).
+  | 'ash_bin' // 1x1 lixeira-cinzeiro de inox com areia no topo.
+  | 'smoking_shelter' // 4x1 abrigo da área de fumantes: painel de vidro ao fundo e cobertura (quem senta fica à frente/sul).
+  | 'rec_sign' // 1x1 placa num poste. variants: 'smoking' (cigarro) | 'tennis' (raquete e bola)
   // --- mesquita (aditivo; campus). A qibla fica a oeste: quem reza olha para a esquerda.
   | 'mihrab' // 1x2 nicho da qibla encostado na parede oeste (arco pontudo, azulejos, lamparina).
   | 'minbar' // 2x1 púlpito de perfil: degraus subindo para oeste e um pequeno dossel.
@@ -284,6 +304,14 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   sink: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   reception_desk: { mount: 'floor', footprint: { w: 3, h: 1 }, blocks: true },
   bench: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: false, seat: true },
+  sleep_pod: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true, states: 2 },
+  tennis_net: { mount: 'floor', footprint: { w: 1, h: 11 }, blocks: true },
+  court_fence: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['h', 'v', 'post'] },
+  floodlight: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  scoreboard: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true },
+  ash_bin: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  smoking_shelter: { mount: 'floor', footprint: { w: 4, h: 1 }, blocks: true },
+  rec_sign: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['smoking', 'tennis'] },
   mihrab: { mount: 'floor', footprint: { w: 1, h: 2 }, blocks: true },
   minbar: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true },
   jali_screen: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['v', 'end'] },
@@ -368,7 +396,8 @@ export type IconName = 'alert' | 'question' | 'zzz' | 'check' | 'heart' | 'coffe
 
 /** Assinatura que art/index.ts deve exportar (o mundo e a UI dependem disto). */
 export interface ArtModule {
-  appearanceFromSeed(seed: number, opts?: { look?: 'f' | 'm'; sub?: boolean; parts?: AppearanceParts }): Appearance;
+  /** `profile`: perfil regional das tabelas do sorteio (AgentInfo.appearance); ausente = o padrão. */
+  appearanceFromSeed(seed: number, opts?: { look?: 'f' | 'm'; sub?: boolean; parts?: AppearanceParts; profile?: AppearanceProfile }): Appearance;
   /** Ancoragem: (ax, ay) = centro dos pés (ponto no chão). Personagem ocupa ~14–18px de largura e ~24–28px de altura. */
   characterSprite(req: CharacterFrameRequest): Sprite;
   poseFrameCount(pose: Pose): number;
@@ -405,5 +434,5 @@ export interface ArtModule {
    */
   footballLance?(t: number, seed: number): { lance: number; progress: number; right: boolean; period: number; goalAt: number };
   /** Avatar (cabeça + ombros) ampliado para a UI. `parts`: peças do personagem editado (ver AgentInfo.parts). */
-  avatarCanvas(seed: number, opts?: { look?: 'f' | 'm'; sub?: boolean; scale?: number; parts?: AppearanceParts }): HTMLCanvasElement;
+  avatarCanvas(seed: number, opts?: { look?: 'f' | 'm'; sub?: boolean; scale?: number; parts?: AppearanceParts; profile?: AppearanceProfile }): HTMLCanvasElement;
 }

@@ -64,3 +64,12 @@ describe('nameKey, parseSeed e partsKey', () => {
     expect(partsKey({ skin: '#000000' })).not.toBe(partsKey({ skin: '#000000', hairStyle: 'bob' }));
   });
 });
+
+describe('peças do sul da Ásia', () => {
+  it('parseAppearanceParts aceita kurta, shalwar kameez, colete, shalwar, dupatta, hijab, topi e trança', () => {
+    for (const topStyle of ['kurta', 'shalwar_kameez', 'kurta_waistcoat']) expect(parseAppearanceParts({ topStyle })).toEqual({ topStyle });
+    for (const accessory of ['dupatta', 'hijab', 'topi']) expect(parseAppearanceParts({ accessory })).toEqual({ accessory });
+    expect(parseAppearanceParts({ bottomStyle: 'shalwar', hairStyle: 'braid' })).toEqual({ hairStyle: 'braid', bottomStyle: 'shalwar' });
+    expect(parseAppearanceParts({ topStyle: 'kameez' })).toBeNull();
+  });
+});

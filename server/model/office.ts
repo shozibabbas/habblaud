@@ -8,6 +8,7 @@ import type {
   AgentInfo,
   AgentStats,
   AgentStatus,
+  AppearanceProfile,
   FeedItem,
   Notice,
   NoticeLevel,
@@ -28,6 +29,7 @@ import { nameKey, type AppearanceParts } from '../../shared/appearance';
 import { DemoSimulator } from '../../shared/demo/simulator';
 import { describeGitHubEvent, githubEventKey, RoomEffects, type GitHubEvent } from '../../shared/github';
 import { hash32 } from '../../shared/hash';
+import { appearanceProfileOf, type NameSet as NameSetId } from '../../shared/names';
 import { applyPermission } from '../permissions/registry';
 import type { NameStore, StoredCharacter } from './names';
 import { normalizeCwd, roomDisplayNames, SlotAllocator } from './rooms';
@@ -53,6 +55,8 @@ const FEED_LIMIT = 200;
 
 export interface OfficeDeps {
   names: NameStore;
+  /** Conjunto de nomes (HABBLAUD_NAMES): o mesmo do NameStore; escolhe também o perfil da aparência dos agentes. */
+  nameSet?: NameSetId;
   /** Nome escolhido pelo usuário para a sala da pasta (model/room-aliases.ts), se houver. */
   roomAlias?: (path: string) => string | undefined;
   version: string;
@@ -214,9 +218,12 @@ export class Office {
   private effects = new RoomEffects();
   private seq = 0;
   private readonly now: () => number;
+  /** Perfil da aparência posto em todo agente (AgentInfo.appearance); undefined = o padrão. */
+  private readonly profile: AppearanceProfile | undefined;
 
   constructor(private readonly deps: OfficeDeps) {
     this.now = deps.now ?? Date.now;
+    this.profile = appearanceProfileOf(deps.nameSet ?? 'br');
   }
 
   /** Avisado (síncrono) sempre que algo muda; o hub decide quando fazer commit(). */
@@ -344,6 +351,7 @@ export class Office {
       seed: chosen?.seed ?? hash32(p.id),
     };
     if (p.provider && p.provider !== 'claude') info.provider = p.provider;
+    if (this.profile) info.appearance = this.profile;
     if (chosen) {
       info.custom = true;
       if (chosen.parts) info.parts = { ...chosen.parts };
@@ -607,6 +615,7 @@ export class Office {
       seed: hash32(p.id),
     };
     if (parent.info.provider) info.provider = parent.info.provider;
+    if (this.profile) info.appearance = this.profile;
     if (p.title) info.title = p.title;
     if (p.background) info.background = true;
     this.agents.set(p.id, { info, history: [], turnStart: now });
@@ -795,7 +804,7 @@ export class Office {
     if (enabled === this.isDemo()) return;
     const now = this.now();
     if (enabled) {
-      this.demo = new DemoSimulator({ idPrefix: 'demo:' }, now);
+      this.demo = new DemoSimulator({ idPrefix: 'demo:', nameSet: this.deps.nameSet }, now);
       this.demoSnap = this.demo.snapshot(now);
     } else {
       this.demo = null;

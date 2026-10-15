@@ -399,19 +399,26 @@ um **chip colorido com a letra da conta** (C, D…).
 
 Em **Configurações → Aparência → Tema do escritório**, escolha:
 
-- **Automático** (padrão): segue o calendário, na hora local. Halloween de 1º a 31 de outubro, Natal de 1º de
-  novembro a 26 de dezembro e, no resto do ano, o visual original.
+- **Automático** (padrão): segue o calendário hijri (Umm al-Qura, pelo navegador), na hora local. Ramadã o mês
+  inteiro, Eid al-Fitr de 1 a 3 de Shawwal, Eid al-Adha de 10 a 13 de Dhu al-Hijjah e, no resto do ano, o visual
+  original.
 - **Nenhum**: sempre o visual original.
-- **Natal**: guirlandas, luzes quentes, árvores com presentes, tapetes natalinos, neve nas janelas e gorros nos personagens.
-- **Halloween**: abóboras, fantasmas decorativos, teias, morcegos, luzes roxas, tapetes temáticos e acessórios de fantasia.
+- **Ramadã**: fanoos (lanternas) que brilham à noite, varal de luzes com lanterninhas, luas crescentes e estrelas, lua
+  crescente nas janelas à noite, estrelas douradas nos tapetes, faixa "Ramadan Mubarak" na recepção e, perto do pôr
+  do sol, o iftar na copa (tâmaras, água, pakoras e sharbat de rosas).
+- **Eid al-Fitr**: bandeirinhas verdes e douradas, balões, lanternas, faixa "Eid Mubarak", sheer khurma e caixas de
+  mithai nas mesas, fogos discretos nas janelas à noite e um brilho pequeno nos personagens.
+- **Eid al-Adha**: o mesmo clima de festa, em verde-água e dourado.
 
 A troca é imediata e a escolha fica salva neste navegador. Os temas preservam os caminhos,
-as atividades e as animações dos agentes. O ciclo dia/noite continua sendo uma opção independente.
+as atividades e as animações dos agentes, e funcionam no prédio único e no escritório combinado. O ciclo dia/noite
+continua sendo uma opção independente, e "reduzir movimento" desliga o tremular, os fogos e os brilhos. Para ver uma
+data, use `?hijri=1447-09-10` (ou `?hijri=10-1`) na URL, como `?hora=21:30` para a hora do dia.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/seasonal-christmas.png" alt="Escritório no tema Natal: árvores com presentes nos cantos das salas, guirlandas e luzes nas paredes, tapetes vermelhos e personagens de gorro" /></td>
-    <td width="50%"><img src="docs/screenshots/seasonal-halloween.png" alt="Escritório no tema Halloween: abóboras e fantasmas no lugar das plantas, teias e morcegos nas paredes, tapetes roxos e personagens fantasiados" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-ramadan.png" alt="Escritório no tema Ramadã ao pôr do sol: fanoos no lugar das plantas, luas crescentes sobre os elevadores, faixa Ramadan Mubarak na recepção, estrelas douradas nos tapetes e o iftar nas mesas da copa" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-eid.png" alt="Escritório no tema Eid al-Fitr: balões e lanternas verdes, bandeirinhas verdes e douradas nas paredes, faixa Eid Mubarak na recepção e doces nas mesas" /></td>
   </tr>
 </table>
 

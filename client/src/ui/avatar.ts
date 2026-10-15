@@ -6,13 +6,13 @@ import { h } from './dom';
 
 const cache = new Map<string, { url: string; w: number; h: number }>();
 
-type AvatarSource = Pick<AgentInfo, 'seed' | 'look' | 'kind' | 'parts'>;
+type AvatarSource = Pick<AgentInfo, 'seed' | 'look' | 'kind' | 'parts' | 'appearance'>;
 
 function avatarData(agent: AvatarSource, scale: number): { url: string; w: number; h: number } {
-  const key = `${agent.seed}|${agent.look}|${agent.kind}|${scale}|${partsKey(agent.parts)}`;
+  const key = `${agent.seed}|${agent.look}|${agent.kind}|${scale}|${partsKey(agent.parts)}|${agent.appearance ?? ''}`;
   let entry = cache.get(key);
   if (!entry) {
-    const c = avatarCanvas(agent.seed, { look: agent.look, sub: agent.kind === 'sub', scale, parts: agent.parts });
+    const c = avatarCanvas(agent.seed, { look: agent.look, sub: agent.kind === 'sub', scale, parts: agent.parts, profile: agent.appearance });
     entry = { url: c.toDataURL('image/png'), w: c.width, h: c.height };
     cache.set(key, entry);
   }
@@ -38,7 +38,7 @@ export function createAvatarPlaceholder(size: AvatarSize): HTMLElement {
 
 /** Atualiza o avatar só se a aparência (semente, look, peças) mudou. */
 export function updateAvatar(box: HTMLElement, agent: AvatarSource, size: AvatarSize): void {
-  const sig = `${agent.seed}|${agent.look}|${agent.kind}|${partsKey(agent.parts)}`;
+  const sig = `${agent.seed}|${agent.look}|${agent.kind}|${partsKey(agent.parts)}|${agent.appearance ?? ''}`;
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig;
   let img = box.querySelector('img');

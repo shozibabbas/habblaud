@@ -6,7 +6,7 @@ import type { AreaLayout, WallItemPlacement, WallSegment } from '../layout/types
 import type { RoomState } from '../sim/room-state';
 import type { WallArtAsset, WorldAssets } from '../assets';
 import type { SeasonalTheme } from '../api';
-import { decorateSeasonalRug, decorateSeasonalWall, seasonalRugColor, seasonalWallStyle } from './seasonal';
+import { decorateSeasonalBanner, decorateSeasonalRug, decorateSeasonalWall } from './seasonal';
 
 /** Margem acima da área no cache de paredes (itens que passam do topo da face). */
 export const WALL_MARGIN = 16;
@@ -212,8 +212,6 @@ function tintFloor(ctx: CanvasRenderingContext2D, px: { x: number; y: number; w:
 export function buildAreaVis(art: ArtModule, layout: AreaLayout, room: RoomState | undefined, assets: WorldAssets | null, theme: SeasonalTheme = 'none'): AreaVis {
   const r = layout.rect;
   const px = { x: r.x * TILE, y: r.y * TILE, w: r.w * TILE, h: r.h * TILE };
-  // a mesquita não recebe as decorações de Halloween/Natal
-  if (layout.kind === 'mosque') theme = 'none';
 
   // ---- piso + tapetes
   const [floor, fctx] = makeCanvas(px.w, px.h);
@@ -228,11 +226,10 @@ export function buildAreaVis(art: ArtModule, layout: AreaLayout, room: RoomState
   }
   if (layout.floorTint) tintFloor(fctx, px, layout.floorTint);
   for (const rug of layout.rugs) {
-    const color = seasonalRugColor(theme, rug.color);
     try {
-      art.drawRug(fctx, rug.x, rug.y, rug.w, rug.h, color, rug.seed);
+      art.drawRug(fctx, rug.x, rug.y, rug.w, rug.h, rug.color, rug.seed);
     } catch {
-      fctx.fillStyle = color;
+      fctx.fillStyle = rug.color;
       fctx.fillRect(rug.x, rug.y, rug.w, rug.h);
     }
     decorateSeasonalRug(fctx, theme, rug);
@@ -242,7 +239,7 @@ export function buildAreaVis(art: ArtModule, layout: AreaLayout, room: RoomState
   const [walls, wctx] = makeCanvas(px.w, px.h + WALL_MARGIN);
   wctx.translate(-px.x, -px.y + WALL_MARGIN);
   const order = { face: 0, south: 1, cap: 2 } as const;
-  for (const w of [...layout.walls].sort((a, b) => order[a.kind] - order[b.kind])) drawWallSegment(art, wctx, { ...w, style: seasonalWallStyle(theme, w.style) });
+  for (const w of [...layout.walls].sort((a, b) => order[a.kind] - order[b.kind])) drawWallSegment(art, wctx, w);
   for (const w of layout.walls) decorateSeasonalWall(wctx, theme, w);
 
   const wallItems: WallVis[] = [];
@@ -263,6 +260,7 @@ export function buildAreaVis(art: ArtModule, layout: AreaLayout, room: RoomState
     wctx.drawImage(s.base.canvas, o.x, o.y);
     if (ai && it.kind === 'painting') drawRawPainting(wctx, s.base, o.x, o.y, ai);
   }
+  decorateSeasonalBanner(wctx, theme, layout, DYNAMIC_WALL);
 
   // ---- móveis
   const furniture: FurnVis[] = layout.furniture.map((f) => {

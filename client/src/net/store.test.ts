@@ -50,6 +50,12 @@ describe('mockOptionsFrom', () => {
     expect(mockOptionsFrom('?sessions=999&speed=999')).toEqual({ speed: 50, sessions: 40 });
   });
 
+  it('&names=pk: nomes e aparência paquistaneses; br ou desconhecido = o padrão', () => {
+    expect(mockOptionsFrom('?mock=1&names=pk').nameSet).toBe('pk');
+    expect(mockOptionsFrom('?mock=1&names=br')).not.toHaveProperty('nameSet');
+    expect(mockOptionsFrom('?mock=1&names=xx')).not.toHaveProperty('nameSet');
+  });
+
   it('para capturas de tela: semente fixa e o Codex sem cota', () => {
     expect(mockOptionsFrom('?mock=1&seed=7&noquota=1')).toEqual({ speed: 1, sessions: 4, seed: 7, codexNoQuota: true });
     expect(mockOptionsFrom('?seed=-1&noquota=0')).toEqual({ speed: 1, sessions: 4 });

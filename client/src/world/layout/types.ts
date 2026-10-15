@@ -98,7 +98,11 @@ export type SpotKind =
   | 'sink'
   | 'elevator'
   | 'talk'
-  | 'watch' // ponto em pé da torcida (assistir a uma partida)
+  | 'watch' // ponto em pé da torcida (assistir a uma partida); sentado nos bancos da quadra de tênis
+  // --- recreação do campus (layout/recreation.ts)
+  | 'tennis' // jogador na quadra de tênis (4 por quadra: duas duplas)
+  | 'pod' // cápsula de dormir (quem entra some e a cápsula fecha)
+  | 'smoke' // lugar na área de fumantes (em pé junto ao cinzeiro ou no banco do abrigo)
   // --- mesquita (aditivo; layout/mosque.ts)
   | 'shoes' // diante da sapateira (tirar/calçar os sapatos)
   | 'headwear' // diante do cesto de topis / cabideiro de hijabs
@@ -167,6 +171,11 @@ export interface AreaLayout {
   bld?: string;
   /** Texto da placa de uma área comum (ex.: o nome da máquina no saguão do prédio dela). */
   signText?: string;
+  /**
+   * Campus: área de recreação (layout/recreation.ts). 'court' e 'smoking' ficam ao ar livre (a iluminação as
+   * trata como gramado, com os refletores da quadra à noite); 'rest' (cápsulas) fica na penumbra.
+   */
+  rec?: 'games' | 'rest' | 'court' | 'smoking';
 }
 
 /** Elemento decorativo externo (árvore, arbusto, poste...) desenhado pelo próprio mundo. */

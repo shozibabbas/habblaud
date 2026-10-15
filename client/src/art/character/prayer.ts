@@ -5,10 +5,9 @@
 // Curvado (ruku) e prostrado (sujood): o tronco e a cabeça são desenhados em pé num buffer à parte e girados
 // 90° em torno do quadril (rotação exata de pixel art, sem reamostrar). O que a roupa desenha abaixo do quadril
 // (barra de uma bata longa) fica pendurado no lugar, sem girar.
-import { ACCESSORIES } from '../../../../shared/appearance';
 import type { CharacterFrameRequest, Pose } from '../api';
 import { mix, shade } from '../core/color';
-import { PixelBuf, type Palette } from '../core/pixbuf';
+import { PixelBuf } from '../core/pixbuf';
 import type { BufSprite } from '../core/sprite';
 import type { HeadView } from './hair';
 import { CHAR_AX, CHAR_AY, CHAR_H, CHAR_PARTS as P, type Arm, type Dc, type Rig } from './render';
@@ -33,9 +32,6 @@ export const PRAYER_AX = DX + 12;
 /** Linha do quadril em pé (coordenadas padrão): o eixo das rotações. */
 const HIP_Y = 24;
 
-/** Acessórios que o renderer já desenha (o hijab/topi de verdade chegam com as roupas paquistanesas). */
-const KNOWN: ReadonlySet<string> = new Set<string>(ACCESSORIES);
-
 export function renderPrayer(req: CharacterFrameRequest): BufSprite {
   if (req.dir === 'right') {
     const left = renderPrayer({ ...req, dir: 'left' });
@@ -46,7 +42,6 @@ export function renderPrayer(req: CharacterFrameRequest): BufSprite {
   const out = new PixelBuf(PRAYER_W, CHAR_H);
   out.ox = DX;
   const dc = context(req, out, pose === 'wudu');
-  costume = req.costume;
   switch (pose) {
     case 'takbir':
     case 'qiyam':
@@ -76,9 +71,6 @@ export function renderPrayer(req: CharacterFrameRequest): BufSprite {
 
 // ---------------------------------------------------------------- montagem
 
-/** Fantasia sazonal do pedido atual (o mundo não a usa na mesquita, mas a arte respeita o pedido). */
-let costume: CharacterFrameRequest['costume'];
-
 /** Contexto de desenho em perfil (rig de quem está em pé, sem item, olhos baixos). */
 function context(req: CharacterFrameRequest, b: PixelBuf, seated: boolean): Dc {
   const r = P.makeRig({ ...req, pose: seated ? 'sit' : 'stand', frame: 0, held: 'none', seated }, 'side');
@@ -92,7 +84,7 @@ function withRig(dc: Dc, patch: Partial<Rig>, b: PixelBuf = dc.b): Dc {
   return { ...dc, b, r: { ...dc.r, ...patch } };
 }
 
-/** Cabeça completa (cabelo de trás, rosto, barba, cabelo da frente, acessório, fantasia). */
+/** Cabeça completa (cabelo de trás, rosto, barba, cabelo da frente, acessório). */
 function head(dc: Dc, view: HeadView = 'side'): void {
   const d = view === dc.r.view ? dc : withRig(dc, { view });
   P.drawHair(d, 'back');
@@ -100,7 +92,6 @@ function head(dc: Dc, view: HeadView = 'side'): void {
   P.drawFacialHair(d);
   P.drawHair(d, 'front');
   P.drawAccessory(d);
-  P.drawCostume(d, costume);
 }
 
 function arms(dc: Dc, far: Arm, near: Arm, sleeve = P.sleeveLength(dc.a)): { far: () => void; near: () => void } {
@@ -147,7 +138,6 @@ function bowedUpperBody(dc: Dc, hx: number, hy: number): void {
   P.drawFacialHair(d);
   P.drawHair(d, 'front');
   P.drawAccessory(d);
-  P.drawCostume(d, costume);
   const px = 11;
   const out = dc.b;
   for (let y = 0; y < u.h; y++) {
@@ -274,80 +264,7 @@ function drawWudu(dc: Dc, f: number): void {
   }
 }
 
-// ---------------------------------------------------------------- cobertura provisória
-
-/**
- * Hijab desenhado aqui só enquanto o renderer ainda não conhece o acessório 'hijab' (chega com as roupas
- * paquistanesas; depois disso esta função não faz nada). Cobre o alto da cabeça e as laterais, emoldurando o
- * rosto, e cai sobre os ombros. Chamada por drawCostume, então acompanha qualquer pose.
- */
-export function drawCoverFallback(dc: Dc): void {
-  if ((dc.a.accessory as string) !== 'hijab' || KNOWN.has('hijab')) return;
-  const { b, p, r } = dc;
-  const it = p.item;
-  const pal: Palette = { o: it.base, h: it.lt, H: it.hi, d: it.dk, D: it.dd };
-  const ox = P.HX + r.lean;
-  const oy = P.HY + r.ub + r.hd;
-  const rows = COVER[r.view];
-  b.stamp(rows, ox, oy + 1, pal);
-}
-
-const COVER: Readonly<Record<HeadView, readonly string[]>> = {
-  down: [
-    '....oooooo....',
-    '..oohhhhoooo..',
-    '.ohhHhhhooood.',
-    'ohhhhhhhoooodd',
-    'ohhoooooooooDd',
-    'oho........oDd',
-    'oo..........Dd',
-    'oo..........dd',
-    'oo..........dd',
-    'oo..........dd',
-    'od..........dd',
-    'ood........ddd',
-    'oood......dddd',
-    'ooooodddddddd.',
-    '.oooodddddddd.',
-    '..oooddddddd..',
-  ],
-  up: [
-    '....oooooo....',
-    '..oohhhhoooo..',
-    '.ohhHhhhooood.',
-    'ohhhhhhhoooodd',
-    'ohhoooooooooDd',
-    'oooooooooooodd',
-    'oooooooooooodd',
-    'oooooooooooodd',
-    'oooooooooooodd',
-    'oooooooooooodd',
-    'ooooooooooodd.',
-    'oooooooooooddd',
-    'ooooooooooddd.',
-    '.ooooooooddd..',
-    '.ooooodddddd..',
-    '..oodddddd....',
-  ],
-  side: [
-    '....oooooo....',
-    '..oohhhhhooo..',
-    '.ohhHhhhhoood.',
-    'ohhhhhhhoooodd',
-    'oho.ooooooood.',
-    '.....ooooooodd',
-    '......oooooodd',
-    '......oooooodd',
-    '......oooooodd',
-    '......oooooodd',
-    '.....oooooood.',
-    '.....ooooooodd',
-    '....oooooooodd',
-    '...ooooooodddd',
-    '..oooooooddd..',
-    '...ddddddd....',
-  ],
-};
+// ---------------------------------------------------------------- cores
 
 /** Cor de um hijab pela semente (tons suaves de tecido). */
 export function hijabColor(seed: number): string {

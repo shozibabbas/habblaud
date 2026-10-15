@@ -369,7 +369,7 @@ uninstallers leave `settings.json.habblaud-backup-<data>` copies in each account
 | **Working** | At the desk, typing. The monitor and a bubble show the activity: 📖 reading, ✏️ editing, 💻 terminal, 🧪 tests, 🌐 searching… |
 | **Needs you** | Rushes to the desk and raises a hand, with a blinking alert: it's waiting for a permission or an answer in the terminal. |
 | **Waiting on shell** | Finished its turn but left a command running (tests, build, deploy…), so it stays at the desk with an hourglass flipping over its head and the terminal in progress: it eats popcorn while watching, after 3 min it crosses its arms and spins in its chair, after 10 min it gathers cobwebs and after 25 min it dozes off; when the command finishes, it stands up and celebrates with confetti (or gets a rain cloud, if it failed). After 40 s, if there are coworkers with nothing to do, it may head out to a hangout — with the hourglass over its head. |
-| **Idle** | Finished its turn and wanders around: coffee in the kitchen, the water cooler, the restroom, the lounge couch, the phone on the beanbag, the mirror. With idle coworkers around, it joins a hangout: TV, video games, ping-pong, a kitchen chat, rock-paper-scissors (see [Social life](#social-life)). After 10 min without moving, it dozes off — but a coworker may wake it up for a hangout. |
+| **Idle** | Finished its turn and wanders around: coffee in the kitchen, the water cooler, the restroom, the lounge couch, the phone on the beanbag, the mirror. With idle coworkers around, it joins a hangout: TV, video games, ping-pong, a kitchen chat, rock-paper-scissors (see [Social life](#social-life)). After 10 min without moving, it dozes off (in the combined office, in a sleeping pod) — but a coworker may wake it up for a hangout. |
 | **Subagent done** | Walks over to the agent that called it, delivers the result and leaves by elevator. |
 | **Session ended** | Leaves; if it was the last one in the room, it turns off the lights on the way out. |
 
@@ -401,19 +401,26 @@ a **colored chip with the account letter** (C, D…).
 
 In **Settings → Appearance → Office theme**, choose:
 
-- **Automatic** (default): follows the calendar, in local time. Halloween from October 1 to 31, Christmas from
-  November 1 to December 26 and, the rest of the year, the original look.
+- **Automatic** (default): follows the Hijri calendar (Umm al-Qura, via the browser), in local time. Ramadan for the
+  whole month, Eid al-Fitr on Shawwal 1–3, Eid al-Adha on Dhu al-Hijjah 10–13 and, the rest of the year, the
+  original look.
 - **None**: always the original look.
-- **Christmas**: wreaths, warm lights, trees with presents, Christmas rugs, snow on the windows and Santa hats on the characters.
-- **Halloween**: pumpkins, decorative ghosts, cobwebs, bats, purple lights, themed rugs and costume accessories.
+- **Ramadan**: fanoos lanterns that glow at night, string lights with little lanterns, crescents and stars, a crescent
+  moon in the windows at night, gold star motifs on the rugs, a "Ramadan Mubarak" banner in the lobby and, around
+  sunset, an iftar spread in the kitchen (dates, water, pakoras and rose sharbat).
+- **Eid al-Fitr**: green and gold bunting, balloons, lanterns, an "Eid Mubarak" banner, sheer khurma and boxes of
+  mithai on the tables, faint fireworks in the windows at night and a small sparkle on the characters.
+- **Eid al-Adha**: the same festive look in teal and gold.
 
 The switch is immediate and the choice is saved in this browser. The themes keep the agents' paths,
-activities and animations. The day/night cycle is still a separate option.
+activities and animations, and work in the single building and in the combined office. The day/night cycle is
+still a separate option, and "reduce motion" stops the flicker, fireworks and sparkles. To preview a date, add
+`?hijri=1447-09-10` (or `?hijri=10-1`) to the URL, like `?hora=21:30` for the time of day.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/seasonal-christmas.png" alt="Office with the Christmas theme: trees with presents in the corners of the rooms, wreaths and lights on the walls, red rugs and characters in Santa hats" /></td>
-    <td width="50%"><img src="docs/screenshots/seasonal-halloween.png" alt="Office with the Halloween theme: pumpkins and ghosts in place of the plants, cobwebs and bats on the walls, purple rugs and characters in costume" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-ramadan.png" alt="Office with the Ramadan theme at sunset: fanoos lanterns in place of plants, crescents above the elevators, a Ramadan Mubarak banner in the reception, gold stars on the rugs and the iftar spread on the kitchen tables" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-eid.png" alt="Office with the Eid al-Fitr theme: balloons and green lanterns, green and gold bunting on the walls, an Eid Mubarak banner in the reception and sweets on the tables" /></td>
   </tr>
 </table>
 
@@ -779,7 +786,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_FRAME_ANCESTORS` | — (no framing) | Origins allowed to show the office in an iframe, space- or comma-separated (e.g. `http://localhost:4700`): only `http(s)://host[:port]`, no paths or `*`. See [Embed mode](#embed-mode). |
 | `HABBLAUD_PEERS` | — | Combined office: other Habblauds to show in this one, `id=http://host:port` separated by commas (ids: lowercase letters, digits and `-`). See [Combined office](#combined-office-preview). |
 | `HABBLAUD_MACHINE_NAME` | hostname | This computer's name in the combined office. |
-| `HABBLAUD_NAMES` | `br` | Name set for the characters: `br` (Brazilian) or `pk` (Pakistani). Characters that already had a name from the other set get a new one. |
+| `HABBLAUD_NAMES` | `br` | Name set for the characters: `br` (Brazilian) or `pk` (Pakistani). Characters that already had a name from the other set get a new one. `pk` also gives the characters a Pakistani look (skin, hair, eyes, beards, hairstyles and clothes); in a combined office each machine keeps its own. Try it with the mock: `?mock=1&names=pk`. |
 | `HABBLAUD_TERMINAL` | on (local access only) | `0` turns off the terminal, answering and sending messages from the office, and the character editor. With the port exposed they're already off, with no way to turn them on. |
 | `HABBLAUD_PTY` | off | `1` turns on the interactive terminal (open, take over and end Claude Code sessions from the office; local access only and outside Docker) and **New agent** (also in Docker, through `npm run codex:bridge`). Read the warning in [Privacy and security](#privacy-and-security). |
 | `HABBLAUD_CLAUDE_BIN` | `claude` from PATH | The Claude Code executable that the interactive terminal and New agent run. |
@@ -1179,7 +1186,9 @@ a new request to someone — it lets the group know ("Oops, they're calling me! 
 | 📺 | **TV in the lounge** | Soccer, a soap opera or cartoons, with popcorn on the couch. During soccer the fans cheer along with the "GOL" flashing on the screen (or groan at the other team's goal); during the soap opera, little hearts and "No way! 😱". Nap lovers end up falling asleep on the couch. |
 | 🎮 | **Video games** | Two on the couch with controllers, the TV in split screen (racing or fighting), best of 3, trash talk ("What's with this lag?!") and fans. |
 | 👾 | **Arcade** | A duel at the lounge's two machines, a single match. |
-| 🏓 | **Ping-pong** | Up to 5 points, with the ball going back and forth, the score in the bubbles ("3 × 2 🏓") and fans behind the table. |
+| 🏓 | **Ping-pong** | Up to 5 points, with the ball going back and forth, the score in the bubbles ("3 × 2 🏓") and fans behind the table. In the combined office's games hall it's **doubles** whenever four are free (partners alternate shots, friends play together, rivals end up on the other side); otherwise singles. |
+| 🎾 | **Tennis** *(combined office)* | Singles or doubles on the outdoor court: serves from the baseline, the ball arcing over the net with its shadow on the court, players covering their halves, "30–15", "Deuce!", games up to 2 on the scoreboard and fans on the benches. Floodlights at night. |
+| 🚬 | **Smoke break** *(combined office)* | Two smokers chatting by an ash bin in the smoking area, puffing away while the smoke drifts with the wind. Only agents with the Smoking trait go there. |
 | ☕ | **Kitchen chat** | Each one grabs a coffee (or water) and sits at the table: gossip with coworkers' names ("Did you see Rafaela's commit? 👀"), jokes (the group cracks up), work talk ("Deploy on a Friday? 😈") and topics about the day and the time ("TGIF! 🎉"). |
 | 💬 | **Chat** | Two coworkers standing in a corner of the lobby, the kitchen or the lounge. |
 | ✊ | **Rock-paper-scissors for coins** | "Jo… Ken… Po!", the hand signs appear over their heads, the winner celebrates and the coins fly from one to the other; the loser gets upset and, if competitive, asks for a rematch. A tie goes again. Anyone walking by may stop to watch. |
@@ -1204,12 +1213,30 @@ a new request to someone — it lets the group know ("Oops, they're calling me! 
   </tr>
 </table>
 
+### Campus recreation (combined office)
+
+In the combined office a recreation strip runs north of the first row of buildings, reached by a promenade that goes up
+from both ends of the Commons corridor:
+
+- **Games hall** — four table-tennis tables (singles or doubles, with a live score over each table and fans around it),
+  benches, a water cooler and a snack machine.
+- **Rest room** — capsule pods. An agent idle for more than 10 minutes walks to a free pod, climbs in and sleeps behind a
+  closed visor ("Zzz" over the pod, a dim light at night) instead of dozing at the desk. It wakes up and runs back when
+  work arrives, or stretches and walks back after a few minutes. Busy agents never sleep; with every pod taken (or in a
+  single-computer office) the old desk nap stays.
+- **Tennis court** — fenced, with benches, a scoreboard and floodlights (see the table above).
+- **Smoking area** — away from the entrances: a shelter with benches, ash bins and a sign. Smokers come alone (a few
+  drags, standing or sitting) or in pairs to chat.
+
 ### Personalities
 
 Each agent has 2 or 3 traits, drawn from its seed (it's always the same person, in any browser):
 
 🏆 Competition · 🎲 Betting · 🎮 Games · 📺 TV & shows · 🗣️ Gossip · 💄 Vanity · ☕ Caffeine · 😂 Jokes · 🏓 Sports ·
 🙈 Shyness · 💰 Thrift · 😴 Naps · 🧘 Calm · 📚 Reading
+
+On top of those, a minority (about 1 in 6, fewer among sports lovers) has 🚬 **Smoking**, from a separate draw on the
+same seed: in the combined office they spend some breaks in the smoking area.
 
 The traits change what each one chooses (TV lovers turn on the TV, sports lovers call people over for ping-pong), whom
 they call (friends look for each other; rivals challenge each other in games), what they say and even who plays better. Each one also has a

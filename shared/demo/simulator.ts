@@ -19,7 +19,7 @@ import { answerSummary, ASK_TOOL, checkAnswers } from '../answers';
 import { describeGitHubEvent, GITHUB_TOOL, RoomEffects } from '../github';
 import { hash32, mulberry32 } from '../hash';
 import { describeMessage, MESSAGE_TOOL } from '../messages';
-import { pickName } from '../names';
+import { appearanceProfileOf, pickName, type NameSet } from '../names';
 import { demoGitHubEvent } from './github';
 import { demoCodexPermission, demoPermission, type DemoPermissionKind } from './permission';
 import { tr } from '../i18n';
@@ -205,6 +205,8 @@ export interface DemoOptions {
   idPrefix?: string;
   /** Conta do Codex sempre "sem cota" (capturas de tela e testes); sem isso, ela fica sem cota só de vez em quando. */
   codexNoQuota?: boolean;
+  /** Conjunto de nomes (HABBLAUD_NAMES; no ?mock=1, &names=pk); também escolhe o perfil da aparência. Ausente = br. */
+  nameSet?: NameSet;
 }
 
 const SLOT_COOLDOWN_MS = 30_000;
@@ -216,6 +218,7 @@ export class DemoSimulator {
   private speed: number;
   private target: number;
   private prefix: string;
+  private nameSet: NameSet;
   /** Marca desta instância: ids de agentes/atividades/avisos não se repetem ao religar o demo. */
   private tag: string;
   private accounts: DemoAccount[];
@@ -260,6 +263,7 @@ export class DemoSimulator {
     this.codexRng = mulberry32(((opts.seed ?? hash32(String(now))) ^ 0x3c6ef372) >>> 0);
     this.target = opts.sessions ?? 4;
     this.prefix = opts.idPrefix ?? '';
+    this.nameSet = opts.nameSet ?? 'br';
     this.tag = now.toString(36);
     this.accounts = this.prefix
       ? DEMO_ACCOUNTS.map((acc, i) => ({ ...acc, ...MERGED_ACCOUNTS[i], id: `${this.prefix}${acc.id}`, configDir: tr('(demonstração)') }))
@@ -532,7 +536,7 @@ export class DemoSimulator {
     const id = `${this.prefix || 'demo:'}${this.tag}-${n}`;
     // Codex: na abertura, só a 2ª; depois, ~30% das sessões novas (pelo hash do id, sem gastar o sorteio).
     const codex = !!host || (!warm && hash32(`codex:${sessionId}`) % 100 < CODEX_SHARE);
-    const person = pickName(sessionId, this.usedNames());
+    const person = pickName(sessionId, this.usedNames(), this.nameSet);
     const rng = mulberry32(hash32(sessionId));
     const tasks: TaskItem[] = project.tasks
       .slice(0, 3 + Math.floor(rng() * 2))
@@ -568,6 +572,8 @@ export class DemoSimulator {
       canMessage: true,
     };
     if (codex) info.provider = 'codex';
+    const profile = appearanceProfileOf(this.nameSet);
+    if (profile) info.appearance = profile;
     const a: SimAgent = {
       info,
       project,
@@ -593,7 +599,7 @@ export class DemoSimulator {
     const n = ++this.seq;
     const agentId = `a${Math.floor(this.rng() * 1e12).toString(16)}`;
     const id = `${parent.info.sessionId}:${agentId}`;
-    const person = pickName(id, this.usedNames());
+    const person = pickName(id, this.usedNames(), this.nameSet);
     const rng = mulberry32(hash32(id));
     const desc = this.pick(SUB_TASKS, rng);
     const info: AgentInfo = {
@@ -620,6 +626,7 @@ export class DemoSimulator {
       background: rng() < 0.3,
     };
     if (parent.info.provider === 'codex') info.provider = 'codex';
+    if (parent.info.appearance) info.appearance = parent.info.appearance;
     const sub: SimAgent = {
       info,
       project: parent.project,

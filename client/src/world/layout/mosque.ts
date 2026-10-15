@@ -1,4 +1,5 @@
-// Mesquita do campus (escritório combinado): ao norte do Commons, no gramado. Puro e testável.
+// Mesquita do campus (escritório combinado): no gramado ao norte da faixa de recreação (que fica ao norte do
+// Commons), centrada sobre o Commons. Puro e testável.
 //
 // A qibla (direção de Meca) a partir do Paquistão fica a OESTE: todas as filas de oração (safs) correm
 // norte-sul e quem reza olha para a esquerda da tela, para o nicho (mihrab) na parede oeste.
@@ -14,7 +15,8 @@
 //     24 └──────────────────────────────▢────────────┘ ← entrada feminina (sul)
 //
 // Homens e mulheres têm entradas, sapateiras, áreas de ablução e salões separados; não há passagem
-// entre as duas alas. Caminhos no gramado ligam as entradas aos caminhos das entradas do Commons.
+// entre as duas alas. Um caminho corre na frente da mesquita e desce pelos dois lados do pavilhão da recreação
+// até o calçadão dela (que já desce até as pontas do corredor do Commons).
 import { TILE, type Dir, type WallStyle } from '../../art/api';
 import { AreaBuilder } from './builder';
 import type { AreaLayout, ExteriorProp, FloorPatch, SpotDef, TileRect } from './types';
@@ -25,8 +27,8 @@ export const MEN_H = 13;
 /** Ala feminina: face (2) + 9 fileiras de piso + parede sul (com a porta). */
 export const WOMEN_H = 12;
 export const MOSQUE_H = MEN_H + WOMEN_H;
-/** Distância (tiles) entre a parede sul da mesquita e o topo do Commons (caminho + gramado). */
-export const MOSQUE_GAP = 8;
+/** Gramado (tiles) entre o caminho da frente da mesquita e o que fica ao sul dela (a faixa de recreação). */
+export const MOSQUE_GAP = 1;
 /** Altura (tiles) da cúpula e dos minaretes acima da parede norte: entra no enquadramento da visão geral. */
 export const MOSQUE_SKY = 8;
 export const MEN_ID = 'mosque:homens';
@@ -59,23 +61,23 @@ export interface MosqueSite {
 }
 
 /**
- * Lugar da mesquita: centrada sobre o Commons, MOSQUE_GAP tiles ao norte dele. `walks` = x dos calçadões
- * oeste/leste (os mesmos das alas) e a faixa (y, h) dos caminhos das entradas do Commons.
+ * Lugar da mesquita: centrada sobre o Commons, com o caminho da frente logo ao norte de `southY` (o topo da faixa
+ * de recreação). `walks` = x dos calçadões oeste/leste (os mesmos das ligações da recreação e das alas) e a
+ * largura dos caminhos; as descidas vão até `joinY` (exclusive: o fim do calçadão da recreação).
  */
-export function mosqueSite(commons: TileRect, walks: { west: number; east: number; rowY: number; h: number }): MosqueSite {
-  const x = commons.x + Math.floor((commons.w - MOSQUE_W) / 2);
-  const y = commons.y - MOSQUE_GAP - MOSQUE_H;
-  const rect: TileRect = { x, y, w: MOSQUE_W, h: MOSQUE_H };
-  const front = y + MOSQUE_H;
+export function mosqueSite(commons: TileRect, walks: { west: number; east: number; h: number }, southY: number, joinY: number): MosqueSite {
   const ph = walks.h;
+  const front = southY - MOSQUE_GAP - ph;
+  const x = commons.x + Math.floor((commons.w - MOSQUE_W) / 2);
+  const y = front - MOSQUE_H;
+  const rect: TileRect = { x, y, w: MOSQUE_W, h: MOSQUE_H };
   const menDoorY = y + MEN_DOOR_Y;
-  const bottom = walks.rowY + ph;
   const paths: TileRect[] = [
     // caminho diante da mesquita, de calçadão a calçadão (passa pela porta feminina)
     { x: walks.west, y: front, w: walks.east + ph - walks.west, h: ph },
-    // descidas até os caminhos das entradas do Commons (linha 0)
-    { x: walks.west, y: front, w: ph, h: bottom - front },
-    { x: walks.east, y: front, w: ph, h: bottom - front },
+    // descidas pelos dois lados do pavilhão até o calçadão da recreação
+    { x: walks.west, y: front, w: ph, h: joinY - front },
+    { x: walks.east, y: front, w: ph, h: joinY - front },
     // ramal pelo lado leste até a porta masculina
     { x: x + MOSQUE_W, y: menDoorY - 1, w: ph, h: front - menDoorY + 1 },
   ];
@@ -234,7 +236,7 @@ export function isMosqueArea(areaId: string): boolean {
  * Jardim da mesquita (área externa do campus): calçada dos caminhos, postes, bancos, canteiros ao lado da
  * porta feminina e árvores nos gramados a oeste e a leste do prédio (longe dos caminhos e da cúpula).
  */
-export function mosqueGrounds(site: MosqueSite, rng: () => number): { floors: FloorPatch[]; props: ExteriorProp[] } {
+export function mosqueGrounds(site: MosqueSite, rng: () => number): { floors: FloorPatch[]; props: ExteriorProp[]; keepOut: TileRect[] } {
   const px = (t: number) => t * TILE;
   const seed = () => Math.floor(rng() * 1e9);
   const floors: FloorPatch[] = site.paths.map((r, i) => ({ kind: 'sidewalk', x: px(r.x), y: px(r.y), w: px(r.w), h: px(r.h), seed: 70 + i }));
@@ -268,5 +270,7 @@ export function mosqueGrounds(site: MosqueSite, rng: () => number): { floors: Fl
       }
     }
   }
-  return { floors, props };
+  // onde a mata e os enfeites da recreação não podem ficar: o prédio com a cúpula e os minaretes, e os caminhos
+  const keepOut: TileRect[] = [{ x: r.x - 3, y: site.skyY - 1, w: r.w + 6, h: r.y + r.h + 1 - (site.skyY - 1) }, ...site.paths.map((p) => ({ x: p.x - 1, y: p.y - 1, w: p.w + 2, h: p.h + 2 }))];
+  return { floors, props, keepOut };
 }

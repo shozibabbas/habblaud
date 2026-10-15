@@ -99,6 +99,12 @@ describe('federation: ids e vagas', () => {
     expect(a.recent[0].id).toBe('alice~.claude:1#busy:1');
   });
 
+  it('agente do par mantém o perfil da aparência da máquina dele (e quem não tem continua sem)', () => {
+    const m = { id: 'alice', name: 'alice' };
+    expect(peerAgent(agent('.claude:1', '/srv', { appearance: 'pk' }), m).appearance).toBe('pk');
+    expect(peerAgent(agent('.claude:1', '/srv'), m)).not.toHaveProperty('appearance');
+  });
+
   it('o que a página manda de volta também ganha o prefixo: pedido de permissão, mensagem e terminal', () => {
     const m = { id: 'alice', name: 'alice' };
     const permission = { id: 'p-1', tool: 'Bash', title: 'Bash(ls)', text: 't', icon: 'x', createdAt: 0, expiresAt: 1 };

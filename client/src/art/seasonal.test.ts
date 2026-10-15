@@ -1,37 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { appearanceFromSeed } from './character/appearance';
-import { POSE_FRAMES, renderCharacter } from './character/render';
-import type { Dir, Pose } from './api';
-import { renderSeasonalProp } from './seasonal';
+import { renderSeasonalProp, type SeasonalProp } from './seasonal';
 
-describe('acessórios sazonais', () => {
-  it('mantém a aparência original e desenha os acessórios em todas as poses e direções', () => {
-    const appearance = appearanceFromSeed(42);
-    const original = { ...appearance };
-    for (const dir of ['up', 'down', 'left', 'right'] as Dir[]) {
-      for (const pose of Object.keys(POSE_FRAMES) as Pose[]) {
-        for (let frame = 0; frame < POSE_FRAMES[pose]; frame++) {
-          const req = { appearance, dir, pose, frame };
-          const plain = renderCharacter(req);
-          for (const costume of ['santa', 'witch', 'pumpkin', 'vampire'] as const) {
-            const dressed = renderCharacter({ ...req, costume });
-            expect(dressed.buf.data.some((byte, i) => byte !== plain.buf.data[i])).toBe(true);
-            expect([dressed.ax, dressed.ay]).toEqual([plain.ax, plain.ay]);
-          }
-        }
-      }
-    }
-    expect(appearance).toEqual(original);
-  });
+describe('decorações sazonais', () => {
   it('mantém decorações dentro das folhas de desenho, com margem transparente', () => {
-    for (const kind of ['tree', 'gift', 'pumpkin', 'ghost', 'wreath', 'bat'] as const) {
-      const { buf } = renderSeasonalProp(kind);
+    const kinds: SeasonalProp[] = [
+      'fanoos_tall', 'fanoos', 'fanoos_green', 'fanoos_teal', 'balloons_fitr', 'balloons_adha', 'crescent',
+      'dates', 'water', 'sharbat', 'pakora', 'khurma', 'mithai', 'fanoos_mini',
+    ];
+    for (const kind of kinds) {
+      const { buf, ax, ay } = renderSeasonalProp(kind);
       const bounds = buf.bounds()!;
-      expect(buf.countOpaque()).toBeGreaterThan(40);
+      expect(buf.countOpaque()).toBeGreaterThan(buf.w > 20 ? 40 : 12);
       expect(bounds.x).toBeGreaterThan(0);
       expect(bounds.y).toBeGreaterThan(0);
       expect(bounds.x + bounds.w).toBeLessThan(buf.w);
-      expect(bounds.y + bounds.h).toBeLessThan(buf.h);
+      expect(bounds.y + bounds.h).toBeLessThanOrEqual(buf.h);
+      expect(ax).toBeGreaterThan(bounds.x);
+      expect(ax).toBeLessThan(bounds.x + bounds.w);
+      // a âncora fica na base do desenho (chão ou tampo da mesa); o crescente fica pendurado acima
+      if (kind !== 'crescent') expect(bounds.y + bounds.h - ay).toBeGreaterThanOrEqual(-1);
+      expect(bounds.y + bounds.h - ay).toBeLessThanOrEqual(2);
     }
   });
 });

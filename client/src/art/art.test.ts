@@ -6,6 +6,7 @@ import { FURNITURE, TILE, type Accessory, type Appearance, type Dir, type FloorK
 import { appearanceFromSeed, appearanceKey, editorConflict, editorOptions, fitToOptions } from './character/appearance';
 import { HAIR, HEAD_BASE } from './character/hair';
 import { CHAR_AX, CHAR_AY, CHAR_H, CHAR_W, POSE_DURATION, POSE_FRAMES, isSeated, renderCharacter } from './character/render';
+import { ramp, shade } from './core/color';
 import { isPrayerPose, PRAYER_AX, PRAYER_W } from './character/prayer';
 import { PixelBuf } from './core/pixbuf';
 import type { BufSprite } from './core/sprite';
@@ -918,5 +919,108 @@ describe('editor do personagem (arte)', () => {
     const ok = { ...appearanceFromSeed(1), topStyle: 'tshirt' as const, top: '#e2604f' };
     expect(fitToOptions(ok).top).toBe('#e2604f');
     expect(fitToOptions({ ...ok, accessory: 'sunglasses', accessoryColor: '#e2604f' }).accessoryColor).toBe('#22232b');
+  });
+});
+
+describe('roupas do sul da Ásia, hijab, topi, dupatta e trança', () => {
+  const base = appearanceFromSeed(3, { look: 'f' });
+  const looks: Appearance[] = [
+    { ...base, topStyle: 'kurta', top: '#f5f3ec', topAccent: '#d4af5a', bottomStyle: 'shalwar', bottom: '#f5f3ec', accessory: 'topi', accessoryColor: '#f4f2ee' },
+    { ...base, topStyle: 'kurta_waistcoat', top: '#ede3cc', topAccent: '#26272e', bottomStyle: 'pants', accessory: 'none' },
+    { ...base, topStyle: 'shalwar_kameez', top: '#c43d6f', topAccent: '#d9a42e', bottomStyle: 'shalwar', bottom: '#f1e6cf', hairStyle: 'braid', accessory: 'none' },
+    { ...base, topStyle: 'shalwar_kameez', top: '#2a8c8c', topAccent: '#f1e6cf', bottomStyle: 'skirt', accessory: 'hijab', accessoryColor: '#2c3a5c' },
+    { ...base, topStyle: 'kurta', top: '#cfe0ef', topAccent: '#2c3a5c', bottomStyle: 'shorts', hairStyle: 'long', accessory: 'dupatta', accessoryColor: '#c43d6f' },
+    { ...base, topStyle: 'tshirt', bottomStyle: 'shalwar', hairStyle: 'bun', accessory: 'dupatta', accessoryColor: '#2e7d4f' },
+  ];
+
+  it('renderizam em todas as poses × direções × quadros, em pé e sentado', () => {
+    for (const a of looks) {
+      for (const pose of POSES) {
+        for (const dir of DIRS) {
+          for (let frame = 0; frame < POSE_FRAMES[pose]; frame++) {
+            for (const seated of [false, true]) {
+              const s = renderCharacter({ appearance: a, dir, pose, frame, seated, held: pose === 'wait' ? 'popcorn' : 'none' });
+              expect(s.buf.w).toBe(isPrayerPose(pose) ? PRAYER_W : CHAR_W);
+              expect(s.buf.countOpaque(), `${a.topStyle}/${pose}/${dir}`).toBeGreaterThan(150);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('as batas vão até o joelho: em pé cobrem o quadril e a coxa; sentado de frente cobrem o colo', () => {
+    for (const topStyle of ['kurta', 'shalwar_kameez', 'kurta_waistcoat'] as const) {
+      const a: Appearance = { ...base, topStyle, top: '#cfe0ef', topAccent: '#26272e', bottom: '#3f5f8c', bottomStyle: 'pants', accessory: 'none' };
+      const stand = renderCharacter({ appearance: a, dir: 'down', pose: 'stand', frame: 0 }).buf;
+      expect(countColor(stand.crop(9, 24, 6, 3), '#cfe0ef'), topStyle).toBeGreaterThanOrEqual(6);
+      expect(countColor(stand.crop(8, 24, 8, 3), '#3f5f8c'), topStyle).toBe(0);
+      expect(countColor(stand.crop(8, 27, 8, 2), '#3f5f8c'), topStyle).toBeGreaterThan(0);
+      const sit = renderCharacter({ appearance: a, dir: 'down', pose: 'sit', frame: 0 }).buf;
+      expect(countColor(sit.crop(8, 28, 8, 2), '#3f5f8c'), topStyle).toBe(0);
+    }
+  });
+
+  it('o hijab esconde o cabelo (qualquer penteado dá o mesmo sprite) e emoldura o rosto', () => {
+    const hijab: Appearance = { ...base, accessory: 'hijab', accessoryColor: '#7a2f3a' };
+    for (const dir of DIRS) {
+      const ref = digest(renderCharacter({ appearance: { ...hijab, hairStyle: 'short' }, dir, pose: 'stand', frame: 0 }).buf.data);
+      for (const hairStyle of ['long', 'afro', 'braid', 'pigtails', 'mohawk'] as const) {
+        expect(digest(renderCharacter({ appearance: { ...hijab, hairStyle }, dir, pose: 'stand', frame: 0 }).buf.data), `${hairStyle}/${dir}`).toBe(ref);
+      }
+    }
+    // De frente o rosto continua à mostra (olhos e pele dentro da moldura).
+    const front = renderCharacter({ appearance: hijab, dir: 'down', pose: 'stand', frame: 0 }).buf;
+    expect(countColor(front.crop(7, 11, 10, 5), hijab.skin)).toBeGreaterThan(15);
+  });
+
+  it('a trança aparece de costas e de perfil, abaixo da nuca', () => {
+    const plain: Appearance = { ...base, hair: '#2b2530', topStyle: 'tshirt', top: '#f1efe9', accessory: 'none' };
+    const hairBelowNeck = (hairStyle: HairStyle, dir: Dir) => {
+      const b = renderCharacter({ appearance: { ...plain, hairStyle }, dir, pose: 'stand', frame: 0 }).buf.crop(0, 19, CHAR_W, 6);
+      return countColor(b, '#2b2530') + countColor(b, shade('#2b2530', -0.09)) + countColor(b, shade('#2b2530', 0.09));
+    };
+    expect(hairBelowNeck('braid', 'up')).toBeGreaterThan(6);
+    expect(hairBelowNeck('braid', 'left')).toBeGreaterThan(4);
+    expect(hairBelowNeck('short', 'up')).toBe(0);
+  });
+
+  it('a shalwar é mais larga que a calça e franzida no tornozelo', () => {
+    const a: Appearance = { ...base, topStyle: 'tshirt', bottom: '#6b7346', accessory: 'none' };
+    const tones = Object.values(ramp('#6b7346', 0.07));
+    const width = (bottomStyle: 'pants' | 'shalwar', y: number) => {
+      const row = renderCharacter({ appearance: { ...a, bottomStyle }, dir: 'down', pose: 'stand', frame: 0 }).buf.crop(0, y, CHAR_W, 1);
+      return tones.reduce((n, c) => n + countColor(row, c), 0);
+    };
+    expect(width('shalwar', 27)).toBeGreaterThan(width('pants', 27));
+    expect(width('shalwar', 28)).toBeLessThan(width('shalwar', 27));
+  });
+
+  it('editor: paletas próprias, topi como boné e shalwar com as cores da bata', () => {
+    const a = appearanceFromSeed(1);
+    expect(editorOptions({ ...a, topStyle: 'kurta_waistcoat' }).topAccent).toContain('#26272e');
+    expect(editorOptions({ ...a, topStyle: 'shalwar_kameez' }).topAccent).toEqual(editorOptions({ ...a, accessory: 'dupatta' }).accessoryColor);
+    expect(editorOptions({ ...a, accessory: 'hijab' }).accessoryColor).toContain('#26272e');
+    expect(editorOptions({ ...a, accessory: 'topi' }).accessoryColor).toContain('#f4f2ee');
+    const shalwar = editorOptions({ ...a, bottomStyle: 'shalwar' }).bottom;
+    for (const c of [...editorOptions({ ...a, topStyle: 'kurta' }).top, ...editorOptions({ ...a, topStyle: 'shalwar_kameez' }).top]) expect(shalwar).toContain(c);
+    expect(editorConflict({ ...a, hairStyle: 'bun' }, 'accessory', 'topi')).toMatch(/cabelo/);
+    expect(editorConflict({ ...a, accessory: 'topi' }, 'hairStyle', 'afro')).toMatch(/boné/);
+    expect(editorConflict({ ...a, hairStyle: 'afro' }, 'accessory', 'hijab')).toBeUndefined();
+    expect(editorConflict({ ...a, hairStyle: 'afro' }, 'accessory', 'dupatta')).toBeUndefined();
+    // Trocar para shalwar leva a cor da calça para a paleta nova (e de volta).
+    const s = fitToOptions({ ...a, bottomStyle: 'shalwar', bottom: '#3f5f8c' });
+    expect(shalwar).toContain(s.bottom);
+    expect(editorOptions(a).bottom).toContain(fitToOptions({ ...s, bottomStyle: 'pants' }).bottom);
+  });
+
+  it('peso 0: o sorteio padrão nunca escolhe as peças novas', () => {
+    for (let i = 0; i < 3000; i++) {
+      const a = appearanceFromSeed(i);
+      expect(['kurta', 'shalwar_kameez', 'kurta_waistcoat']).not.toContain(a.topStyle);
+      expect(['dupatta', 'hijab', 'topi']).not.toContain(a.accessory);
+      expect(a.hairStyle).not.toBe('braid');
+      expect(a.bottomStyle).not.toBe('shalwar');
+    }
   });
 });

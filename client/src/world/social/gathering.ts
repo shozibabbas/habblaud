@@ -3,9 +3,10 @@
 // comemora, paga) fica em social.ts.
 import type { Dir, HeldItem, Pose } from '../../art/api';
 import { hasTrait, type Bond, type Persona, type TraitId } from './persona';
+import type { RallyState } from './rally';
 import { tr } from '../../../../shared/i18n';
 
-export type GatherKind = 'tv' | 'videogame' | 'arcade' | 'pingpong' | 'kitchen' | 'talk' | 'rps' | 'mirror';
+export type GatherKind = 'tv' | 'videogame' | 'arcade' | 'pingpong' | 'kitchen' | 'talk' | 'rps' | 'mirror' | 'tennis' | 'smoke';
 export type Role = 'player' | 'watcher' | 'talker';
 export type Program = 'futebol' | 'novela' | 'desenho';
 export type Gesture = 'rock' | 'paper' | 'scissors';
@@ -31,11 +32,15 @@ export const KINDS: Readonly<Record<GatherKind, KindInfo>> = {
   tv: { label: tr('Vendo TV'), emoji: '📺', min: 2, max: 5 },
   videogame: { label: tr('Jogando videogame'), emoji: '🎮', min: 2, max: 5, match: true },
   arcade: { label: tr('Duelo no fliperama'), emoji: '👾', min: 2, max: 2, match: true },
-  pingpong: { label: tr('Jogando pingue-pongue'), emoji: '🏓', min: 2, max: 4, match: true },
+  pingpong: { label: tr('Jogando pingue-pongue'), emoji: '🏓', min: 2, max: 8, match: true },
   kitchen: { label: tr('Papo na copa'), emoji: '☕', min: 2, max: 4 },
   talk: { label: tr('Conversando'), emoji: '💬', min: 2, max: 2 },
   rps: { label: tr('Jokenpô'), emoji: '✊', min: 2, max: 4, match: true },
   mirror: { label: tr('Se arrumando no espelho'), emoji: '💄', min: 1, max: 2, solo: true },
+  // campus: quadra de tênis (simples ou duplas, torcida nos bancos)
+  tennis: { label: tr('Jogando tênis'), emoji: '🎾', min: 2, max: 12, match: true },
+  // campus: dois fumantes conversando na área de fumantes
+  smoke: { label: tr('Fumando um cigarro'), emoji: '🚬', min: 2, max: 2 },
 };
 
 export interface Member {
@@ -58,6 +63,8 @@ export interface Member {
   actUntil: number;
   /** O que segura ao voltar para a mesa (o café da copa). */
   carry: 'none' | 'coffee' | 'water';
+  /** Partidas de mesa/quadra (pingue-pongue, tênis): lado do jogador (0 = oeste, 1 = leste). */
+  side?: 0 | 1;
 }
 
 export interface Gathering {
@@ -93,6 +100,8 @@ export interface Gathering {
   lastSpeaker: string | null;
   /** Falas agendadas (ex.: o "bora!" de quem foi convidado, um pouco depois do convite). */
   pending: { id: string; at: number; text: string }[];
+  /** Pingue-pongue e tênis: o rali em andamento (bola, saque, pontos do game) — social/rally.ts. */
+  rally?: RallyState;
 }
 
 export function ownerTag(g: Pick<Gathering, 'id'>): string {
@@ -118,27 +127,31 @@ const BASE: Readonly<Record<GatherKind, number>> = {
   talk: 8,
   rps: 8,
   mirror: 2,
+  tennis: 8,
+  smoke: 12,
 };
 
 /** Quanto cada traço multiplica a vontade de cada roda. */
 const TRAIT_K: Partial<Record<TraitId, Partial<Record<GatherKind, number>>>> = {
   series: { tv: 3 },
   games: { videogame: 3, arcade: 2.5 },
-  esporte: { pingpong: 3, tv: 1.3 },
-  competicao: { pingpong: 1.8, videogame: 1.8, rps: 1.8, arcade: 1.5 },
+  esporte: { pingpong: 3, tv: 1.3, tennis: 3 },
+  competicao: { pingpong: 1.8, videogame: 1.8, rps: 1.8, arcade: 1.5, tennis: 1.6 },
   apostas: { rps: 3.5 },
   fofoca: { kitchen: 2.5, talk: 1.8 },
   cafeina: { kitchen: 2.2 },
   piadas: { kitchen: 1.5, talk: 1.5 },
   vaidade: { mirror: 5 },
-  timidez: { talk: 0.6, kitchen: 0.7, rps: 0.6, pingpong: 0.7, videogame: 0.8 },
-  sonecas: { tv: 1.5, pingpong: 0.6 },
+  timidez: { talk: 0.6, kitchen: 0.7, rps: 0.6, pingpong: 0.7, videogame: 0.8, tennis: 0.7 },
+  sonecas: { tv: 1.5, pingpong: 0.6, tennis: 0.5 },
   economia: { rps: 0.4 },
-  calma: { talk: 1.3, kitchen: 1.2, rps: 0.5, pingpong: 0.7 },
+  calma: { talk: 1.3, kitchen: 1.2, rps: 0.5, pingpong: 0.7, tennis: 0.8 },
   leitura: { tv: 0.8 },
 };
 
 export function kindWeight(kind: GatherKind, p: Persona): number {
+  // o cigarro é só para fumantes
+  if (kind === 'smoke' && !hasTrait(p, 'fumo')) return 0;
   let w = BASE[kind];
   for (const t of p.traits) w *= TRAIT_K[t]?.[kind] ?? 1;
   return w;
@@ -225,7 +238,7 @@ export function winChance(skillA: number, skillB: number): number {
 }
 
 /** Pontos para vencer cada jogo. */
-export const TARGET: Readonly<Partial<Record<GatherKind, number>>> = { pingpong: 5, videogame: 2, arcade: 1 };
+export const TARGET: Readonly<Partial<Record<GatherKind, number>>> = { pingpong: 5, videogame: 2, arcade: 1, tennis: 2 };
 
 /** Ícone de cada gesto acima da cabeça (contrato da arte). */
 export const GESTURE_ICON = { rock: 'hand_rock', paper: 'hand_paper', scissors: 'hand_scissors' } as const;

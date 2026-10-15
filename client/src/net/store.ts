@@ -7,6 +7,7 @@
 import type { AppearanceParts } from '../../../shared/appearance';
 import type { Activity, AgentDetail, AgentInfo, FeedItem, Notice, OfficeSnapshot, OutboxMessage, PermissionDecision, PermissionRequestInfo, RoomInfo } from '../../../shared/types';
 import { DemoSimulator } from '../../../shared/demo/simulator';
+import { parseNameSet, type NameSet } from '../../../shared/names';
 import { tr } from '../../../shared/i18n';
 
 export type ConnectionState = 'connecting' | 'open' | 'closed' | 'mock';
@@ -64,7 +65,7 @@ export function reconnectDelay(attempt: number): number {
  * Opções do simulador a partir da query string (?speed=2&sessions=6). `sessions=0` vale: escritório vazio. Para
  * capturas de tela: `seed=N` repete o mesmo escritório e `noquota=1` deixa a conta do Codex "sem cota".
  */
-export function mockOptionsFrom(search: string): { speed: number; sessions: number; seed?: number; codexNoQuota?: boolean } {
+export function mockOptionsFrom(search: string): { speed: number; sessions: number; seed?: number; codexNoQuota?: boolean; nameSet?: NameSet } {
   const params = new URLSearchParams(search);
   const num = (name: string): number | null => {
     const raw = params.get(name);
@@ -75,11 +76,14 @@ export function mockOptionsFrom(search: string): { speed: number; sessions: numb
   const speed = num('speed');
   const sessions = num('sessions');
   const seed = num('seed');
+  const names = parseNameSet(params.get('names') ?? undefined);
   return {
     speed: speed !== null && speed > 0 ? Math.min(speed, 50) : 1,
     sessions: sessions !== null && sessions >= 0 ? Math.min(Math.floor(sessions), 40) : 4,
     ...(seed !== null && seed >= 0 ? { seed: Math.floor(seed) } : {}),
     ...(params.get('noquota') === '1' ? { codexNoQuota: true } : {}),
+    // &names=pk: nomes e aparência paquistaneses, como HABBLAUD_NAMES=pk no servidor.
+    ...(names !== 'br' ? { nameSet: names } : {}),
   };
 }
 

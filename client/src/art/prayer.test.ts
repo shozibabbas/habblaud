@@ -1,5 +1,5 @@
 // Posturas da oração (character/prayer.ts): perfil virado para a qibla, as mesmas roupas e acessórios do corpo,
-// silhuetas distintas (em pé, curvado, prostrado, ajoelhado), salam virando a cabeça e o hijab provisório.
+// silhuetas distintas (em pé, curvado, prostrado, ajoelhado), salam virando a cabeça, hijab e topi.
 import { describe, expect, it } from 'vitest';
 import type { Appearance, Pose } from './api';
 import { appearanceFromSeed } from './character/appearance';
@@ -68,13 +68,20 @@ describe('posturas da oração', () => {
     for (const pose of POSTURES) expect(hasTop(draw(a, pose).buf), pose).toBe(true);
   });
 
-  it('hijab provisório (renderer sem o acessório): cobre a cabeça na cor do tecido', () => {
-    const a = { ...women[1], accessory: 'hijab', accessoryColor: '#9fc0e4', hairStyle: 'bald' } as unknown as Appearance;
-    const count = (b: PixelBuf) => {
+  it('o hijab e o topi de verdade acompanham as posturas (o hijab esconde o cabelo)', () => {
+    const count = (b: PixelBuf, hex: string) => {
+      const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
       let n = 0;
-      for (let i = 0; i < b.data.length; i += 4) if (b.data[i] === 0x9f && b.data[i + 1] === 0xc0 && b.data[i + 2] === 0xe4) n++;
+      for (let i = 0; i < b.data.length; i += 4) if (b.data[i] === r && b.data[i + 1] === g && b.data[i + 2] === bl) n++;
       return n;
     };
-    for (const pose of ['stand', 'walk', 'qiyam', 'sujood', 'jalsa'] as Pose[]) expect(count(renderCharacter({ appearance: a, dir: 'left', pose, frame: 0 }).buf), pose).toBeGreaterThan(15);
+    const w = { ...women[1], accessory: 'hijab', accessoryColor: '#9fc0e4', hair: '#d03030' } as Appearance;
+    const m = { ...men[0], accessory: 'topi', accessoryColor: '#f4f2ee' } as Appearance;
+    for (const pose of ['stand', 'walk', ...POSTURES] as Pose[]) {
+      const bw = renderCharacter({ appearance: w, dir: 'left', pose, frame: 0, seated: pose === 'wudu' }).buf;
+      expect(count(bw, '#9fc0e4'), pose).toBeGreaterThan(15);
+      expect(count(bw, '#d03030'), pose).toBe(0);
+      expect(count(renderCharacter({ appearance: m, dir: 'left', pose, frame: 0, seated: pose === 'wudu' }).buf, '#f4f2ee'), pose).toBeGreaterThan(3);
+    }
   });
 });

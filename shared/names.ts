@@ -1,4 +1,5 @@
 import { hash32 } from './hash';
+import type { AppearanceProfile } from './types';
 
 export interface PersonName {
   name: string;
@@ -63,6 +64,11 @@ export const NAME_POOL: readonly PersonName[] = NAME_SETS.br;
 export function parseNameSet(raw: string | undefined): NameSet {
   const v = raw?.trim().toLowerCase();
   return v === 'pk' ? 'pk' : 'br';
+}
+
+/** Perfil da aparência que acompanha o conjunto de nomes (AgentInfo.appearance); undefined = o padrão. */
+export function appearanceProfileOf(set: NameSet): AppearanceProfile | undefined {
+  return set === 'pk' ? 'pk' : undefined;
 }
 
 /**

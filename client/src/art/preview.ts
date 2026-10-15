@@ -4,6 +4,7 @@
 import '@fontsource/pixelify-sans/400.css';
 import * as art from './index';
 import { pixelText, pixelTextWidth } from './pixelfont';
+import type { AppearanceParts } from '../../../shared/appearance';
 import {
   FURNITURE,
   TILE,
@@ -18,6 +19,7 @@ import {
   type WallPattern,
   type WallStyle,
 } from './api';
+import type { AppearanceProfile } from '../../../shared/types';
 
 const SCALE = 3;
 const DIRS: readonly Dir[] = ['down', 'left', 'up', 'right'];
@@ -34,10 +36,11 @@ const POSE_PT: Record<Pose, string> = {
 };
 /** Poses que sempre são sentadas (as demais podem ser em pé ou sentadas). */
 const SEATED_POSES: readonly Pose[] = ['sit', 'type', 'sleep', 'wait'];
-const HELD: readonly HeldItem[] = ['coffee', 'water', 'papers', 'laptop', 'book', 'box', 'paddle', 'popcorn', 'controller', 'phone', 'lipstick', 'comb', 'rock', 'paper', 'scissors'];
+const HELD: readonly HeldItem[] = ['coffee', 'water', 'papers', 'laptop', 'book', 'box', 'paddle', 'popcorn', 'controller', 'phone', 'lipstick', 'comb', 'rock', 'paper', 'scissors', 'racket', 'cigarette'];
 const HELD_PT: Record<HeldItem, string> = {
   none: 'nada', coffee: 'café', water: 'água', papers: 'papéis', laptop: 'notebook', book: 'livro', box: 'caixa', paddle: 'raquete', popcorn: 'pipoca',
   controller: 'controle', phone: 'celular', lipstick: 'batom', comb: 'pente', rock: 'pedra', paper: 'papel', scissors: 'tesoura',
+  racket: 'raquete de tênis', cigarette: 'cigarro',
 };
 const SCREENS: readonly ScreenMode[] = ['off', 'standby', 'idle', 'code', 'terminal', 'browser', 'search', 'chat', 'docs', 'tasks', 'alert', 'progress', 'show', 'game'];
 const SCREEN_PT: Record<ScreenMode, string> = {
@@ -559,13 +562,15 @@ function socialLife(): void {
 
 // ------------------------------------------------------------------ personagens
 
-function characters(): void {
-  const s = section('personagens', 'Personagens — 40 sementes', 'Sementes variadas (a cada 5ª, subagente com crachá) andando nas 4 direções. Variedade de pele, cabelo, roupas e acessórios.');
+function characters(profile?: AppearanceProfile): void {
+  const s = profile
+    ? section(`personagens-${profile}`, `Perfil ${profile} — as mesmas 40 sementes`, `Perfil regional da aparência (AgentInfo.appearance = '${profile}', HABBLAUD_NAMES=${profile}): mesmas sementes e looks de cima, outras tabelas.`)
+    : section('personagens', 'Personagens — 40 sementes', 'Sementes variadas (a cada 5ª, subagente com crachá) andando nas 4 direções. Variedade de pele, cabelo, roupas e acessórios.');
   const cw = 26;
   const ch = 36;
   canvas(s, cw * 16, ch * 10, (ctx, t) => {
     for (let i = 0; i < 40; i++) {
-      const a = art.appearanceFromSeed(i * 7919 + 13, { sub: i % 5 === 4 });
+      const a = art.appearanceFromSeed(i * 7919 + 13, { sub: i % 5 === 4, profile });
       DIRS.forEach((dir, k) => {
         const col = (i % 4) * 4 + k;
         const row = Math.floor(i / 4);
@@ -573,6 +578,42 @@ function characters(): void {
       });
     }
   });
+}
+
+/** Peças do sul da Ásia (só aparecem quando escolhidas no editor): andando, sentado à mesa, digitando e de perfil. */
+function southAsian(): void {
+  const s = section('roupas', 'Kurta, shalwar kameez, hijab, topi, dupatta e trança', 'Peças escolhidas por cima de sementes variadas: andando nas 4 direções, sentado diante da desk_back, digitando de costas na cadeira de escritório e de perfil na cadeira do café; à direita, o avatar.');
+  const looks: { seed: number; look: 'f' | 'm'; parts: AppearanceParts }[] = [
+    { seed: 11, look: 'm', parts: { topStyle: 'kurta', top: '#f5f3ec', topAccent: '#d4af5a', bottomStyle: 'shalwar', bottom: '#f5f3ec', accessory: 'topi', accessoryColor: '#f4f2ee', skin: '#bd8560', hair: '#2b2530', facialHair: 'beard' } },
+    { seed: 12, look: 'm', parts: { topStyle: 'kurta_waistcoat', top: '#ede3cc', topAccent: '#26272e', bottomStyle: 'shalwar', bottom: '#ede3cc', accessory: 'topi', accessoryColor: '#4a4d55', skin: '#d69f78', hairStyle: 'side_part', hair: '#2b2530', facialHair: 'mustache' } },
+    { seed: 13, look: 'f', parts: { topStyle: 'shalwar_kameez', top: '#c43d6f', topAccent: '#d9a42e', bottomStyle: 'shalwar', bottom: '#f1e6cf', accessory: 'earrings', accessoryColor: '#f2c14e', skin: '#eab894', hairStyle: 'braid', hair: '#3f2c22' } },
+    { seed: 14, look: 'f', parts: { topStyle: 'shalwar_kameez', top: '#2a8c8c', topAccent: '#f1e6cf', bottomStyle: 'shalwar', bottom: '#2a8c8c', accessory: 'hijab', accessoryColor: '#2c3a5c', skin: '#9a6444' } },
+    { seed: 15, look: 'f', parts: { topStyle: 'kurta', top: '#cfe0ef', topAccent: '#2c3a5c', bottomStyle: 'pants', bottom: '#2e3e5e', accessory: 'dupatta', accessoryColor: '#c43d6f', skin: '#f6cfb0', hairStyle: 'long', hair: '#2b2530' } },
+    { seed: 16, look: 'm', parts: { topStyle: 'kurta', top: '#2c3a5c', topAccent: '#d4af5a', bottomStyle: 'shalwar', bottom: '#2c3a5c', accessory: 'glasses', accessoryColor: '#2b2b33', skin: '#7a4a31', hairStyle: 'short', hair: '#2b2530' } },
+  ];
+  const cw = 30;
+  const ch = 42;
+  canvas(s, cw * 9, ch * looks.length, (ctx, t) => {
+    looks.forEach((l, row) => {
+      const a = art.appearanceFromSeed(l.seed, { look: l.look, parts: l.parts });
+      const y = row * ch + 36;
+      DIRS.forEach((dir, k) => blit(ctx, art.characterSprite({ appearance: a, dir, pose: 'walk', frame: frameOf('walk', t, row * 70) }), k * cw + cw / 2, y));
+      const seat = (col: number, kind: FurnitureKind, variant: string, dir: Dir, pose: Pose, desk: boolean) => {
+        const x = col * cw + cw / 2;
+        const f = art.furnitureSprites(kind, variant);
+        blit(ctx, f.base, x, y);
+        blit(ctx, art.characterSprite({ appearance: a, dir, pose, frame: frameOf(pose, t, row * 90), seated: true }), x, y - SEAT_FOOT_DY);
+        if (f.front) blit(ctx, f.front, x, y);
+        if (desk) blit(ctx, art.furnitureSprites('desk_back', 'white').base, x, y + TILE);
+      };
+      seat(4, 'office_chair_front', 'blue', 'down', 'type', true);
+      seat(5, 'office_chair', 'blue', 'up', 'type', false);
+      seat(6, 'cafe_chair', 'left', 'left', 'sit', false);
+      seat(7, 'cafe_chair', 'right', 'right', 'talk', false);
+      const av = art.avatarCanvas(l.seed, { look: l.look, parts: l.parts, scale: 1 });
+      ctx.drawImage(av, 8 * cw + 4, row * ch + 8);
+    });
+  }, '#dfe3e8');
 }
 
 function poses(): void {
@@ -893,6 +934,8 @@ sampleScene();
 shellWait();
 socialLife();
 characters();
+characters('pk');
+southAsian();
 poses();
 heldItems();
 furniture();
