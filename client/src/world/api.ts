@@ -2,6 +2,8 @@
 // Implementação: client/src/world/index.ts -> createWorld().
 // Regra: mudanças aqui devem ser ADITIVAS.
 
+import { hijriTheme, hijriToday, type HijriDate } from './hijri';
+
 export type Selection = { type: 'agent'; id: string } | { type: 'room'; id: string } | null;
 
 export interface WorldOptions {
@@ -17,24 +19,25 @@ export interface WorldOptions {
   dayNight: boolean;
   /** (Opcional, aditivo) Ciclo dia/noite: automático, sempre dia ou sempre noite. Vale sobre `dayNight`. */
   daylight?: DaylightMode;
-  /** Tema visual: automático (segue o calendário; ver seasonalThemeFor), nenhum, Natal ou Halloween. */
+  /** Tema visual: automático (segue o calendário hijri; ver seasonalThemeFor), nenhum, Ramadã, Eid al-Fitr ou Eid al-Adha. */
   theme?: OfficeTheme;
 }
 
 /** Tema que o renderer desenha: o escritório original ('none') ou um dos sazonais. */
-export type SeasonalTheme = 'none' | 'christmas' | 'halloween';
+export type SeasonalTheme = 'none' | 'ramadan' | 'eid_fitr' | 'eid_adha';
 export type OfficeTheme = 'auto' | SeasonalTheme;
 
+export const SEASONAL_THEMES: readonly SeasonalTheme[] = ['none', 'ramadan', 'eid_fitr', 'eid_adha'];
+
 /**
- * Tema desenhado numa data (hora local). No automático: Halloween de 1º a 31 de outubro, Natal de 1º de novembro a
- * 26 de dezembro e, no resto do ano, o escritório original.
+ * Tema desenhado numa data (hora local). No automático segue o calendário hijri (ver hijriTheme): Ramadã o mês
+ * inteiro, Eid al-Fitr de 1 a 3 de Shawwal, Eid al-Adha de 10 a 13 de Dhu al-Hijjah e, no resto do ano, o
+ * escritório original. `hijri` substitui a data convertida (prévia por `?hijri=` na URL). Valores
+ * desconhecidos (temas antigos) valem como automático.
  */
-export function seasonalThemeFor(theme: OfficeTheme | undefined, date: Date): SeasonalTheme {
-  if (theme && theme !== 'auto') return theme;
-  const month = date.getMonth();
-  if (month === 9) return 'halloween';
-  if (month === 10 || (month === 11 && date.getDate() <= 26)) return 'christmas';
-  return 'none';
+export function seasonalThemeFor(theme: OfficeTheme | undefined, date: Date, hijri?: HijriDate | null): SeasonalTheme {
+  if (theme && theme !== 'auto' && SEASONAL_THEMES.includes(theme)) return theme;
+  return hijriTheme(hijri !== undefined ? hijri : hijriToday(date));
 }
 
 /** Ciclo dia/noite: segue a hora local, ou fixa o dia ou a noite. */

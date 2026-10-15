@@ -401,19 +401,26 @@ a **colored chip with the account letter** (C, D…).
 
 In **Settings → Appearance → Office theme**, choose:
 
-- **Automatic** (default): follows the calendar, in local time. Halloween from October 1 to 31, Christmas from
-  November 1 to December 26 and, the rest of the year, the original look.
+- **Automatic** (default): follows the Hijri calendar (Umm al-Qura, via the browser), in local time. Ramadan for the
+  whole month, Eid al-Fitr on Shawwal 1–3, Eid al-Adha on Dhu al-Hijjah 10–13 and, the rest of the year, the
+  original look.
 - **None**: always the original look.
-- **Christmas**: wreaths, warm lights, trees with presents, Christmas rugs, snow on the windows and Santa hats on the characters.
-- **Halloween**: pumpkins, decorative ghosts, cobwebs, bats, purple lights, themed rugs and costume accessories.
+- **Ramadan**: fanoos lanterns that glow at night, string lights with little lanterns, crescents and stars, a crescent
+  moon in the windows at night, gold star motifs on the rugs, a "Ramadan Mubarak" banner in the lobby and, around
+  sunset, an iftar spread in the kitchen (dates, water, pakoras and rose sharbat).
+- **Eid al-Fitr**: green and gold bunting, balloons, lanterns, an "Eid Mubarak" banner, sheer khurma and boxes of
+  mithai on the tables, faint fireworks in the windows at night and a small sparkle on the characters.
+- **Eid al-Adha**: the same festive look in teal and gold.
 
 The switch is immediate and the choice is saved in this browser. The themes keep the agents' paths,
-activities and animations. The day/night cycle is still a separate option.
+activities and animations, and work in the single building and in the combined office. The day/night cycle is
+still a separate option, and "reduce motion" stops the flicker, fireworks and sparkles. To preview a date, add
+`?hijri=1447-09-10` (or `?hijri=10-1`) to the URL, like `?hora=21:30` for the time of day.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/seasonal-christmas.png" alt="Office with the Christmas theme: trees with presents in the corners of the rooms, wreaths and lights on the walls, red rugs and characters in Santa hats" /></td>
-    <td width="50%"><img src="docs/screenshots/seasonal-halloween.png" alt="Office with the Halloween theme: pumpkins and ghosts in place of the plants, cobwebs and bats on the walls, purple rugs and characters in costume" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-ramadan.png" alt="Office with the Ramadan theme at sunset: fanoos lanterns in place of plants, crescents above the elevators, a Ramadan Mubarak banner in the reception, gold stars on the rugs and the iftar spread on the kitchen tables" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-eid.png" alt="Office with the Eid al-Fitr theme: balloons and green lanterns, green and gold bunting on the walls, an Eid Mubarak banner in the reception and sweets on the tables" /></td>
   </tr>
 </table>
 

@@ -413,23 +413,28 @@ mover · `+` `-` zoom · `?` ayuda.
 
 ### Temas de la oficina
 
-En **Configuración → Apariencia → Tema de la oficina**, elige:
+En **Ajustes → Apariencia → Tema de la oficina**, elige:
 
-- **Automático** (por defecto): sigue el calendario, en la hora local. Halloween del 1 al 31 de octubre, Navidad del 1
-  de noviembre al 26 de diciembre y, el resto del año, el aspecto original.
+- **Automático** (predeterminado): sigue el calendario hégira (Umm al-Qura, a través del navegador), en hora local.
+  Ramadán todo el mes, Eid al-Fitr del 1 al 3 de Shawwal, Eid al-Adha del 10 al 13 de Dhu al-Hiyya y, el resto del
+  año, el aspecto original.
 - **Ninguno**: siempre el aspecto original.
-- **Navidad**: guirnaldas, luces cálidas, árboles con regalos, alfombras navideñas, nieve en las ventanas y gorros en
-  los personajes.
-- **Halloween**: calabazas, fantasmas decorativos, telarañas, murciélagos, luces moradas, alfombras temáticas y
-  accesorios de disfraz.
+- **Ramadán**: faroles fanoos que brillan de noche, guirnaldas de luces con farolitos, lunas crecientes y estrellas, luna
+  creciente en las ventanas de noche, estrellas doradas en las alfombras, una pancarta "Ramadan Mubarak" en la
+  recepción y, hacia la puesta del sol, el iftar en la cocina (dátiles, agua, pakoras y sharbat de rosas).
+- **Eid al-Fitr**: banderines verdes y dorados, globos, faroles, una pancarta "Eid Mubarak", sheer khurma y cajas de
+  mithai en las mesas, fuegos artificiales discretos en las ventanas de noche y un pequeño destello en los personajes.
+- **Eid al-Adha**: el mismo ambiente festivo, en verde azulado y dorado.
 
-El cambio es inmediato y la elección queda guardada en este navegador. Los temas conservan los caminos,
-las actividades y las animaciones de los agentes. El ciclo día/noche sigue siendo una opción independiente.
+El cambio es inmediato y la elección se guarda en este navegador. Los temas conservan los recorridos,
+las actividades y las animaciones de los agentes, y funcionan en el edificio único y en la oficina combinada. El
+ciclo día/noche sigue siendo una opción independiente, y "reducir movimiento" apaga el parpadeo, los fuegos y los
+destellos. Para ver una fecha, añade `?hijri=1447-09-10` (o `?hijri=10-1`) a la URL, como `?hora=21:30` para la hora.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/seasonal-christmas.png" alt="Oficina con el tema Navidad: árboles con regalos en las esquinas de las salas, guirnaldas y luces en las paredes, alfombras rojas y personajes con gorro" /></td>
-    <td width="50%"><img src="docs/screenshots/seasonal-halloween.png" alt="Oficina con el tema Halloween: calabazas y fantasmas en lugar de las plantas, telarañas y murciélagos en las paredes, alfombras moradas y personajes disfrazados" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-ramadan.png" alt="Oficina con el tema Ramadán al atardecer: faroles fanoos en lugar de las plantas, lunas crecientes sobre los ascensores, pancarta Ramadan Mubarak en la recepción, estrellas doradas en las alfombras y el iftar en las mesas de la cocina" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-eid.png" alt="Oficina con el tema Eid al-Fitr: globos y faroles verdes, banderines verdes y dorados en las paredes, pancarta Eid Mubarak en la recepción y dulces en las mesas" /></td>
   </tr>
 </table>
 

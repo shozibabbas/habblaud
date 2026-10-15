@@ -2156,9 +2156,10 @@ export const FR: Readonly<Record<string, string>> = {
 
   // client/src/ui/settings.ts
   "Tema do escritório": "Thème du bureau",
-  "Natal": "Noël",
-  "Halloween": "Halloween",
-  "Automático: Halloween em outubro e Natal de 1º de novembro a 26 de dezembro; no resto do ano, o visual original. Nenhum: sempre o original.": "Automatique : Halloween en octobre et Noël du 1er novembre au 26 décembre ; le reste de l'année, l'apparence d'origine. Aucun : toujours l'original.",
+  "Ramadã": "Ramadan",
+  "Eid al-Fitr": "Aïd al-Fitr",
+  "Eid al-Adha": "Aïd al-Adha",
+  "Automático: segue o calendário hijri (hora local): Ramadã o mês inteiro, Eid al-Fitr de 1 a 3 de Shawwal e Eid al-Adha de 10 a 13 de Dhu al-Hijjah; no resto do ano, o visual original. Nenhum: sempre o original.": "Automatique : suit le calendrier hégirien (heure locale) : Ramadan tout le mois, Aïd al-Fitr du 1er au 3 chawwal et Aïd al-Adha du 10 au 13 dhou al-hijja ; le reste de l'année, l'apparence d'origine. Aucun : toujours l'original.",
   "Os textos das atividades vêm do servidor: seguem HABBLAUD_LANG ou o idioma do sistema onde o Habblaud roda (o inglês, só com HABBLAUD_LANG=en).": "Les textes d'activité viennent du serveur : ils suivent HABBLAUD_LANG ou la langue du système où tourne Habblaud (l'anglais, seulement avec HABBLAUD_LANG=en).",
   "Aparência": "Apparence",
 

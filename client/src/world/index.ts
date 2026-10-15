@@ -7,6 +7,7 @@ import { DEFAULT_WORLD_OPTIONS, seasonalThemeFor, type Selection, type SocialEve
 import { loadWorldAssets, type WorldAssets } from './assets';
 import { Camera, overviewFrame } from './camera';
 import { createDebug, type WorldDebug } from './debug';
+import { parseHijriParam } from './hijri';
 import { campusMockFrom, mockCampusSnapshot } from './campus-mock';
 import { inRect, rectPx } from './layout/geometry';
 import { attachInput, type Hit } from './input';
@@ -47,6 +48,8 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
   let userMoved = false;
   let framed = false;
   let lastKey = '';
+  /** Data hijri forçada (?hijri=1447-09-10) para prévia dos temas no automático. */
+  const hijriOverride = typeof location === 'undefined' ? null : parseHijriParam(location.search);
   /** Demonstração do campus no modo mock (?mock=1&machines=4). */
   const campusMock = store.mock && typeof location !== 'undefined' ? campusMockFrom(location.search) : null;
   const abort = new AbortController();
@@ -251,7 +254,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
         if (!playback) for (const e of events) for (const cb of socialCbs) cb(e);
         events.length = 0;
       }
-      renderer.sync(seasonalThemeFor(options.theme, new Date()));
+      renderer.sync(seasonalThemeFor(options.theme, new Date(), hijriOverride ?? undefined));
       if (sim.building.key !== lastKey) {
         lastKey = sim.building.key;
         updateBounds();
