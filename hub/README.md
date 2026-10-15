@@ -174,6 +174,23 @@ The dot on each label tells you how the office is doing:
 | amber, *no status* | The page loaded but doesn't report: an older Habblaud without embed mode, or `HABBLAUD_FRAME_ANCESTORS` isn't set there (the tile then shows the browser's "refused to connect" page). |
 | red, *offline* | Nothing answers on that port. The tile shows a **Retry** button and checks again on its own every 5–30 s. |
 
+## Open by name instead of a port (optional)
+
+A small proxy on `127.0.0.1:80` can route names to the hub and the offices, so you open `http://habblaud.localhost`
+instead of `http://localhost:4700`.
+
+```bash
+cp hub/proxy.example.conf hub/proxy.conf        # edit the names and upstreams
+docker compose -f hub/compose.yml --profile proxy up -d
+```
+
+- Use names under `.localhost`. Browsers always resolve them to the loopback, treat them as secure contexts (so the
+  PWA still installs), and Habblaud counts them as local access, so the terminal, approvals and messages keep working.
+- Add the hub's new origin (e.g. `http://habblaud.localhost`) to `HABBLAUD_FRAME_ANCESTORS` on every office, and use
+  the office names (e.g. `http://laptop.habblaud.localhost`) as the URLs in `config.json`.
+- Chrome needs nothing else. For Safari, curl and other apps, add the names to `/etc/hosts` pointing at `127.0.0.1`.
+- Unknown names get `421`. The `localhost:<port>` addresses keep working alongside.
+
 ## Configuration reference
 
 Environment variables for `docker compose` (in the shell or in `hub/.env`):
