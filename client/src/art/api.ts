@@ -69,11 +69,20 @@ export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book
 
 export type HairStyle =
   | 'short' | 'buzz' | 'spiky' | 'side_part' | 'curly' | 'afro' | 'bob' | 'long' | 'ponytail' | 'bun' | 'pigtails'
-  | 'mohawk' | 'bald' | 'wavy';
+  | 'mohawk' | 'bald' | 'wavy'
+  | 'braid'; // (aditivo) trança única caindo nas costas
 
-export type TopStyle = 'tshirt' | 'hoodie' | 'shirt_tie' | 'sweater' | 'jacket' | 'blouse' | 'polo';
+export type TopStyle = 'tshirt' | 'hoodie' | 'shirt_tie' | 'sweater' | 'jacket' | 'blouse' | 'polo'
+  // --- roupas do sul da Ásia (aditivo): batas até o joelho, desenhadas por cima da parte de baixo
+  | 'kurta' // bata solta com gola curta, carcela e fendas laterais; topAccent = gola/botões
+  | 'shalwar_kameez' // kameez com barrado bordado e dupatta nos ombros, ambos em topAccent
+  | 'kurta_waistcoat'; // kurta (top) com colete sem mangas por cima (topAccent)
 
-export type Accessory = 'none' | 'glasses' | 'sunglasses' | 'headphones' | 'cap' | 'beanie' | 'earrings' | 'bow';
+export type Accessory = 'none' | 'glasses' | 'sunglasses' | 'headphones' | 'cap' | 'beanie' | 'earrings' | 'bow'
+  // --- (aditivo)
+  | 'dupatta' // lenço solto sobre a cabeça e os ombros (o cabelo da frente aparece)
+  | 'hijab' // cobre cabelo, orelhas e pescoço, emoldurando o rosto (o cabelo não é desenhado)
+  | 'topi'; // gorrinho redondo no alto da cabeça (de oração ou karakul)
 
 export interface Appearance {
   skin: string;
@@ -93,7 +102,7 @@ export interface Appearance {
   /** (Opcional, aditivo) Barba/bigode — só sorteado para look 'm'. Ausente = sem pelos faciais. */
   facialHair?: 'none' | 'stubble' | 'beard' | 'mustache' | 'goatee';
   /** (Opcional, aditivo) Parte de baixo da roupa. Ausente = calça. */
-  bottomStyle?: 'pants' | 'shorts' | 'skirt';
+  bottomStyle?: 'pants' | 'shorts' | 'skirt' | 'shalwar';
 }
 
 export interface Rect {

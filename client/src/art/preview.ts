@@ -4,6 +4,7 @@
 import '@fontsource/pixelify-sans/400.css';
 import * as art from './index';
 import { pixelText, pixelTextWidth } from './pixelfont';
+import type { AppearanceParts } from '../../../shared/appearance';
 import {
   FURNITURE,
   TILE,
@@ -577,6 +578,42 @@ function characters(profile?: AppearanceProfile): void {
   });
 }
 
+/** Peças do sul da Ásia (só aparecem quando escolhidas no editor): andando, sentado à mesa, digitando e de perfil. */
+function southAsian(): void {
+  const s = section('roupas', 'Kurta, shalwar kameez, hijab, topi, dupatta e trança', 'Peças escolhidas por cima de sementes variadas: andando nas 4 direções, sentado diante da desk_back, digitando de costas na cadeira de escritório e de perfil na cadeira do café; à direita, o avatar.');
+  const looks: { seed: number; look: 'f' | 'm'; parts: AppearanceParts }[] = [
+    { seed: 11, look: 'm', parts: { topStyle: 'kurta', top: '#f5f3ec', topAccent: '#d4af5a', bottomStyle: 'shalwar', bottom: '#f5f3ec', accessory: 'topi', accessoryColor: '#f4f2ee', skin: '#bd8560', hair: '#2b2530', facialHair: 'beard' } },
+    { seed: 12, look: 'm', parts: { topStyle: 'kurta_waistcoat', top: '#ede3cc', topAccent: '#26272e', bottomStyle: 'shalwar', bottom: '#ede3cc', accessory: 'topi', accessoryColor: '#4a4d55', skin: '#d69f78', hairStyle: 'side_part', hair: '#2b2530', facialHair: 'mustache' } },
+    { seed: 13, look: 'f', parts: { topStyle: 'shalwar_kameez', top: '#c43d6f', topAccent: '#d9a42e', bottomStyle: 'shalwar', bottom: '#f1e6cf', accessory: 'earrings', accessoryColor: '#f2c14e', skin: '#eab894', hairStyle: 'braid', hair: '#3f2c22' } },
+    { seed: 14, look: 'f', parts: { topStyle: 'shalwar_kameez', top: '#2a8c8c', topAccent: '#f1e6cf', bottomStyle: 'shalwar', bottom: '#2a8c8c', accessory: 'hijab', accessoryColor: '#2c3a5c', skin: '#9a6444' } },
+    { seed: 15, look: 'f', parts: { topStyle: 'kurta', top: '#cfe0ef', topAccent: '#2c3a5c', bottomStyle: 'pants', bottom: '#2e3e5e', accessory: 'dupatta', accessoryColor: '#c43d6f', skin: '#f6cfb0', hairStyle: 'long', hair: '#2b2530' } },
+    { seed: 16, look: 'm', parts: { topStyle: 'kurta', top: '#2c3a5c', topAccent: '#d4af5a', bottomStyle: 'shalwar', bottom: '#2c3a5c', accessory: 'glasses', accessoryColor: '#2b2b33', skin: '#7a4a31', hairStyle: 'short', hair: '#2b2530' } },
+  ];
+  const cw = 30;
+  const ch = 42;
+  canvas(s, cw * 9, ch * looks.length, (ctx, t) => {
+    looks.forEach((l, row) => {
+      const a = art.appearanceFromSeed(l.seed, { look: l.look, parts: l.parts });
+      const y = row * ch + 36;
+      DIRS.forEach((dir, k) => blit(ctx, art.characterSprite({ appearance: a, dir, pose: 'walk', frame: frameOf('walk', t, row * 70) }), k * cw + cw / 2, y));
+      const seat = (col: number, kind: FurnitureKind, variant: string, dir: Dir, pose: Pose, desk: boolean) => {
+        const x = col * cw + cw / 2;
+        const f = art.furnitureSprites(kind, variant);
+        blit(ctx, f.base, x, y);
+        blit(ctx, art.characterSprite({ appearance: a, dir, pose, frame: frameOf(pose, t, row * 90), seated: true }), x, y - SEAT_FOOT_DY);
+        if (f.front) blit(ctx, f.front, x, y);
+        if (desk) blit(ctx, art.furnitureSprites('desk_back', 'white').base, x, y + TILE);
+      };
+      seat(4, 'office_chair_front', 'blue', 'down', 'type', true);
+      seat(5, 'office_chair', 'blue', 'up', 'type', false);
+      seat(6, 'cafe_chair', 'left', 'left', 'sit', false);
+      seat(7, 'cafe_chair', 'right', 'right', 'talk', false);
+      const av = art.avatarCanvas(l.seed, { look: l.look, parts: l.parts, scale: 1 });
+      ctx.drawImage(av, 8 * cw + 4, row * ch + 8);
+    });
+  }, '#dfe3e8');
+}
+
 function poses(): void {
   const s = section('poses', 'Poses × direções', 'Todas as poses do contrato, animadas. Poses sentadas sobre cadeira de escritório (de costas) e cadeira frontal (de frente), como o mundo posiciona.');
   const cw = 30;
@@ -896,6 +933,7 @@ shellWait();
 socialLife();
 characters();
 characters('pk');
+southAsian();
 poses();
 heldItems();
 furniture();

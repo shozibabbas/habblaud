@@ -33,25 +33,28 @@ export const PROFILE_PK: ProfileTables = {
   hairStyle: {
     m: {
       short: 22, buzz: 10, spiky: 3, side_part: 20, curly: 3, afro: 0.2, bob: 0, long: 0.5, ponytail: 0.2, bun: 0.1,
-      pigtails: 0, mohawk: 0.2, bald: 5, wavy: 12,
+      pigtails: 0, mohawk: 0.2, bald: 5, wavy: 12, braid: 0,
     },
     f: {
       short: 1.5, buzz: 0.1, spiky: 0.2, side_part: 5, curly: 3, afro: 0.1, bob: 6, long: 22, ponytail: 16, bun: 12,
-      pigtails: 0.3, mohawk: 0, bald: 0, wavy: 14,
+      pigtails: 0.3, mohawk: 0, bald: 0, wavy: 14, braid: 9,
     },
   },
   topStyle: {
-    m: { tshirt: 12, hoodie: 6, shirt_tie: 16, sweater: 14, jacket: 14, blouse: 0, polo: 16 },
-    f: { tshirt: 8, hoodie: 5, shirt_tie: 3, sweater: 14, jacket: 12, blouse: 22, polo: 6 },
+    // Roupa de escritório no Paquistão: ~1/3 dos homens de kurta (às vezes com colete) e mais da metade das mulheres de
+    // shalwar kameez ou kurta; o resto em camisa, polo, suéter e jaqueta.
+    m: { tshirt: 10, hoodie: 5, shirt_tie: 15, sweater: 12, jacket: 12, blouse: 0, polo: 14, kurta: 24, shalwar_kameez: 0, kurta_waistcoat: 12 },
+    f: { tshirt: 5, hoodie: 3, shirt_tie: 2, sweater: 9, jacket: 8, blouse: 14, polo: 3, kurta: 12, shalwar_kameez: 60, kurta_waistcoat: 0 },
   },
   accessory: {
-    m: { none: 44, glasses: 24, sunglasses: 4, headphones: 12, cap: 4, beanie: 3, earrings: 0, bow: 0 },
-    f: { none: 38, glasses: 18, sunglasses: 3, headphones: 8, cap: 1, beanie: 2, earrings: 22, bow: 2 },
+    m: { none: 44, glasses: 24, sunglasses: 4, headphones: 12, cap: 3, beanie: 2, earrings: 0, bow: 0, dupatta: 0, hijab: 0, topi: 3 },
+    f: { none: 28, glasses: 16, sunglasses: 2, headphones: 6, cap: 0.5, beanie: 1, earrings: 16, bow: 1, dupatta: 18, hijab: 12, topi: 0 },
   },
   // ~65% com barba ou bigode (só vale para o look 'm').
   facialHair: { none: 35, stubble: 20, beard: 26, mustache: 12, goatee: 7 },
   bottomStyle: {
-    m: { pants: 100, shorts: 0, skirt: 0 },
-    f: { pants: 88, shorts: 0, skirt: 12 },
+    // Com kurta, metade de shalwar e metade de calça; shalwar kameez sempre de shalwar (ver appearanceFromSeed).
+    m: { pants: 50, shorts: 0, skirt: 0, shalwar: 50 },
+    f: { pants: 40, shorts: 0, skirt: 4, shalwar: 56 },
   },
 };

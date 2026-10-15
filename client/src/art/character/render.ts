@@ -5,6 +5,7 @@ import type { Appearance, CharacterFrameRequest, HeldItem, Pose } from '../api';
 import { luminance, mix, ramp, shade, type Ramp } from '../core/color';
 import { PixelBuf, type Palette } from '../core/pixbuf';
 import type { BufSprite } from '../core/sprite';
+import { LONG_TOPS } from './appearance';
 import { HAIR, HEAD_BASE, TEXTURED, type HeadView, type Tpl } from './hair';
 
 export const CHAR_W = 24;
@@ -730,6 +731,8 @@ function drawFacialHair(dc: Dc): void {
 
 function drawHair(dc: Dc, layer: 'front' | 'back'): void {
   const style = dc.a.hairStyle;
+  // O hijab cobre todo o cabelo.
+  if (dc.a.accessory === 'hijab') return;
   const set = HAIR[style]?.[dc.r.view];
   const tpl = set?.[layer];
   if (!tpl) return;
@@ -855,10 +858,188 @@ function drawAccessory(dc: Dc): void {
       else b.stamp(rows, ox + 7, oy + 1, pal);
       break;
     }
+    case 'hijab': {
+      // Capa nos ombros presa ao tronco (não acompanha a cabeça no cochilo); a parte da cabeça vem por cima.
+      const pal = { o: it.base, h: it.lt, H: it.hi, d: it.dk, D: it.dd };
+      const cape = HIJAB_CAPE[v];
+      b.stamp(cape.rows, ox + cape.x, HY + r.ub + cape.y, pal);
+      const head = HIJAB_HEAD[v];
+      b.stamp(head.rows, ox + head.x, oy + head.y, pal);
+      break;
+    }
+    case 'dupatta': {
+      // Solta sobre a cabeça (o cabelo da frente aparece); com penteado alto fica só nos ombros (drawDupattaBody).
+      if (TALL_HAIR.has(a.hairStyle)) break;
+      const shape = DUPATTA_HEAD[v];
+      b.stamp(shape.rows, ox + shape.x, oy + shape.y, { o: it.base, h: it.lt, H: it.hi, d: it.dk, D: it.dd });
+      break;
+    }
+    case 'topi': {
+      // Gorrinho redondo no alto da cabeça, com textura de crochê/karakul.
+      const shape = TOPI[v === 'side' ? 'side' : 'down'];
+      const knit = shade(it.base, luminance(it.base) > 0.5 ? -0.1 : 0.12);
+      b.stamp(shape.rows, ox + shape.x, oy + shape.y, { o: it.base, h: it.lt, H: it.hi, d: it.dk, D: it.dd, t: knit });
+      break;
+    }
     case 'none':
       break;
   }
 }
+
+const cloth = (x: number, y: number, rows: readonly string[]): Tpl => ({ x, y, rows });
+
+/** Penteados que o topi e a dupatta na cabeça não cobrem. */
+const TALL_HAIR: ReadonlySet<string> = new Set(['afro', 'bun', 'mohawk', 'pigtails']);
+
+// Templates dos acessórios de tecido, na grade da cabeça (ver hair.ts). o/h/H/d/D = base/claro/brilho/sombra/sombra
+// profunda; t = textura do topi.
+const HIJAB_HEAD: Readonly<Record<HeadView, Tpl>> = {
+  down: cloth(0, 1, [
+    '....oooooo....',
+    '..oohhhhoooo..',
+    '.ohhHHhhooood.',
+    'ohhhhhhhoooodd',
+    'ohhhhhoooooodd',
+    'ohhooooooooodd',
+    'ohoddddddddodd',
+    'ohd........odd',
+    'od..........dd',
+    'od..........dd',
+    'od..........dd',
+    'od..........dd',
+    'od..........dd',
+    '.od........dd.',
+  ]),
+  up: cloth(0, 1, [
+    '....oooooo....',
+    '..oohhhhoooo..',
+    '.ohhHHhhooood.',
+    'ohhhhhhhoooodd',
+    'ohhhhhoooooodd',
+    'ohhooooooooodd',
+    'ohoooooooooodd',
+    'oooooooooooodd',
+    'oooooooooooodd',
+    'oooooooooooodd',
+    'oooooooooooodd',
+    'oooooooooooddd',
+    '.ooooooooooddd',
+    '.ooooooooooddd',
+  ]),
+  side: cloth(0, 1, [
+    '....oooooo....',
+    '..oohhhhhooo..',
+    '.ohhHHhhhoood.',
+    'ohhhhhhhoooodd',
+    'ohhhhoooooood.',
+    'ohoooooooooodd',
+    '.ddddooooooodd',
+    '......dooooodd',
+    '......dooooodd',
+    '......dhooood.',
+    '......dooooodd',
+    '.....dooooood.',
+    '....doooooodd.',
+    '...dooooooodd.',
+  ]),
+};
+const HIJAB_CAPE: Readonly<Record<HeadView, Tpl>> = {
+  down: cloth(0, 15, [
+    'oooooooooooodd',
+    'ohhooooooooodd',
+    '.ohooooodoodd.',
+    '...ooooood....',
+  ]),
+  up: cloth(0, 15, [
+    'oooooooooooodd',
+    'ohoooooooooodd',
+    '.oooooodoooddd',
+    '..ooooooodddd.',
+    '....dddddd....',
+  ]),
+  side: cloth(0, 15, [
+    '..ooooooooodd.',
+    '..ohoooooooodd',
+    '...ooooooodddd',
+    '......oooddd..',
+  ]),
+};
+const DUPATTA_HEAD: Readonly<Record<HeadView, Tpl>> = {
+  down: cloth(0, 1, [
+    '....oooooo....',
+    '..oohhhhoooo..',
+    '.ohhHhhhooood.',
+    'ohhd......dodd',
+    'oh..........dd',
+    'oh..........dd',
+    'oo..........dd',
+    'oo..........dd',
+    'oo..........dd',
+    'oo..........dd',
+    'oo..........dd',
+    'oo..........dd',
+    'od..........dd',
+  ]),
+  up: cloth(0, 1, [
+    '....oooooo....',
+    '..oohhhhoooo..',
+    '.ohhHhhhooood.',
+    'ohhhhhhooooodd',
+    'ohhoooooooood.',
+    'ohoooooooooodd',
+    'oooooooooooodd',
+    'oooooooooooodd',
+    'oooooodoooood.',
+    'oooooodooooodd',
+    'oooooodooooodd',
+    'oooooodooooodd',
+    'oooooodooooodd',
+    'oooooodooooodd',
+    '.ooooodoooodd.',
+    '.oooooddooodd.',
+    '.ooooooddoodd.',
+    '..oooooodood..',
+    '..oooooooood..',
+    '..ddoooooodd..',
+    '....dddddd....',
+  ]),
+  side: cloth(0, 1, [
+    '.....ooooo....',
+    '...oohhhhooo..',
+    '..ohHhhhhoood.',
+    '..dohhhhoooodd',
+    '....ohoooooodd',
+    '.....ooooooodd',
+    '......oooooodd',
+    '......oooooodd',
+    '.......ooooodd',
+    '.......ooooodd',
+    '.......ooooodd',
+    '.......ooooodd',
+    '........ooodd.',
+    '........ooood.',
+    '........oooodd',
+    '.........oood.',
+    '.........oood.',
+    '.........oodd.',
+    '.........oodd.',
+    '..........dd..',
+  ]),
+};
+const TOPI: Readonly<Record<'down' | 'side', Tpl>> = {
+  down: cloth(0, 2, [
+    '....ohHhoo....',
+    '...ohtotoot...',
+    '..ohotototod..',
+    '..dtdtdtdtdd..',
+  ]),
+  side: cloth(0, 2, [
+    '.....ohHhoo...',
+    '....ohtotood..',
+    '...ohotototd..',
+    '...dtdtdtdtd..',
+  ]),
+};
 
 // ----- corpo
 
@@ -908,6 +1089,7 @@ function sleeveLength(a: Appearance): number {
     case 'polo':
       return 2;
     case 'blouse':
+    case 'shalwar_kameez':
       return 3;
     default:
       return 99;
@@ -919,7 +1101,7 @@ function drawLegs(dc: Dc): void {
   const pants = p.bottom;
   const sh = p.shoes;
   const style = a.bottomStyle ?? 'pants';
-  const skinLeg = style !== 'pants';
+  const skinLeg = style === 'shorts' || style === 'skirt';
   if (r.view === 'side') {
     drawLegsSide(dc, pants, sh, skinLeg);
     return;
@@ -973,14 +1155,24 @@ function drawLegs(dc: Dc): void {
     b.set(11, top + 1, pants.dk);
     b.set(12, top + 2, pants.dk);
   }
-  const leg = (x: number, dyFoot: number, shadeRight: boolean) => {
+  const shalwar = style === 'shalwar';
+  const leg = (x: number, dyFoot: number, shadeRight: boolean, outer: number) => {
     const y1 = 28 + dyFoot;
     for (let y = top + 2; y <= y1; y++) {
       const isSkin = skinLeg && y >= top + 3;
       const c = isSkin ? p.skin : pants;
+      if (shalwar && y === y1) {
+        // Shalwar franzida no tornozelo: barra estreita e escura.
+        b.rect(x, y, 3, 1, c.dk);
+        b.set(x + 1, y, c.base);
+        continue;
+      }
       b.set(x, y, c.base);
       b.set(x + 1, y, c.base);
       b.set(x + 2, y, shadeRight ? c.dk : c.base);
+      // Shalwar: perna larga (1 px a mais para fora) com uma prega acima da barra.
+      if (shalwar) b.set(outer, y, outer < x ? c.lt : c.dk);
+      if (shalwar && y === y1 - 1) b.set(x + 1, y, c.dk);
     }
     // Sapato: duas linhas, ponta clara, sola escura.
     b.rect(x, y1 + 1, 3, 1, sh.base);
@@ -989,8 +1181,8 @@ function drawLegs(dc: Dc): void {
   };
   const a1 = r.view === 'up' ? r.legB.dy : r.legA.dy;
   const b1 = r.view === 'up' ? r.legA.dy : r.legB.dy;
-  leg(8, a1, true);
-  leg(13, b1, true);
+  leg(8, a1, true, 7);
+  leg(13, b1, true, 16);
   if (!skinLeg || style === 'shorts') {
     b.set(10, top + 2, pants.dk);
     b.set(13, top + 2, pants.base);
@@ -1009,6 +1201,11 @@ function drawLegsSide(dc: Dc, pants: Ramp, sh: Ramp, skinLeg: boolean): void {
     const shin = skinLeg ? p.skin : pants;
     b.rect(7, y0 + 1, 2, 30 - (y0 + 1), shin.base);
     b.set(8, y0 + 1, shin.dk);
+    if (style === 'shalwar') {
+      // Canela larga da shalwar e a barra franzida.
+      b.vline(9, y0 + 1, 28, pants.dk);
+      b.hline(7, 9, 29, pants.dk);
+    }
     if (r.toeTap) {
       // Ponta do pé levantada, calcanhar apoiado.
       b.rect(5, 29, 2, 1, sh.base);
@@ -1021,6 +1218,8 @@ function drawLegsSide(dc: Dc, pants: Ramp, sh: Ramp, skinLeg: boolean): void {
     return;
   }
   const top = 24 + r.ub;
+  const shalwar = style === 'shalwar';
+  if (shalwar) b.rect(8, top, 7, 2, pants.base);
   b.rect(9, top, 5, 2, pants.base);
   b.set(9, top, pants.lt);
   b.set(13, top, pants.dk);
@@ -1041,9 +1240,16 @@ function drawLegsSide(dc: Dc, pants: Ramp, sh: Ramp, skinLeg: boolean): void {
       const tt = (y - y0) / Math.max(1, y1 - y0);
       const x = Math.round(10 + dx * tt);
       const c = skinLeg && y >= top + 3 ? sc : pc;
+      if (shalwar && y === y1) {
+        b.set(x, y, c.base);
+        b.set(x + 1, y, c.dk);
+        b.set(x + 2, y, c.dk);
+        continue;
+      }
       b.set(x, y, c.lt);
       b.set(x + 1, y, c.base);
       b.set(x + 2, y, c.dk);
+      if (shalwar) b.set(x + 3, y, y === y1 - 1 ? c.dd : c.dk);
     }
     const fx = Math.round(10 + dx);
     b.rect(fx - 1, y1 + 1, 4, 1, shc.base);
@@ -1060,6 +1266,11 @@ function drawTorso(dc: Dc): void {
   const t = p.top;
   const ac = p.acc;
   const lx = r.lean;
+  if (LONG_TOPS.has(a.topStyle)) {
+    drawLongTop(dc);
+    drawLanyard(dc);
+    return;
+  }
   if (r.view === 'side') {
     // Tronco de perfil (x 8..14), frente à esquerda.
     b.rect(8 + lx, y, 7, 6, t.base);
@@ -1204,6 +1415,186 @@ function drawTorso(dc: Dc): void {
       break;
   }
   drawLanyard(dc);
+}
+
+/**
+ * Batas até o joelho (kurta, kameez, kurta com colete). Em pé a barra cobre o quadril e as coxas (y 24–26) e abre um
+ * pouco nas fendas laterais; sentado ela cai sobre o colo (de frente/costas) ou sobre a coxa (perfil). A parte de
+ * baixo continua aparecendo nas canelas.
+ */
+function drawLongTop(dc: Dc): void {
+  const { b, p, r, a } = dc;
+  const y = 18 + r.ub;
+  const lx = r.lean;
+  const t = p.top;
+  const ac = p.acc;
+  const style = a.topStyle;
+  const vest = style === 'kurta_waistcoat';
+  const kameez = style === 'shalwar_kameez';
+  // Sentado de frente/costas o colo (y+6..y+7) é a própria barra; em pé a barra vai até y+8.
+  const hem = r.seated ? y + 7 : y + 8;
+  if (r.view === 'side') {
+    b.rect(8 + lx, y, 7, 6, t.base);
+    if (r.seated) {
+      // Bata sobre a coxa (para a frente, à esquerda) e caindo um pouco atrás do assento.
+      b.rect(7 + lx, y + 5, 8, 2, t.base);
+      b.hline(7 + lx, 13 + lx, y + 5, t.lt);
+      b.hline(8 + lx, 14 + lx, y + 6, t.dk);
+      b.set(7 + lx, y + 6, t.base);
+      b.set(14 + lx, y + 7, t.dk);
+    } else {
+      b.rect(8 + lx, y + 6, 7, 3, t.base);
+      b.set(7 + lx, hem, t.lt); // a frente da barra abre um pouco
+      b.hline(7 + lx, 14 + lx, hem, t.dk);
+      // Fenda lateral: um risco da shalwar aparecendo na costura.
+      b.vline(11 + lx, y + 7, hem, p.bottom.dk);
+    }
+    for (let yy = y; yy < y + (r.seated ? 5 : 8); yy++) {
+      b.set(8 + lx, yy, t.lt);
+      b.set(14 + lx, yy, t.dk);
+    }
+    if (vest) {
+      // Colete até o quadril (sentado, o colo continua na cor da kurta), com a gola da kurta na frente do pescoço.
+      const vb = r.seated ? y + 4 : y + 6;
+      b.rect(8 + lx, y, 7, vb - y + 1, ac.base);
+      b.vline(8 + lx, y + 1, vb, ac.lt);
+      b.vline(14 + lx, y, vb, ac.dk);
+      b.hline(8 + lx, 14 + lx, vb, ac.dk);
+      b.set(9 + lx, y, t.lt);
+      b.set(10 + lx, y, t.base);
+      b.set(9 + lx, y + 3, ac.hi); // botão
+    } else {
+      b.set(9 + lx, y, ac.lt);
+      b.set(10 + lx, y, ac.base);
+      if (!kameez) b.set(9 + lx, y + 2, ac.dk); // botão da carcela
+      if (kameez && !r.seated) b.hline(8 + lx, 14 + lx, hem, ac.base); // barrado bordado
+      if (kameez && !r.seated) for (let xx = 8; xx <= 14; xx += 2) b.set(xx + lx, hem, ac.lt);
+    }
+    if (hasDupatta(a)) drawDupattaBody(dc);
+    return;
+  }
+  const front = r.view === 'down';
+  // Tronco e barra (frente/costas: x 8..15), com luz à esquerda e sombra à direita.
+  b.rect(8, y, 8, hem - y + 1, t.base);
+  for (let yy = y; yy <= hem; yy++) {
+    b.set(8, yy, t.lt);
+    b.set(15, yy, t.dk);
+  }
+  b.hline(8, 15, hem, t.dk);
+  if (!r.seated) {
+    // A barra abre nas fendas laterais (1 px para fora em cada lado) com a costura marcada.
+    b.vline(7, y + 7, hem, t.lt);
+    b.vline(16, y + 7, hem, t.dk);
+    b.set(7, hem, t.dk);
+    b.set(16, hem, t.dd);
+    b.set(8, y + 7, t.dk);
+    b.set(15, y + 7, t.dd);
+  } else {
+    b.set(8, hem, t.base);
+  }
+  if (vest) {
+    // Colete escuro até o quadril (sentado, acima do colo), decote em V mostrando a gola da kurta, botões e bolsos.
+    const vb = r.seated ? y + 5 : y + 6;
+    b.rect(8, y, 8, vb - y + 1, ac.base);
+    b.vline(8, y, vb, ac.lt);
+    b.vline(15, y, vb, ac.dk);
+    b.hline(8, 15, vb, ac.dk);
+    if (front) {
+      b.set(11, y, t.hi);
+      b.set(12, y, t.lt);
+      b.set(11, y + 1, t.lt);
+      b.set(12, y + 1, t.dk);
+      b.vline(12, y + 2, vb - 1, ac.dd);
+      b.set(11, y + 3, ac.hi);
+      b.set(11, y + 5, ac.hi);
+      b.hline(9, 10, y + 4, ac.dk); // bolsos
+      b.hline(13, 14, y + 4, ac.dd);
+      b.set(14, y + 1, ac.lt); // lenço do bolso de cima
+    } else {
+      b.hline(10, 13, y, t.base);
+      b.vline(11, y + 2, vb - 1, ac.dk);
+    }
+  } else if (front) {
+    // Gola curta (padre) e carcela com botões; no kameez, decote redondo bordado.
+    if (kameez) {
+      b.set(10, y, ac.base);
+      b.set(11, y, p.skin.dk);
+      b.set(12, y, p.skin.dk);
+      b.set(13, y, ac.dk);
+      b.set(11, y + 1, ac.lt);
+      b.set(12, y + 1, ac.base);
+    } else {
+      b.set(10, y, ac.lt);
+      b.set(11, y, ac.base);
+      b.set(12, y, ac.base);
+      b.set(13, y, ac.dk);
+      b.vline(11, y + 1, y + 3, t.dk);
+      b.set(12, y + 1, ac.base);
+      b.set(12, y + 3, ac.base);
+    }
+  } else {
+    b.hline(10, 13, y, kameez ? ac.dk : ac.base);
+  }
+  if (kameez) {
+    // Barrado bordado: faixa no tom do detalhe com pontinhos claros.
+    const by = r.seated ? hem : hem - 1;
+    b.hline(8, 15, by, ac.base);
+    for (let xx = 9; xx <= 15; xx += 2) b.set(xx, by, ac.lt);
+    if (!r.seated) {
+      b.set(7, by, ac.base);
+      b.set(16, by, ac.dk);
+    }
+  }
+  if (hasDupatta(a)) drawDupattaBody(dc);
+}
+
+/** Dupatta nos ombros: o acessório, ou a do kameez (que some debaixo do hijab, para a capa não ficar com retalhos). */
+function hasDupatta(a: Appearance): boolean {
+  return a.accessory === 'dupatta' || (a.topStyle === 'shalwar_kameez' && a.accessory !== 'hijab');
+}
+
+/**
+ * Dupatta sobre os ombros (no tronco, por baixo dos braços): de frente cai em U sobre o peito; de costas as duas
+ * pontas descem pelas costas; de perfil passa pelo ombro com uma ponta na frente e outra atrás. A cor é a do
+ * acessório (dupatta) ou, no kameez sem o acessório, a do detalhe.
+ */
+function drawDupattaBody(dc: Dc): void {
+  const { b, p, r, a } = dc;
+  const c = a.accessory === 'dupatta' ? p.item : p.acc;
+  const y = 18 + r.ub;
+  const lx = r.lean;
+  if (r.view === 'down') {
+    // Faixa larga em U: ombros, laterais do peito e a curva embaixo (com o avesso mais escuro).
+    const rows: readonly (readonly [number, number])[] = [[8, 10], [8, 10], [8, 10], [9, 14], [10, 13]];
+    rows.forEach(([x0, x1], yy) => b.hline(x0, x1, y + yy, c.base));
+    for (let yy = 0; yy <= 2; yy++) b.hline(13, 15, y + yy, c.base);
+    b.vline(8, y, y + 2, c.lt);
+    b.set(9, y + 3, c.lt);
+    b.vline(15, y, y + 2, c.dk);
+    b.set(14, y + 3, c.dk);
+    b.hline(10, 13, y + 4, c.dk);
+    b.set(10, y + 2, c.dk);
+    b.set(13, y + 2, c.dk);
+    b.set(9, y, c.hi);
+  } else if (r.view === 'up') {
+    const len = r.seated ? 4 : 7;
+    b.rect(8, y, 2, len, c.base);
+    b.rect(14, y, 2, len, c.base);
+    b.vline(8, y, y + len - 1, c.lt);
+    b.vline(15, y, y + len - 1, c.dk);
+    b.set(9, y + len - 1, c.dk);
+    b.set(14, y + len - 1, c.dk);
+    b.hline(10, 13, y, c.base);
+  } else {
+    b.hline(9 + lx, 13 + lx, y, c.base);
+    b.set(9 + lx, y, c.lt);
+    b.rect(8 + lx, y + 1, 2, 3, c.base);
+    b.vline(8 + lx, y + 1, y + 3, c.lt);
+    b.set(9 + lx, y + 3, c.dk);
+    const len = r.seated ? 4 : 7;
+    b.rect(13 + lx, y, 2, len, c.base);
+    b.vline(14 + lx, y, y + len - 1, c.dk);
+  }
 }
 
 function drawLanyard(dc: Dc): void {

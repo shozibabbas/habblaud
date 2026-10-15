@@ -58,11 +58,26 @@ describe('perfil da aparência pk', () => {
     expect(facial).toBeLessThan(0.7);
     expect(women.every((a) => a.facialHair === 'none')).toBe(true);
     expect(share(men, (a) => ['mohawk', 'afro', 'pigtails', 'bun', 'long', 'ponytail', 'bob'].includes(a.hairStyle))).toBeLessThan(0.02);
-    expect(share(women, (a) => ['long', 'ponytail', 'bun', 'wavy'].includes(a.hairStyle))).toBeGreaterThan(0.75);
+    expect(share(women, (a) => ['long', 'ponytail', 'bun', 'wavy', 'braid'].includes(a.hairStyle))).toBeGreaterThan(0.75);
     expect(share(women, (a) => ['mohawk', 'buzz', 'bald', 'afro', 'pigtails'].includes(a.hairStyle))).toBeLessThan(0.02);
     expect([...men, ...women].some((a) => a.bottomStyle === 'shorts')).toBe(false);
     expect(men.some((a) => a.bottomStyle === 'skirt' || a.accessory === 'earrings' || a.accessory === 'bow')).toBe(false);
     expect(share(women, (a) => a.bottomStyle === 'skirt')).toBeLessThan(0.2);
     expect(share(men, (a) => a.topStyle === 'hoodie')).toBeLessThan(0.1);
+  });
+
+  it('roupas regionais: ~1/3 dos homens de kurta, mais da metade das mulheres de shalwar kameez ou kurta', () => {
+    const men = Array.from({ length: N }, (_, i) => pk(i, 'm'));
+    const women = Array.from({ length: N }, (_, i) => pk(i, 'f'));
+    const long = (a: { topStyle: string }) => ['kurta', 'kurta_waistcoat', 'shalwar_kameez'].includes(a.topStyle);
+    expect(share(men, long)).toBeGreaterThan(0.25);
+    expect(share(men, long)).toBeLessThan(0.42);
+    expect(share(women, long)).toBeGreaterThan(0.5);
+    const all = [...men, ...women];
+    expect(all.filter((a) => a.topStyle === 'shalwar_kameez').every((a) => a.bottomStyle === 'shalwar')).toBe(true);
+    expect(all.filter((a) => a.bottomStyle === 'shalwar').every(long)).toBe(true);
+    expect(all.filter(long).some((a) => a.bottomStyle === 'skirt')).toBe(false);
+    expect(men.some((a) => a.accessory === 'hijab' || a.accessory === 'dupatta')).toBe(false);
+    expect(share(women, (a) => a.accessory === 'hijab')).toBeGreaterThan(0.05);
   });
 });

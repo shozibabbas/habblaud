@@ -81,16 +81,16 @@ const STYLE_LABELS: Partial<Record<PartKey, Readonly<Record<string, string>>>> =
   hairStyle: {
     short: tr('Curto'), buzz: tr('Raspado'), spiky: tr('Espetado'), side_part: tr('Repartido'), curly: tr('Cacheado'), afro: tr('Black power'),
     bob: tr('Chanel'), long: tr('Longo'), ponytail: tr('Rabo de cavalo'), bun: tr('Coque'), pigtails: 'Maria-chiquinha', mohawk: tr('Moicano'),
-    bald: tr('Careca'), wavy: tr('Ondulado'),
+    bald: tr('Careca'), wavy: tr('Ondulado'), braid: tr('Trança'),
   },
   topStyle: {
     tshirt: tr('Camiseta'), hoodie: tr('Moletom'), shirt_tie: tr('Camisa e gravata'), sweater: tr('Suéter'), jacket: tr('Jaqueta'),
-    blouse: tr('Blusa'), polo: 'Polo',
+    blouse: tr('Blusa'), polo: 'Polo', kurta: 'Kurta', shalwar_kameez: 'Shalwar kameez', kurta_waistcoat: tr('Kurta e colete'),
   },
-  bottomStyle: { pants: tr('Calça'), shorts: tr('Bermuda'), skirt: tr('Saia') },
+  bottomStyle: { pants: tr('Calça'), shorts: tr('Bermuda'), skirt: tr('Saia'), shalwar: 'Shalwar' },
   accessory: {
     none: tr('Nenhum'), glasses: tr('Óculos'), sunglasses: tr('Óculos escuros'), headphones: tr('Fone'), cap: tr('Boné'), beanie: tr('Gorro'),
-    earrings: tr('Brincos'), bow: tr('Laço'),
+    earrings: tr('Brincos'), bow: tr('Laço'), dupatta: 'Dupatta', hijab: 'Hijab', topi: 'Topi',
   },
   facialHair: { none: tr('Sem barba'), stubble: tr('Por fazer'), beard: tr('Barba'), mustache: tr('Bigode'), goatee: tr('Cavanhaque') },
 };
