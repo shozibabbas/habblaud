@@ -83,7 +83,7 @@ function between(rng: () => number, a: number, b: number): number {
 }
 
 /** O que define a aparência de um personagem (muda quando o personagem é editado). */
-const lookSig = (a: AgentInfo): string => `${a.seed}|${a.look}|${partsKey(a.parts)}`;
+const lookSig = (a: AgentInfo): string => `${a.seed}|${a.look}|${partsKey(a.parts)}|${a.appearance ?? ''}`;
 
 export class Sim {
   readonly chars = new Map<string, Character>();
@@ -384,7 +384,7 @@ export class Sim {
     ch.info = a;
     if (lookSig(a) !== prevLook) {
       try {
-        ch.appearance = this.art.appearanceFromSeed(a.seed, { look: a.look, sub: a.kind === 'sub', parts: a.parts });
+        ch.appearance = this.art.appearanceFromSeed(a.seed, { look: a.look, sub: a.kind === 'sub', parts: a.parts, profile: a.appearance });
       } catch {
         // Arte com problema: fica a aparência que já estava.
       }
@@ -521,7 +521,7 @@ export class Sim {
   private spawn(a: AgentInfo, first: boolean, now: number): Character | null {
     let appearance;
     try {
-      appearance = this.art.appearanceFromSeed(a.seed, { look: a.look, sub: a.kind === 'sub', parts: a.parts });
+      appearance = this.art.appearanceFromSeed(a.seed, { look: a.look, sub: a.kind === 'sub', parts: a.parts, profile: a.appearance });
     } catch {
       return null;
     }

@@ -18,6 +18,7 @@ import {
   type WallPattern,
   type WallStyle,
 } from './api';
+import type { AppearanceProfile } from '../../../shared/types';
 
 const SCALE = 3;
 const DIRS: readonly Dir[] = ['down', 'left', 'up', 'right'];
@@ -558,13 +559,15 @@ function socialLife(): void {
 
 // ------------------------------------------------------------------ personagens
 
-function characters(): void {
-  const s = section('personagens', 'Personagens — 40 sementes', 'Sementes variadas (a cada 5ª, subagente com crachá) andando nas 4 direções. Variedade de pele, cabelo, roupas e acessórios.');
+function characters(profile?: AppearanceProfile): void {
+  const s = profile
+    ? section(`personagens-${profile}`, `Perfil ${profile} — as mesmas 40 sementes`, `Perfil regional da aparência (AgentInfo.appearance = '${profile}', HABBLAUD_NAMES=${profile}): mesmas sementes e looks de cima, outras tabelas.`)
+    : section('personagens', 'Personagens — 40 sementes', 'Sementes variadas (a cada 5ª, subagente com crachá) andando nas 4 direções. Variedade de pele, cabelo, roupas e acessórios.');
   const cw = 26;
   const ch = 36;
   canvas(s, cw * 16, ch * 10, (ctx, t) => {
     for (let i = 0; i < 40; i++) {
-      const a = art.appearanceFromSeed(i * 7919 + 13, { sub: i % 5 === 4 });
+      const a = art.appearanceFromSeed(i * 7919 + 13, { sub: i % 5 === 4, profile });
       DIRS.forEach((dir, k) => {
         const col = (i % 4) * 4 + k;
         const row = Math.floor(i / 4);
@@ -892,6 +895,7 @@ sampleScene();
 shellWait();
 socialLife();
 characters();
+characters('pk');
 poses();
 heldItems();
 furniture();

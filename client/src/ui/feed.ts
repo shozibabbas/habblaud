@@ -13,7 +13,7 @@ import { tr } from '../../../shared/i18n';
 
 const VISIBLE = 50;
 
-type AgentMeta = Pick<AgentInfo, 'seed' | 'look' | 'kind' | 'account' | 'parts'>;
+type AgentMeta = Pick<AgentInfo, 'seed' | 'look' | 'kind' | 'account' | 'parts' | 'appearance'>;
 
 export class FeedPanel implements UiComponent {
   readonly el: HTMLElement;
@@ -93,8 +93,8 @@ export class FeedPanel implements UiComponent {
   render(): void {
     for (const a of this.ctx.store.snapshot?.agents ?? []) {
       const m = this.meta.get(a.id);
-      if (!m || m.seed !== a.seed || m.account !== a.account || partsKey(m.parts) !== partsKey(a.parts)) {
-        this.meta.set(a.id, { seed: a.seed, look: a.look, kind: a.kind, account: a.account, parts: a.parts });
+      if (!m || m.seed !== a.seed || m.account !== a.account || partsKey(m.parts) !== partsKey(a.parts) || m.appearance !== a.appearance) {
+        this.meta.set(a.id, { seed: a.seed, look: a.look, kind: a.kind, account: a.account, parts: a.parts, appearance: a.appearance });
       }
     }
     const open = this.ctx.isPanelOpen('feed');
@@ -239,7 +239,7 @@ export class FeedPanel implements UiComponent {
   private metaFromStore(id: string): AgentMeta | undefined {
     const a = this.ctx.agent(id);
     if (!a) return undefined;
-    const m = { seed: a.seed, look: a.look, kind: a.kind, account: a.account, parts: a.parts };
+    const m = { seed: a.seed, look: a.look, kind: a.kind, account: a.account, parts: a.parts, appearance: a.appearance };
     this.meta.set(id, m);
     return m;
   }

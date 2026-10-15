@@ -93,6 +93,7 @@ const accounts = new AccountsService({
 });
 const office = new Office({
   names,
+  nameSet: config.nameSet,
   roomAlias: (path) => roomAliases.get(path),
   version: config.version,
   // No modo dev o Vite serve o cliente direto do código-fonte: não há build para comparar.

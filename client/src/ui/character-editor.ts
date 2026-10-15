@@ -2,7 +2,7 @@
 // inteiro. "Salvar" grava o personagem do projeto (a sala) no servidor; as regras puras (quando aparece, rótulos, o
 // que vai em `parts`) estão em character-model.ts.
 import { NAME_MAX, type PartKey } from '../../../shared/appearance';
-import type { AgentInfo } from '../../../shared/types';
+import type { AgentInfo, AppearanceProfile } from '../../../shared/types';
 import { appearanceFromSeed, characterSprite, editorConflict, editorOptions, fitToOptions } from '../art';
 import type { Appearance } from '../art/api';
 import { canEditCharacter, changedParts, EDITOR_GROUPS, rowVisible, styleLabel, type EditorRow } from './character-model';
@@ -31,6 +31,7 @@ export class CharacterEditor {
   private confirmingReset = false;
   private seed = 0;
   private look: 'f' | 'm' = 'f';
+  private profile: AppearanceProfile | undefined;
   /** Aparência sorteada pela seed (sem peças): o que não mudar não vai em `parts`. */
   private base: Appearance | null = null;
   private draft: Appearance | null = null;
@@ -100,7 +101,8 @@ export class CharacterEditor {
     this.editId++;
     this.seed = a.seed;
     this.look = a.look;
-    this.base = appearanceFromSeed(a.seed, { look: a.look });
+    this.profile = a.appearance;
+    this.base = appearanceFromSeed(a.seed, { look: a.look, profile: a.appearance });
     this.draft = { ...this.base, ...a.parts };
     this.nameInput.value = a.name;
     this.confirmingReset = false;
@@ -132,7 +134,7 @@ export class CharacterEditor {
 
   private roll(): void {
     this.seed = randomSeed();
-    this.base = appearanceFromSeed(this.seed, { look: this.look });
+    this.base = appearanceFromSeed(this.seed, { look: this.look, profile: this.profile });
     this.draft = { ...this.base };
     this.paint();
   }

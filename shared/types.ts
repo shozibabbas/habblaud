@@ -6,6 +6,9 @@
 
 import type { AppearanceParts } from './appearance';
 
+/** Perfil regional da aparência dos personagens ('pk' = paquistanês). */
+export type AppearanceProfile = 'pk';
+
 export type AgentKind = 'main' | 'sub';
 
 /**
@@ -171,6 +174,11 @@ export interface AgentInfo {
   seed: number;
   /** Peças escolhidas no editor do personagem, aplicadas por cima da aparência da `seed` (ver shared/appearance.ts). */
   parts?: AppearanceParts;
+  /**
+   * Perfil regional da aparência sorteada (paletas e pesos; ver client/src/art/character/appearance.ts). Ausente = o
+   * padrão. O servidor põe em todo agente conforme HABBLAUD_NAMES; no escritório combinado, cada máquina manda o seu.
+   */
+  appearance?: AppearanceProfile;
   /** Usa o personagem escolhido para o projeto (a sala): o painel oferece "Voltar ao sorteio". */
   custom?: true;
   /** Subagente rodando em segundo plano. */

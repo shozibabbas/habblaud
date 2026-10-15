@@ -2,7 +2,9 @@
 // `look` apenas enviesa as probabilidades de estilos; nada é exclusivo de um look, exceto barba ('m').
 import { ACCESSORIES, BOTTOM_STYLES, FACIAL_HAIR, HAIR_STYLES, PART_KEYS, TOP_STYLES, type AppearanceParts, type PartKey } from '../../../../shared/appearance';
 import { mulberry32 } from '../../../../shared/hash';
+import type { AppearanceProfile } from '../../../../shared/types';
 import type { Accessory, Appearance, HairStyle, TopStyle } from '../api';
+import { PROFILE_PK } from './profile-pk';
 
 export const SKINS = ['#ffe2cc', '#f6cfb0', '#eab894', '#d69f78', '#bd8560', '#9a6444', '#7a4a31', '#5a3623'] as const;
 
@@ -49,7 +51,7 @@ const ACC_COLORS: Record<Accessory, readonly string[]> = {
 };
 const LANYARDS = ['#f2b33d', '#e2604f', '#4a86d8', '#4bab72', '#8d66cf', '#36b0b0'] as const;
 
-type Weights<T extends string> = Readonly<Record<T, number>>;
+export type Weights<T extends string> = Readonly<Record<T, number>>;
 
 const HAIR_W: Record<'f' | 'm', Weights<HairStyle>> = {
   m: {
@@ -81,6 +83,26 @@ const BOTTOM_W: Record<'f' | 'm', Weights<BottomStyle>> = {
 export type FacialHair = NonNullable<Appearance['facialHair']>;
 export type BottomStyle = NonNullable<Appearance['bottomStyle']>;
 
+type Pairs = readonly (readonly [string, number])[];
+
+/**
+ * Tabelas de um perfil regional (AgentInfo.appearance). Trocam as do padrão sem mudar a ordem nem a quantidade de
+ * sorteios: pele e olhos passam a ter pesos (um sorteio, como o `pick` do padrão) e o sorteio de cor "divertida" do
+ * cabelo cai na cor natural.
+ */
+export interface ProfileTables {
+  skins: Pairs;
+  hair: Pairs;
+  eyes: Pairs;
+  hairStyle: Record<'f' | 'm', Weights<HairStyle>>;
+  topStyle: Record<'f' | 'm', Weights<TopStyle>>;
+  accessory: Record<'f' | 'm', Weights<Accessory>>;
+  facialHair: Weights<FacialHair>;
+  bottomStyle: Record<'f' | 'm', Weights<BottomStyle>>;
+}
+
+const PROFILES: Readonly<Record<AppearanceProfile, ProfileTables>> = { pk: PROFILE_PK };
+
 /** Mistura a semente (sementes consecutivas viram sequências bem diferentes). */
 function scramble(seed: number): number {
   let h = (seed ^ 0x9e3779b9) >>> 0;
@@ -89,7 +111,10 @@ function scramble(seed: number): number {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
-export function appearanceFromSeed(seed: number, opts: { look?: 'f' | 'm'; sub?: boolean; parts?: AppearanceParts } = {}): Appearance {
+export function appearanceFromSeed(
+  seed: number,
+  opts: { look?: 'f' | 'm'; sub?: boolean; parts?: AppearanceParts; profile?: AppearanceProfile } = {},
+): Appearance {
   const rnd = mulberry32(scramble(seed));
   const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length) % arr.length];
   const weighted = <T extends string>(w: Weights<T>): T => {
@@ -102,18 +127,19 @@ export function appearanceFromSeed(seed: number, opts: { look?: 'f' | 'm'; sub?:
     }
     return entries[entries.length - 1][0];
   };
-  const weightedPair = (arr: readonly (readonly [string, number])[]): string =>
-    weighted(Object.fromEntries(arr) as Weights<string>);
+  const weightedPair = (arr: Pairs): string => weighted(Object.fromEntries(arr) as Weights<string>);
+  // Perfil desconhecido (servidor mais novo) = o padrão.
+  const prof: ProfileTables | undefined = opts.profile ? PROFILES[opts.profile] : undefined;
 
   // A ordem dos sorteios é fixa: mudar a ordem muda todas as aparências.
   const lookRoll = rnd();
   const look: 'f' | 'm' = opts.look ?? (lookRoll < 0.5 ? 'f' : 'm');
-  const skin = pick(SKINS);
+  const skin = prof ? weightedPair(prof.skins) : pick(SKINS);
   const fun = rnd() < 0.08;
-  const hair = fun ? pick(HAIR_FUN) : weightedPair(HAIR_NATURAL);
-  let hairStyle = weighted(HAIR_W[look]);
-  const eyes = pick(EYES);
-  const topStyle = weighted(TOP_W[look]);
+  const hair = fun && !prof ? pick(HAIR_FUN) : weightedPair(prof?.hair ?? HAIR_NATURAL);
+  let hairStyle = weighted((prof?.hairStyle ?? HAIR_W)[look]);
+  const eyes = prof ? weightedPair(prof.eyes) : pick(EYES);
+  const topStyle = weighted((prof?.topStyle ?? TOP_W)[look]);
 
   let top: string;
   let topAccent: string;
@@ -139,7 +165,7 @@ export function appearanceFromSeed(seed: number, opts: { look?: 'f' | 'm'; sub?:
 
   const bottom = weightedPair(BOTTOMS);
   const shoes = weightedPair(SHOES);
-  let accessory = weighted(ACC_W[look]);
+  let accessory = weighted((prof?.accessory ?? ACC_W)[look]);
   // Bonés e gorros não combinam com penteados volumosos no topo.
   if ((accessory === 'cap' || accessory === 'beanie') && (hairStyle === 'afro' || hairStyle === 'bun' || hairStyle === 'mohawk' || hairStyle === 'pigtails')) {
     accessory = 'glasses';
@@ -147,9 +173,9 @@ export function appearanceFromSeed(seed: number, opts: { look?: 'f' | 'm'; sub?:
   if (accessory === 'bow' && (hairStyle === 'bald' || hairStyle === 'buzz')) accessory = 'earrings';
   const accessoryColor = pick(ACC_COLORS[accessory]);
   const lanyardRoll = rnd();
-  const facialRoll = weighted(FACIAL_W);
+  const facialRoll = weighted(prof?.facialHair ?? FACIAL_W);
   const facialHair: FacialHair = look === 'm' ? facialRoll : 'none';
-  const bottomStyle = weighted(BOTTOM_W[look]);
+  const bottomStyle = weighted((prof?.bottomStyle ?? BOTTOM_W)[look]);
   // Cabelos raros e grisalhos pedem menos careca/raspado em looks femininos.
   if (look === 'f' && hairStyle === 'bald') hairStyle = 'buzz';
 
