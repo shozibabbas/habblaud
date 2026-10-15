@@ -24,7 +24,7 @@ import { Lighting } from './lighting';
 import { Particles } from './particles';
 import { carSprite, propSprite, shadowSprite } from './props';
 import { countBadge, fallbackIcon } from './shell-sprites';
-import { decorateElevator, drawSeasonalLights, drawSeasonalWindow, seasonalCostume, seasonalFurniture } from './seasonal';
+import { decorateElevator, drawEidSparkle, drawSeasonalLights, drawSeasonalWindow, seasonalFurniture, seasonalTableTop } from './seasonal';
 import { buildAreaVis, furnitureSprites, opaqueBounds, paintShell, toWallVis, WALL_MARGIN, wallItemOrigin, wallSprites, type AreaVis, type FurnVis, type WallVis } from './scene';
 
 const enum K {
@@ -132,6 +132,8 @@ export class Renderer {
   private clearColor = '#7fae62';
   private grass: CanvasPattern | null = null;
   private theme: SeasonalTheme = 'none';
+  /** Hora do ciclo dia/noite no quadro atual (iftar na copa). */
+  private hour = 12;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -399,6 +401,7 @@ export class Renderer {
       this.date.setHours(Math.floor(min / 60) % 24, min % 60);
     }
     const hour = this.lighting.update(now, daylightModeOf(opts), this.hourOverride, this.date);
+    this.hour = hour;
     const t = now;
 
     // janelas da fachada nos slots vazios
@@ -536,7 +539,7 @@ export class Renderer {
       for (const vis of this.areas.values()) {
         if (vis.room && vis.room.phase !== 'ready') continue;
         if (!visible(vis.px.x, vis.px.y, vis.px.w, vis.px.h)) continue;
-        drawSeasonalLights(ctx, this.theme, vis.layout, vis.room ? vis.room.light(now) : 1);
+        drawSeasonalLights(ctx, this.theme, vis, vis.room ? vis.room.light(now) : 1, this.night, now);
       }
     }
     // giroflex e balão "!" do alarme de CI (brilham também no escuro)
@@ -707,7 +710,7 @@ export class Renderer {
     }
     ctx.globalAlpha *= alpha;
     this.safe(() => this.art.drawWindowView(ctx, { x: o.x + r.x, y: o.y + rise + r.y, w: r.w, h: r.h }, hour, now, w.seed));
-    drawSeasonalWindow(ctx, this.theme, { x: o.x + r.x, y: o.y + rise + r.y, w: r.w, h: r.h }, now, w.seed);
+    drawSeasonalWindow(ctx, this.theme, { x: o.x + r.x, y: o.y + rise + r.y, w: r.w, h: r.h }, hour, now, w.seed);
     ctx.drawImage(s.base.canvas, o.x, o.y + rise);
   }
 
@@ -800,6 +803,9 @@ export class Renderer {
     }
     ctx.drawImage(s.canvas, dx, dy);
     if (!front) {
+      for (const it of seasonalTableTop(this.theme, f.kind, area.layout, f.seed, this.hour)) {
+        ctx.drawImage(it.sprite.canvas, Math.round(f.ax + it.dx - it.sprite.ax), Math.round(f.ay + it.dy - it.sprite.ay));
+      }
       if (f.kind === 'desk' && s.rects?.screen) {
         const r = s.rects.screen;
         const mode = this.deskScreen(f, area);
@@ -868,7 +874,6 @@ export class Renderer {
     req.pose = ch.pose;
     req.held = ch.held;
     req.seated = ch.seated;
-    req.costume = seasonalCostume(this.theme, ch.info.seed);
     try {
       sprite = this.charSprite(req, ch.animT);
     } catch {
@@ -894,6 +899,7 @@ export class Renderer {
       head.bw = b.w;
       head.bh = b.h;
       head.y = sy + b.y;
+      drawEidSparkle(ctx, this.theme, sx + b.x + b.w + 1, sy + b.y + 3, now, ch.info.seed);
     } else {
       head.bx = x - 7;
       head.by = y - 26;
@@ -1069,7 +1075,6 @@ export class Renderer {
       req.pose = ch.pose === 'groom' ? 'groom' : 'stand';
       req.held = ch.pose === 'groom' ? ch.held : 'none';
       req.seated = false;
-      req.costume = seasonalCostume(this.theme, ch.info.seed);
       let s: Sprite;
       try {
         s = this.charSprite(req, ch.animT);

@@ -49,8 +49,8 @@ function switchRow(label: string, hintText: string, onToggle: () => void): Switc
   return { row, btn, hint };
 }
 
-function segmented<T extends string>(label: string, options: readonly [T, string][], onPick: (v: T) => void): { row: HTMLElement; set(v: T): void } {
-  const group = h('div', { class: 'ui-seg', role: 'radiogroup', attrs: { 'aria-label': label } });
+function segmented<T extends string>(label: string, options: readonly [T, string][], onPick: (v: T) => void, cls = ''): { row: HTMLElement; set(v: T): void } {
+  const group = h('div', { class: `ui-seg ${cls}`.trim(), role: 'radiogroup', attrs: { 'aria-label': label } });
   const buttons = options.map(([value, text]) => {
     const b = h('button', { class: 'ui-seg__opt', type: 'button', role: 'radio', text, attrs: { 'aria-checked': 'false' } });
     b.addEventListener('click', () => onPick(value));
@@ -139,10 +139,17 @@ export class SettingsPopover implements UiComponent {
     this.daylight.row.append(h('span', { class: 'ui-set__hint', text: tr('Automático: céu, luzes e sol nas janelas seguem a hora local.') }));
     this.theme = segmented<UiPrefs['theme']>(
       tr('Tema do escritório'),
-      [['auto', tr('Automático')], ['none', tr('Nenhum')], ['christmas', tr('Natal')], ['halloween', tr('Halloween')]],
+      [
+        ['auto', tr('Automático')],
+        ['none', tr('Nenhum')],
+        ['ramadan', tr('Ramadã')],
+        ['eid_fitr', tr('Eid al-Fitr')],
+        ['eid_adha', tr('Eid al-Adha')],
+      ],
       (v) => ctx.updatePrefs({ theme: v }),
+      'ui-seg--themes',
     );
-    this.theme.row.append(h('span', { class: 'ui-set__hint', text: tr('Automático: Halloween em outubro e Natal de 1º de novembro a 26 de dezembro; no resto do ano, o visual original. Nenhum: sempre o original.') }));
+    this.theme.row.append(h('span', { class: 'ui-set__hint', text: tr('Automático: segue o calendário hijri (hora local): Ramadã o mês inteiro, Eid al-Fitr de 1 a 3 de Shawwal e Eid al-Adha de 10 a 13 de Dhu al-Hijjah; no resto do ano, o visual original. Nenhum: sempre o original.') }));
     this.soundGroup = new SoundSettingsGroup(ctx, sound);
 
     // Nomes dos idiomas sempre na própria língua, para quem não entende o idioma atual achar o seu.

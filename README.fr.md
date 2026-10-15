@@ -418,19 +418,26 @@ suivante (permission ou question) · `O` ou `0` vue d'ensemble · `Esc` effacer 
 
 Dans **Réglages → Apparence → Thème du bureau**, choisissez :
 
-- **Automatique** (par défaut) : suit le calendrier, à l'heure locale. Halloween du 1er au 31 octobre, Noël du
-  1er novembre au 26 décembre et, le reste de l'année, l'apparence d'origine.
+- **Automatique** (par défaut) : suit le calendrier hégirien (Umm al-Qura, via le navigateur), en heure locale.
+  Ramadan tout le mois, Aïd al-Fitr du 1er au 3 chawwal, Aïd al-Adha du 10 au 13 dhou al-hijja et, le reste de
+  l'année, l'apparence d'origine.
 - **Aucun** : toujours l'apparence d'origine.
-- **Noël** : guirlandes, lumières chaudes, sapins avec des cadeaux, tapis de Noël, neige aux fenêtres et bonnets sur les personnages.
-- **Halloween** : citrouilles, fantômes décoratifs, toiles d'araignée, chauves-souris, lumières violettes, tapis thématiques et accessoires de déguisement.
+- **Ramadan** : lanternes fanoos qui brillent la nuit, guirlandes lumineuses avec de petites lanternes, croissants et
+  étoiles, un croissant de lune aux fenêtres la nuit, des étoiles dorées sur les tapis, une banderole « Ramadan
+  Mubarak » à l'accueil et, vers le coucher du soleil, l'iftar dans la cuisine (dattes, eau, pakoras et sharbat à la rose).
+- **Aïd al-Fitr** : fanions verts et dorés, ballons, lanternes, une banderole « Eid Mubarak », sheer khurma et boîtes
+  de mithai sur les tables, de discrets feux d'artifice aux fenêtres la nuit et une petite étincelle sur les personnages.
+- **Aïd al-Adha** : la même ambiance de fête, en bleu-vert et doré.
 
 Le changement est immédiat et le choix est enregistré dans ce navigateur. Les thèmes conservent les trajets,
-les activités et les animations des agents. Le cycle jour/nuit reste une option indépendante.
+les activités et les animations des agents, et fonctionnent dans le bâtiment unique comme dans le bureau combiné. Le
+cycle jour/nuit reste une option à part, et « réduire les animations » coupe le scintillement, les feux et les
+étincelles. Pour voir une date, ajoutez `?hijri=1447-09-10` (ou `?hijri=10-1`) à l'URL, comme `?hora=21:30` pour l'heure.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/seasonal-christmas.png" alt="Le bureau avec le thème Noël : sapins avec des cadeaux dans les coins des salles, guirlandes et lumières aux murs, tapis rouges et personnages en bonnet" /></td>
-    <td width="50%"><img src="docs/screenshots/seasonal-halloween.png" alt="Le bureau avec le thème Halloween : citrouilles et fantômes à la place des plantes, toiles d'araignée et chauves-souris aux murs, tapis violets et personnages déguisés" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-ramadan.png" alt="Le bureau avec le thème Ramadan au coucher du soleil : lanternes fanoos à la place des plantes, croissants au-dessus des ascenseurs, banderole Ramadan Mubarak à l'accueil, étoiles dorées sur les tapis et l'iftar sur les tables de la cuisine" /></td>
+    <td width="50%"><img src="docs/screenshots/seasonal-eid.png" alt="Le bureau avec le thème Aïd al-Fitr : ballons et lanternes vertes, fanions verts et dorés aux murs, banderole Eid Mubarak à l'accueil et douceurs sur les tables" /></td>
   </tr>
 </table>
 
