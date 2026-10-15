@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { IDLE_WEIGHTS } from '../sim/behavior';
 import { betFor, kindWeight, pickKind, rpsResult, winChance, type Gesture } from './gathering';
 import { fill, pick, timeLine } from './lines';
-import { bondBetween, personaFor, soloWeights, TRAIT_IDS, TRAITS, type Persona } from './persona';
+import { bondBetween, personaFor, soloWeights, TRAITS, type Persona } from './persona';
 import { DELIVERY_REWARD, START_COINS, TASK_REWARD, Wallets, type StorageLike } from './wallet';
 
 const T0 = 1_700_000_000_000;
@@ -22,7 +22,8 @@ describe('personalidade', () => {
     for (let seed = 1; seed < 400; seed++) {
       const p = personaFor(seed * 7919);
       expect(personaFor(seed * 7919)).toEqual(p);
-      expect(p.traits.length === 2 || p.traits.length === 3).toBe(true);
+      const drawn = p.traits.filter((t) => t !== 'fumo');
+      expect(drawn.length === 2 || drawn.length === 3).toBe(true);
       expect(new Set(p.traits).size).toBe(p.traits.length);
       for (const [a, b] of [
         ['timidez', 'piadas'],
@@ -35,7 +36,7 @@ describe('personalidade', () => {
   });
 
   it('rótulos são substantivos (não dependem do gênero de ninguém) e todo traço tem descrição', () => {
-    for (const id of TRAIT_IDS) {
+    for (const id of Object.keys(TRAITS) as (keyof typeof TRAITS)[]) {
       // nada de adjetivo com gênero ("Competitivo/Competitiva", "Vaidoso/Vaidosa", "Fofoqueiro/Fofoqueira")
       expect(TRAITS[id].label).not.toMatch(/(iv[oa]|os[oa]|ad[oa]|eir[oa])$/i);
       expect(TRAITS[id].desc.length).toBeGreaterThan(20);

@@ -22,6 +22,7 @@ import { COMMONS_W, commonsAreas } from './commons';
 import { ELEVATOR_CX } from './core';
 import { slotShell, type SlotShell } from './exterior';
 import { slotColumn } from './geometry';
+import { layoutRecreation, type RecreationLayout } from './recreation';
 import { translateShell } from './translate';
 import type { AreaLayout, SpotDef, TileRect } from './types';
 
@@ -80,6 +81,8 @@ export interface CampusLayout {
   inner: TileRect;
   rows: number;
   key: string;
+  /** Faixa de recreação ao norte da linha 0 (salão de jogos, descanso, quadra de tênis, fumantes): recreation.ts. */
+  recreation: RecreationLayout;
 }
 
 export function placeOf(place: number): { wing: 'east' | 'west'; row: number } {
@@ -151,17 +154,19 @@ export function layoutCampus(machines: readonly CampusMachineInput[]): CampusLay
       else paths.push({ x: b.lobbyX + COL_W, y, w: walkX + PATH_H - (b.lobbyX + COL_W), h: PATH_H });
     }
   }
-  let x0 = commons.x;
-  let x1 = commons.x + commons.w;
+  const recreation = layoutRecreation();
+  let x0 = Math.min(commons.x, recreation.rect.x);
+  let x1 = Math.max(commons.x + commons.w, recreation.rect.x + recreation.rect.w);
   let y1 = commons.y + commons.h;
   for (const b of buildings) {
     x0 = Math.min(x0, b.rect.x);
     x1 = Math.max(x1, b.rect.x + b.rect.w);
     y1 = Math.max(y1, b.rect.y + b.rect.h);
   }
-  const inner: TileRect = { x: x0, y: 0, w: x1 - x0, h: y1 };
+  const y0 = Math.min(0, recreation.rect.y);
+  const inner: TileRect = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   const key = `campus|${buildings.map((b) => `${b.id}@${b.place}:${b.cols}:${b.online ? 1 : 0}`).join(',')}`;
-  return { buildings, commons, paths, inner, rows, key };
+  return { buildings, commons, paths, inner, rows, key, recreation };
 }
 
 // =================================================================== áreas de cada prédio
@@ -331,9 +336,10 @@ export function assembleCampus(campus: CampusLayout, rooms: readonly AreaLayout[
   const corridor = core.find((a) => a.kind === 'corridor')!;
   const fixed: AreaLayout[] = [...core];
   for (const b of campus.buildings) fixed.push(...cachedBuildingAreas(b));
+  fixed.push(...campus.recreation.areas);
   const r = campus.inner;
   const grid = new WalkGrid(r.w + 2, r.h + 2, version, r.x - 1, r.y - 1);
-  for (const p of campus.paths) grid.fill(p.x, p.y, p.w, p.h, FREE);
+  for (const p of [...campus.paths, ...campus.recreation.paths]) grid.fill(p.x, p.y, p.w, p.h, FREE);
   const all = [...fixed, ...rooms];
   for (const a of all) paintArea(grid, a);
   const spots: SpotDef[] = [];

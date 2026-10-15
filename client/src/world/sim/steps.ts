@@ -19,6 +19,8 @@ export type Step =
   | { t: 'elevIn'; elev: number; phase: number }
   /** Usa a cabine do banheiro: entra, some, porta fecha; depois sai. */
   | { t: 'stall'; spot: string; ms: number; phase: number }
+  /** Campus: dorme numa cápsula da sala de descanso (entra, some, visor fecha; acorda na hora ou se chamado). sim/recreation.ts */
+  | { t: 'pod'; spot: string; ms: number; phase: number; until?: number }
   /** Liga/desliga a luz da sala no interruptor (precisa estar no spot do interruptor). */
   | { t: 'switch'; room: string; on: boolean; phase: number; onlyIfLast?: boolean }
   /** Participa de uma roda (TV, jogo, papo...) até ela acabar; a pose vem do diretor (social/social.ts). */

@@ -260,7 +260,7 @@ function makeRig(req: CharacterFrameRequest, view: HeadView): Rig {
       break;
     }
     case 'play':
-      rig.held = 'paddle';
+      rig.held = held === 'racket' ? 'racket' : 'paddle';
       if (side) {
         rig.armB = f === 0 ? arm([10, 18], [13, 20], [15, 18]) : arm([10, 18], [8, 19], [5, 18]);
       } else {
@@ -1308,6 +1308,14 @@ function drawItem(dc: Dc, x: number, y: number): void {
     case 'paddle':
       b.stamp(['.rr.', 'rRrr', 'rrrd', '.rd.', '.h..', '.h..'], x, y, { r: '#d64545', R: '#ef7a6a', d: '#a83232', h: '#6b4a32' }, side);
       break;
+    case 'racket':
+      // Raquete de tênis: aro oval com cordas e cabo longo enrolado.
+      b.stamp(['.ff.', 'fsSf', 'fSsf', 'fsSf', '.ff.', '.h..', '.g..', '.g..'], x, y - 2, { f: '#3a6fd0', s: 'rgba(240,244,248,0.55)', S: 'rgba(240,244,248,0.85)', h: '#9aa3b5', g: '#2e3648' }, side);
+      break;
+    case 'cigarette':
+      // Cigarro aceso entre os dedos (brasa na ponta).
+      b.stamp(side ? ['Oowwwf'] : ['fwwwoO'], x - 1, y, { w: '#ffffff', f: '#d08a48', o: '#ff7a2a', O: '#ffd04a' });
+      break;
     case 'popcorn':
       b.stamp(POPCORN, x, y, POPCORN_PAL);
       break;
@@ -1465,6 +1473,10 @@ function itemPos(dc: Dc): Pt | null {
       return r.view === 'side' ? [hx - 2, hy - 3] : [hx, hy - 3];
     case 'paddle':
       return r.view === 'side' ? [hx - 2, hy - 5] : [hx + 1, hy - 4];
+    case 'racket':
+      return r.view === 'side' ? [hx - 2, hy - 6] : [hx + 1, hy - 6];
+    case 'cigarette':
+      return r.view === 'side' ? [hx - 2, hy - 1] : [hx - 1, hy - 1];
     case 'popcorn':
       // Segurado pela lateral do balde (a mão fica na borda de trás/esquerda).
       return r.view === 'side' ? [hx - 5, hy - 4] : [hx + 1, hy - 4];
