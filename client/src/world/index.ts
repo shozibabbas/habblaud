@@ -68,7 +68,11 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
   };
 
   // o prédio (no campus: todos os prédios e os caminhos entre eles)
-  const buildingRect = () => rectPx(sim.building.rect);
+  const buildingRect = () => {
+    const r = rectPx(sim.building.rect);
+    // campus: as placas dos prédios ficam uma fileira acima das pílulas das salas (render/overlay.ts)
+    return sim.building.campus ? { x: r.x, y: r.y - 3.5 * TILE, w: r.w, h: r.h + 3.5 * TILE } : r;
+  };
 
   const updateBounds = () => {
     const b = buildingRect();

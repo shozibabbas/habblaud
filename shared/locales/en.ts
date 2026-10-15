@@ -2596,4 +2596,5 @@ export const EN: Readonly<Record<string, string>> = {
   "esperado {from, viewers}": "expected {from, viewers}",
   "Reunião": "Meeting",
   "offline": "offline",
+  "Máquina: {0}": "Machine: {0}",
 };

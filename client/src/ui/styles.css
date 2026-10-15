@@ -995,8 +995,29 @@
   line-height: 14px;
 }
 
+/* Nomes longos (escritório combinado: "apps-12nexusbpo · Conta A") cortam com reticências em vez de invadir o cartão
+   vizinho; a máquina vem antes, numa etiqueta curta que corta primeiro. */
 .ui-usage-card__name {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 2.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+}
+
+.ui-usage-card__machine {
+  flex: 0 100 auto;
+  min-width: 1.6em;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--acc) 22%, rgba(255, 255, 255, 0.06));
+  color: var(--ui-muted);
+  font-size: 10px;
   font-weight: 650;
 }
 
@@ -3949,6 +3970,12 @@
     padding: 3px 2px;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  /* Na fila própria (que rola) os cartões não precisam espremer até o mínimo da linha única: com a etiqueta da máquina
+     (escritório combinado) ficam legíveis. Maior que o mínimo da linha única, então a decisão de fit() não oscila. */
+  .ui-root.has-usage-row .ui-topbar .ui-usage .ui-usage-card {
+    min-width: 196px;
   }
 
   /* Sem ficar presa à rolagem da fila: a dica se ancora na barra (o backdrop-filter dela é o bloco de contenção). */

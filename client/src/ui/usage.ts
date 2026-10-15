@@ -7,7 +7,7 @@
 // Conta do Codex: os números vêm dos arquivos de sessão dele, que só se renovam enquanto alguma sessão roda; por isso
 // a idade ("há 12 min") fica sempre à mostra. Sem cota nem créditos ("sem cota") nunca vira 0%. Não há o que
 // instalar para o uso: "Como funciona" abre a ajuda na seção do Codex. Sem Opus/Sonnet nem e-mail (só o plano).
-import type { AccountInfo } from '../../../shared/types';
+import type { AccountInfo, OfficeSnapshot } from '../../../shared/types';
 import type { UiContext } from './context';
 import { h, KeyedList, setAttr, setHidden, setStyleVar, setText, setTitle, setVariant } from './dom';
 import { FIVE_HOURS_MS, relativeTime, usageLevel, usageWindowView, WEEK_MS, type UsageWindowView } from './format';
@@ -63,6 +63,7 @@ interface CardRefs {
   chip: HTMLElement;
   flag: HTMLElement;
   name: HTMLElement;
+  machine: HTMLElement;
   prov: HTMLElement;
   email: HTMLElement;
   state: HTMLElement;
@@ -181,6 +182,18 @@ export function usageSubtitle(a: Pick<AccountInfo, 'email' | 'plan' | 'configDir
   return a.configDir;
 }
 
+/**
+ * Escritório combinado: nome da conta sem a etiqueta da máquina ("server1 · Conta A" -> máquina "server1", conta
+ * "Conta A"). A máquina vira uma etiqueta curta no cartão (corta primeiro), e o nome da conta fica legível. Contas
+ * locais vêm sem etiqueta: com outras máquinas no escritório, ganham o nome da máquina local.
+ */
+export function splitAccountName(a: Pick<AccountInfo, 'name' | 'machine'>, meta?: OfficeSnapshot['meta']): { machine: string | null; name: string } {
+  const m = a.machine?.name ?? (meta?.machines && meta.machines.length > 1 ? meta.machines.find((x) => x.local)?.name : undefined);
+  if (!m) return { machine: null, name: a.name };
+  const prefix = `${m} · `;
+  return { machine: m, name: a.name.startsWith(prefix) ? a.name.slice(prefix.length) || a.name : a.name };
+}
+
 /** Mensagem no lugar das barras (estados sem números): [longa, curta]. */
 export function usageMessage(a: Pick<AccountInfo, 'usage' | 'usageStatus' | 'provider'>): [string, string] {
   const state = cardState(a);
@@ -269,6 +282,7 @@ export class UsageCards {
     const flag = h('span', { class: 'ui-usage-card__flag', hidden: true, attrs: { 'aria-hidden': 'true' } });
     flag.innerHTML = ICONS.clock;
     const name = h('span', { class: 'ui-usage-card__name' });
+    const machine = h('span', { class: 'ui-usage-card__machine', hidden: true });
     const prov = createProviderTag('ui-prov--xs');
     const email = h('span', { class: 'ui-usage-card__email' });
     const stateIcon = h('span', { class: 'ui-usage-card__state-icon', attrs: { 'aria-hidden': 'true' } });
@@ -304,13 +318,14 @@ export class UsageCards {
       { class: 'ui-usage-card', tabIndex: 0, attrs: { 'aria-describedby': tipId } },
       chip,
       flag,
-      h('div', { class: 'ui-usage-card__body' }, h('div', { class: 'ui-usage-card__head' }, name, prov, email, state), meters, msg),
+      h('div', { class: 'ui-usage-card__body' }, h('div', { class: 'ui-usage-card__head' }, machine, name, prov, email, state), meters, msg),
       tip,
     );
     this.refs.set(card, {
       chip,
       flag,
       name,
+      machine,
       prov,
       email,
       state,
@@ -339,7 +354,12 @@ export class UsageCards {
     const codex = isCodex(a);
     updateAccountChip(r.chip, a);
     setStyleVar(card, '--acc', a.color);
-    setText(r.name, a.name);
+    const split = splitAccountName(a, this.ctx.store.snapshot?.meta);
+    setText(r.name, split.name);
+    setTitle(r.name, a.name);
+    setHidden(r.machine, !split.machine);
+    setText(r.machine, split.machine ?? '');
+    setTitle(r.machine, split.machine ? tr('Máquina: {0}', [split.machine]) : '');
     updateProviderTag(r.prov, codex ? 'codex' : 'claude', a.name);
     setText(r.email, usageSubtitle(a));
     setAttr(card, 'aria-label', tr('{0}{1}: uso do plano', [a.name, codex ? ' (Codex)' : '']));

@@ -32,6 +32,8 @@ const CORE_FONT = `600 11px ${UI_FONT}`;
 const CORE_FONT_SMALL = `600 9.5px ${UI_FONT}`;
 const PLATE_FONT = `800 13px ${UI_FONT}`;
 const PLATE_TAG_FONT = `700 9px ${UI_FONT}`;
+/** Placa do prédio (campus): px acima da linha das pílulas das salas (altura da pílula + folga). */
+export const PLATE_LIFT = 30;
 const signFont = (size: number) => `700 ${size}px ${UI_FONT}`;
 
 /** Largura máxima dos balões (o de alerta é maior: o motivo é a informação acionável). */
@@ -452,7 +454,9 @@ export class Overlay {
         if (!room.present || room.ghost || (anim && anim.walls < 0.6)) continue;
         this.drawRoomPill(this.roomName(room), cx, cy, colW - 8, room.accounts, this.countIn(room.id), room.theme.accent, room.lightOn);
       } else if (plate) {
-        this.drawBuildingPlate(plate, cx, cy);
+        // uma fileira acima das pílulas das salas (que ficam na linha do topo do prédio): a placa de uma máquina de
+        // nome comprido nunca cobre o nome da primeira sala ao lado do saguão
+        this.drawBuildingPlate(plate, cx, cy - PLATE_LIFT);
       } else if (CORE_NAMES[vis.id]) {
         this.drawCorePill(CORE_NAMES[vis.id], cx, cy, colW - 8);
       } else if (vis.layout.kind === 'meeting') {

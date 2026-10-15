@@ -2612,4 +2612,5 @@ export const FR: Readonly<Record<string, string>> = {
   "esperado {from, viewers}": "attendu {from, viewers}",
   "Reunião": "Réunion",
   "offline": "hors ligne",
+  "Máquina: {0}": "Machine : {0}",
 };
