@@ -1,0 +1,8 @@
+{
+  "title": "Habblaud Hub",
+  "offices": [
+    { "id": "laptop", "name": "Laptop", "url": "http://localhost:4747" },
+    { "id": "server-1", "name": "Server 1", "url": "http://localhost:4801" },
+    { "id": "server-2", "name": "Server 2", "url": "http://localhost:4802" }
+  ]
+}

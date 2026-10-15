@@ -74,4 +74,6 @@ export interface UiContext {
   /** Abre/fecha o timelapse do dia (ui/timelapse.ts). */
   toggleTimelapse(): void;
   isTimelapseOpen(): boolean;
+  /** Embutido no estado compacto (?embed=1, ui/embed.ts): só o escritório, sem barras nem avisos de versão. */
+  isCompact(): boolean;
 }

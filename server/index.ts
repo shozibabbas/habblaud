@@ -337,7 +337,7 @@ if (config.dev) {
   closeVite = () => vite.close();
   fallback = (req, res) => vite.middlewares(req, res);
 } else {
-  const serveStatic = createStaticHandler(join(config.rootDir, 'dist', 'client'));
+  const serveStatic = createStaticHandler(join(config.rootDir, 'dist', 'client'), { frameAncestors: config.frameAncestors });
   fallback = (req, res, url) => serveStatic(req, res, url.pathname);
 }
 
@@ -426,6 +426,8 @@ server.listen(config.port, config.host, () => {
   } else {
     log.info(tr('   Codex: {0}.', [config.codex ? tr('nenhuma pasta do Codex encontrada (defina HABBLAUD_CODEX_DIRS)') : tr('desligado (HABBLAUD_CODEX=0)')]));
   }
+  for (const item of config.frameAncestorsInvalid) log.warn(tr('   HABBLAUD_FRAME_ANCESTORS: "{0}" ignorado (use http(s)://host[:porta], sem caminho nem *).', [item]));
+  if (config.frameAncestors.length) log.info(tr('   Pode ser embutido em: {0}.', [config.frameAncestors.join(' ')]));
   if (office.isDemo()) log.info(tr('   Modo demonstração ligado (agentes simulados misturados aos reais).'));
   if (config.terminal) log.info(tr('   Terminal: ligado (acesso só local).'));
   else log.info(tr('   Terminal: desligado ({0}).', [terminalOffReason(process.env, config.host, config.inDocker)]));

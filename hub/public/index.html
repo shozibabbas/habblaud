@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Habblaud Hub</title>
+    <meta name="description" content="Several Habblaud offices side by side." />
+    <meta name="theme-color" content="#12151d" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Hub" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="bar" id="bar">
+      <div class="bar__brand">
+        <svg class="bar__logo" viewBox="0 0 8 8" aria-hidden="true" shape-rendering="crispEdges">
+          <rect x="1" y="1" width="6" height="7" fill="#3a4560" />
+          <rect x="1" y="1" width="6" height="1" fill="#7cc8ff" />
+          <rect x="2" y="3" width="1" height="1" fill="#ffd36b" />
+          <rect x="5" y="3" width="1" height="1" fill="#ffd36b" />
+          <rect x="2" y="5" width="1" height="1" fill="#ffd36b" />
+          <rect x="5" y="5" width="1" height="1" fill="#6b7a99" />
+          <rect x="3" y="6" width="2" height="2" fill="#12151d" />
+        </svg>
+        <h1 class="bar__title" id="title">Habblaud Hub</h1>
+      </div>
+
+      <div class="bar__totals" id="totals" aria-live="polite">
+        <span class="stat" title="Offices reporting status"><b id="t-online">0/0</b> online</span>
+        <span class="stat" title="Agents across all offices"><b id="t-agents">0</b> agents</span>
+        <span class="stat stat--working" title="Agents working right now"><i class="sq"></i><b id="t-working">0</b> working</span>
+        <span class="stat stat--needs" id="t-needs-wrap" title="Agents waiting for you"><i class="sq"></i><b id="t-needs">0</b> need you</span>
+      </div>
+
+      <div class="bar__controls">
+        <div class="seg" role="radiogroup" aria-label="Layout">
+          <button type="button" class="seg__btn" id="btn-grid" role="radio" aria-checked="true" title="Grid (G or Esc)">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z" /></svg>
+            <span>Grid</span>
+          </button>
+          <button type="button" class="seg__btn" id="btn-spot" role="radio" aria-checked="false" title="Spotlight (1–9)">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2h10v12H1zM12 2h3v3.5h-3zM12 6.25h3v3.5h-3zM12 10.5h3V14h-3z" /></svg>
+            <span>Spotlight</span>
+          </button>
+        </div>
+        <label class="toggle" title="Bring an office forward when an agent starts waiting for you">
+          <input type="checkbox" id="auto-spot" checked />
+          <span class="toggle__track" aria-hidden="true"><span class="toggle__knob"></span></span>
+          <span class="toggle__label">Auto-spotlight</span>
+        </label>
+        <button type="button" class="btn" id="btn-notify" hidden>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a4 4 0 0 0-4 4v3L2.5 11v1h11v-1L12 8.5v-3a4 4 0 0 0-4-4zM6.5 13a1.5 1.5 0 0 0 3 0z" /></svg>
+          <span id="btn-notify-label">Enable alerts</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="stage" id="stage" aria-label="Offices"></main>
+
+    <template id="tile-tpl">
+      <section class="tile" data-status="loading">
+        <div class="tile__label" role="button" tabindex="0">
+          <span class="tile__key"></span>
+          <span class="dot" aria-hidden="true"></span>
+          <span class="tile__name"></span>
+          <span class="tile__state"></span>
+          <span class="tile__spacer"></span>
+          <span class="tile__counts">
+            <span class="cnt cnt--agents" title="Agents"><b>0</b><span class="cnt__word"> agents</span></span>
+            <span class="cnt cnt--working" title="Working"><i class="sq"></i><b>0</b><span class="cnt__word"> working</span></span>
+          </span>
+          <span class="tile__needs" hidden></span>
+          <a class="tile__btn tile__open" target="_blank" rel="noopener noreferrer" title="Open this office in a new tab">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2h5v5h-1.6V4.7L7.6 9.5 6.5 8.4l4.8-4.8H9zM3 4h4v1.5H4.5v6h6V9H12v4H3z" /></svg>
+          </a>
+          <button type="button" class="tile__btn tile__full" title="Full screen">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h4.5v1.5h-3v3H2zM9.5 2H14v4.5h-1.5v-3h-3zM2 9.5h1.5v3h3V14H2zM12.5 9.5H14V14H9.5v-1.5h3z" /></svg>
+          </button>
+        </div>
+        <div class="tile__body">
+          <iframe
+            class="tile__frame"
+            allow="clipboard-read; clipboard-write; fullscreen"
+            referrerpolicy="same-origin"
+            loading="eager"
+          ></iframe>
+          <div class="tile__veil">
+            <div class="card card--loading">
+              <span class="spinner" aria-hidden="true"></span>
+              <p class="card__title">Connecting…</p>
+            </div>
+            <div class="card card--offline">
+              <svg class="card__icon" viewBox="0 0 16 16" aria-hidden="true" shape-rendering="crispEdges">
+                <path d="M2 3h12v8H2zM3 4v6h10V4zM6 12h4v1h2v1H4v-1h2z" />
+                <path d="M6 6h1v1H6zM9 6h1v1H9zM6 9h4v-1H6z" />
+              </svg>
+              <p class="card__title">Office unreachable</p>
+              <p class="card__text"></p>
+              <button type="button" class="btn btn--primary card__retry">Retry</button>
+              <p class="card__hint">Retrying on its own every few seconds.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <template id="empty-tpl">
+      <div class="empty">
+        <div class="card card--empty">
+          <p class="card__title">No offices to show</p>
+          <p class="card__text"></p>
+          <pre class="card__code">cp hub/config.example.json hub/config.json</pre>
+        </div>
+      </div>
+    </template>
+  </body>
+</html>

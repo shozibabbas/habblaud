@@ -16,6 +16,7 @@ import { DayLauncher } from './daystats-launcher';
 import { RoomRenamer } from './roomrename';
 import { h } from './dom';
 import { Drawer } from './drawer';
+import { EmbedBridge } from './embed';
 import { FeedPanel } from './feed';
 import { HelpDialog } from './help';
 import { HistoryPopover } from './history';
@@ -51,7 +52,15 @@ function isTypingTarget(t: EventTarget | null): boolean {
   return t.isContentEditable || t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;
 }
 
-export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi): void {
+export interface UiOptions {
+  /** Modo embutido (?embed=1, ui/embed.ts): começa compacto e não grava painéis abertos/fechados nas preferências. */
+  embed?: boolean;
+}
+
+export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi, opts: UiOptions = {}): void {
+  const embed = !!opts.embed;
+  /** Embutido e compacto: só o escritório (barra superior, lista lateral e feed escondidos). */
+  let compact = embed;
   const storage = safeLocalStorage();
   let prefs: UiPrefs = loadPrefs(storage);
   let selection: Selection = world.getSelection();
@@ -123,7 +132,8 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi)
       const next = open ?? !panels[name];
       if (panels[name] === next) return;
       panels[name] = next;
-      if (!ctx.isNarrow()) ctx.updatePrefs(name === 'sidebar' ? { sidebarOpen: next } : { feedOpen: next });
+      // Embutido: abrir/fechar painéis vale só para esta página (não mexe nas preferências da página normal).
+      if (!ctx.isNarrow() && !embed) ctx.updatePrefs(name === 'sidebar' ? { sidebarOpen: next } : { feedOpen: next });
       applyLayout();
       invalidate();
     },
@@ -146,6 +156,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi)
       timelapse.toggle();
     },
     isTimelapseOpen: () => timelapse.isOpen,
+    isCompact: () => compact,
   };
 
   // ---------------------------------------------------------------- componentes
@@ -209,7 +220,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi)
         setTimeout(go, 300);
       });
     }
-    if (url.search && location.search === url.search) window.history.replaceState(null, '', location.pathname);
+    if (url.search && location.search === url.search) window.history.replaceState(null, '', embed ? `${location.pathname}?embed=1` : location.pathname);
   };
   if (typeof location !== 'undefined') openLink(new URL(location.href));
   drawer = new Drawer(ctx, terminal, pty);
@@ -235,8 +246,8 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi)
   root.classList.add('ui-root');
   root.append(timelapse.vignette, topbar.el, sidebar.el, scrim, feed.el, drawer.el, terminal.el, pty.el, timelapse.el, timelapse.badge, toasts.el, banner.el, update.el, empty.el, tip.el, settings.el, history.el, deliveries.el, help.el, renamer.el, live, splash.el);
   area = new FreeArea(world, { root, topbar: topbar.el, sidebar: sidebar.el, drawer: drawer.el, feed: feed.el }, () => ({
-    sidebar: panels.sidebar,
-    feed: panels.feed,
+    sidebar: panels.sidebar && !compact,
+    feed: panels.feed && !compact,
     drawer: selection !== null && !drawer.floating,
     narrow: ctx.isNarrow(),
   }));
@@ -278,6 +289,8 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi)
     root.classList.toggle('has-feed', panels.feed);
     root.classList.toggle('has-drawer', selection !== null && !drawer.floating);
     root.classList.toggle('is-narrow', ctx.isNarrow());
+    root.classList.toggle('is-embed', embed);
+    root.classList.toggle('is-compact', compact);
     area.sync(opts);
   }
 
@@ -410,8 +423,25 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi)
     else terminal.open(id);
   }
 
+  // ---------------------------------------------------------------- modo embutido
+  const bridge = embed
+    ? new EmbedBridge({
+        store,
+        now: () => ctx.now(),
+        onCompact(next) {
+          if (next === compact) return;
+          compact = next;
+          // Sem recarregar: só as classes e a área livre mudam (a gaveta, o terminal e os pedidos continuam).
+          applyLayout();
+          invalidate();
+        },
+        onOverview: () => ctx.camera('overview'),
+      })
+    : null;
+
   // ---------------------------------------------------------------- início
   world.setOptions(worldOptionsFrom(prefs));
   applyLayout();
   renderAll();
+  bridge?.ready();
 }

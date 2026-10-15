@@ -9029,3 +9029,20 @@ html.is-replay #world {
     box-shadow: 0 -12px 24px rgba(5, 7, 12, 0.35);
   }
 }
+
+/* ------------------------------------------------------------------ modo embutido (?embed=1, ui/embed.ts) */
+
+/* Compacto: só o escritório ocupa o quadro (sem barra superior, lista lateral, feed nem aviso de versão); a gaveta,
+   o terminal, os pedidos, os avisos e o aviso de conexão continuam, colados no topo. */
+.ui-root.is-compact {
+  --top-h: 0px;
+  --feed-head: 0px;
+}
+
+.ui-root.is-compact > .ui-topbar,
+.ui-root.is-compact > .ui-sidebar,
+.ui-root.is-compact > .ui-scrim,
+.ui-root.is-compact > .ui-feed,
+.ui-root.is-compact > .ui-banner--update {
+  display: none;
+}

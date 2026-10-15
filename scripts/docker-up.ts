@@ -55,6 +55,10 @@ const USAGE_DIR = process.env.HABBLAUD_USAGE_DIR?.trim() ? resolve(process.env.H
 const CONTAINER_USAGE_DIR = '/usage';
 /** Onde o container lê o certificado do acesso remoto (server/http/remote.ts). */
 const CONTAINER_REMOTE_TLS_DIR = '/remote-tls';
+/** Dados do Habblaud no container (volume habblaud-data, ou pasta do host quando o container roda com o usuário do host). */
+const CONTAINER_DATA_DIR = '/data';
+/** UID do usuário `node` da imagem (Dockerfile: USER node). */
+const IMAGE_UID = 1000;
 const SERVICE = 'habblaud';
 /** Raiz das montagens dentro do container: /claude/<conta>/{projects,sessions}. */
 const CONTAINER_ROOT = '/claude';
@@ -299,6 +303,29 @@ export function hostTimeZone(env: NodeJS.ProcessEnv = process.env): string | und
   return tz && /^[A-Za-z0-9_+\-]+(?:\/[A-Za-z0-9_+\-]+)*$/.test(tz) ? tz : undefined;
 }
 
+/** Usuário do host com que o container roda (Linux, UID diferente do da imagem) e a pasta dos dados dele. */
+export interface HostUser {
+  uid: number;
+  gid: number;
+  dataDir: string;
+}
+
+/**
+ * No Linux o Docker não traduz donos de arquivo: com o usuário do host diferente do da imagem, o container não lê as
+ * pastas das contas (700). Devolve o usuário com que o container deve rodar, ou undefined quando não precisa
+ * (macOS/Windows, ou o mesmo UID da imagem). `HABBLAUD_DOCKER_USER=image` mantém o usuário da imagem.
+ */
+export function planHostUser(
+  platform: NodeJS.Platform,
+  ids: { uid: number; gid: number } | undefined,
+  dataDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+): HostUser | undefined {
+  if (platform !== 'linux' || !ids || ids.uid === IMAGE_UID || ids.uid === 0) return undefined;
+  if (env.HABBLAUD_DOCKER_USER?.trim().toLowerCase() === 'image') return undefined;
+  return { uid: ids.uid, gid: ids.gid, dataDir };
+}
+
 /**
  * `usageDir`: pasta do host com o uso capturado pelo tap de statusline (já existente; caminho real),
  * montada somente leitura em /usage. `timeZone`: fuso do host, repassado como TZ. `codex`: montagens das contas do
@@ -312,6 +339,7 @@ export function renderOverride(
   codex: AccountMount[] = [],
   remoteTlsDir?: string,
   extraPorts: string[] = [],
+  hostUser?: HostUser,
 ): string {
   const env: Array<[string, string]> = [
     ['HABBLAUD_CLAUDE_DIRS', mounts.map((m) => m.mountDir).join(',')],
@@ -327,6 +355,9 @@ export function renderOverride(
     ...(codex.length ? ['# Codex: SOMENTE <pasta>/sessions, <pasta>/archived_sessions e <pasta>/thread-writer-locks, somente leitura.'] : []),
     'services:',
     `  ${SERVICE}:`,
+    // Linux com UID diferente do da imagem: o container roda como o usuário do host para conseguir ler as pastas das
+    // contas (700), e os dados vão para uma pasta do host em vez do volume (que pertence ao usuário da imagem).
+    ...(hostUser ? [`    user: ${yamlString(`${hostUser.uid}:${hostUser.gid}`)}`] : []),
     '    environment:',
     ...env.map(([k, v]) => `      ${k}: ${yamlString(v)}`),
   ];
@@ -336,8 +367,17 @@ export function renderOverride(
   if (usageDir) binds.push({ source: usageDir, target: CONTAINER_USAGE_DIR });
   // Acesso remoto: SÓ a pasta do certificado do servidor (a chave da CA fica no host).
   if (remoteTlsDir) binds.push({ source: remoteTlsDir, target: CONTAINER_REMOTE_TLS_DIR });
-  if (binds.length) {
+  if (binds.length || hostUser) {
     lines.push('    volumes:');
+    if (hostUser) {
+      lines.push(
+        '      - type: bind',
+        `        source: ${yamlString(hostUser.dataDir)}`,
+        `        target: ${yamlString(CONTAINER_DATA_DIR)}`,
+        '        bind:',
+        '          create_host_path: false',
+      );
+    }
     for (const b of binds) {
       lines.push(
         '      - type: bind',
@@ -679,8 +719,14 @@ async function up(opts: Options, port: number): Promise<void> {
   if (usageDir) say(tr('Uso ao vivo (mod ou tap de statusline): monta {0} em {1}, somente leitura.', [tildify(USAGE_DIR), CONTAINER_USAGE_DIR]));
   const remoteTlsDir = prepareRemoteTls();
   const remotePorts = remoteTlsDir || remoteInsecure() ? remotePortsToPublish() : [];
+  const ids = typeof process.getuid === 'function' && typeof process.getgid === 'function' ? { uid: process.getuid(), gid: process.getgid() } : undefined;
+  const hostUser = planHostUser(process.platform, ids, join(STATE_DIR, 'docker-data'));
+  if (hostUser) {
+    mkdirSync(hostUser.dataDir, { recursive: true, mode: 0o700 });
+    say(tr('Linux: o container roda como o usuário do host ({0}) e guarda os dados em {1}.', [`${hostUser.uid}:${hostUser.gid}`, tildify(hostUser.dataDir)]));
+  }
   const tmp = `${OVERRIDE_FILE}.tmp`;
-  writeFileSync(tmp, renderOverride(mounts, new Date(), usageDir, hostTimeZone(), codexMounts, remoteTlsDir, remotePorts), { mode: 0o600 });
+  writeFileSync(tmp, renderOverride(mounts, new Date(), usageDir, hostTimeZone(), codexMounts, remoteTlsDir, remotePorts, hostUser), { mode: 0o600 });
   chmodSync(tmp, 0o600);
   renameSync(tmp, OVERRIDE_FILE);
   say(tr('docker-compose.override.yml gerado.'));

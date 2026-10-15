@@ -28,6 +28,8 @@ services:
     # Opções que podem vir do .env (ou do ambiente) para dentro do container.
     environment:
       HABBLAUD_ALLOWED_HOSTS: ${HABBLAUD_ALLOWED_HOSTS:-}
+      # Origens que podem mostrar o escritório num iframe (modo embutido, ?embed=1); vazio = nenhuma.
+      HABBLAUD_FRAME_ANCESTORS: ${HABBLAUD_FRAME_ANCESTORS:-}
       HABBLAUD_DEMO: ${HABBLAUD_DEMO:-}
       # O mesmo valor da porta publicada acima: o terminal (e o que age sobre as sessões) só liga com bind local.
       HABBLAUD_BIND: ${HABBLAUD_BIND:-127.0.0.1}

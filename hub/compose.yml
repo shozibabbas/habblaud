@@ -1,0 +1,68 @@
+# Habblaud Hub: the hub page plus SSH tunnels to remote offices. See hub/README.md.
+#
+#   cp config.example.json config.json && cp tunnels.example.conf tunnels.conf   # then edit both
+#   docker compose -f hub/compose.yml up -d --build
+#
+# Everything is published on 127.0.0.1 only. The local machine's own Habblaud is not part of this file
+# (it runs from the repository root with `npm run docker:up`).
+name: habblaud-hub
+
+services:
+  hub:
+    build: .
+    image: habblaud-hub:local
+    container_name: habblaud-hub
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HUB_PORT:-4700}:8080"
+    volumes:
+      - type: bind
+        source: ${HUB_CONFIG:-./config.json}
+        target: /usr/share/nginx/html/config.json
+        read_only: true
+        bind:
+          # Fail loudly instead of creating an empty config.json *directory* when the file is missing.
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  tunnels:
+    build: ./tunnels
+    image: habblaud-hub-tunnels:local
+    container_name: habblaud-hub-tunnels
+    restart: unless-stopped
+    init: true
+    ports:
+      # One port per remote office (see tunnels.conf). Loopback only: never publish these on another interface.
+      - "127.0.0.1:4801-4810:4801-4810"
+    volumes:
+      - type: bind
+        source: ${HUB_TUNNELS_CONF:-./tunnels.conf}
+        target: /etc/habblaud/tunnels.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        # A dedicated, passphrase-less key used only for these tunnels (never your personal ~/.ssh key).
+        source: ${HUB_TUNNEL_KEY:-${HOME}/.config/habblaud/tunnel_ed25519}
+        target: /keys/id
+        read_only: true
+        bind:
+          create_host_path: false
+      # known_hosts: host keys are pinned on first contact (StrictHostKeyChecking=accept-new).
+      - tunnels-state:/state
+    read_only: true
+    tmpfs:
+      - /tmp:size=1m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  tunnels-state:

@@ -654,6 +654,34 @@ Want to see the office full without having any sessions open?
   mode** — which puts made-up agents alongside the real ones. With `npm run demo` (or `HABBLAUD_DEMO=1` in the
   Docker `.env`), this mode starts already on.
 
+### Embed mode
+
+To show one or more offices inside another page (a dashboard with several computers, for example), allow that page's
+origin with `HABBLAUD_FRAME_ANCESTORS` (by default the office refuses to be framed) and load
+**`/?embed=1`** in an iframe. The office starts **compact**: only the building, without the top bar, the side list,
+the feed or the new-version notice. The details drawer, the terminal, permission requests, questions and alerts still
+work. Opening and closing panels in an embedded office is not saved to your preferences.
+
+The outer page talks to the office with `postMessage` (only messages from `window.parent` are accepted):
+
+| Direction | Message |
+| --- | --- |
+| page → office | `{type:'habblaud:embed', compact:true\|false}` switches between compact and the full interface, without reloading. |
+| page → office | `{type:'habblaud:overview'}` fits the whole building in the frame again. |
+| office → page | `{type:'habblaud:ready'}` once the interface is up. |
+| office → page | `{type:'habblaud:summary', rooms, agents, working, subagents, needsYou, shells, connection}`: the top-bar counters (numbers only, no names, paths or text) and the connection state (`connecting`, `open`, `closed` or `mock`). Sent on load, on changes (at most once a second, immediately when `needsYou` changes) and every 5 s. |
+
+The terminal and answering from the office still follow the usual rule: they only work when the office itself is
+opened through `localhost` (an SSH tunnel keeps that).
+
+### Multi-office hub
+
+Running Claude Code on several computers? The [hub](hub/README.md) shows each computer's office as a tile on one
+page, like a video call: a grid, or one office in the spotlight with the others in a strip. It brings forward the office
+where an agent needs you, can send a desktop alert, and installs as an app. Remote offices stay bound to their own
+`localhost` and are reached through SSH tunnels, so nothing is exposed on the network and the terminal and answering
+keep working. Setup and the security model are in [hub/README.md](hub/README.md).
+
 ## Accounts and usage (5-hour and weekly)
 
 > **Codex** accounts come in on their own (each `~/.codex*` folder or `CODEX_HOME` is an account; the letter comes from an
@@ -720,6 +748,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_USAGE_DIR` | `~/.habblaud/usage` | Where the mod (or the statusline tap) writes usage. |
 | `HABBLAUD_DEMO` | off | `1` turns on demo mode at startup. |
 | `HABBLAUD_ALLOWED_HOSTS` | — | Extra names accepted in the address (e.g. `meu-mac.local`), besides `localhost` and IPs. |
+| `HABBLAUD_FRAME_ANCESTORS` | — (no framing) | Origins allowed to show the office in an iframe, space- or comma-separated (e.g. `http://localhost:4700`): only `http(s)://host[:port]`, no paths or `*`. See [Embed mode](#embed-mode). |
 | `HABBLAUD_TERMINAL` | on (local access only) | `0` turns off the terminal, answering and sending messages from the office, and the character editor. With the port exposed they're already off, with no way to turn them on. |
 | `HABBLAUD_PTY` | off | `1` turns on the interactive terminal (open, take over and end Claude Code sessions from the office; local access only and outside Docker) and **New agent** (also in Docker, through `npm run codex:bridge`). Read the warning in [Privacy and security](#privacy-and-security). |
 | `HABBLAUD_CLAUDE_BIN` | `claude` from PATH | The Claude Code executable that the interactive terminal and New agent run. |
@@ -732,7 +761,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_LANG` | system language (except English), otherwise `pt-BR` | Language of the texts the server builds (activities, notices, logs): `pt-BR`, `en`, `es` or `fr`. The interface follows the browser or the choice in Settings › Language. See [Languages](#languages). |
 | `HABBLAUD_ACCOUNTS` | — | JSON to customize name, letter or color, matched by the account folder name. E.g. `[{"id":".claude-conta2","name":"Trabalho","short":"T","color":"#5cc97b"}]`. |
 
-**In Docker**, `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
+**In Docker**, `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_FRAME_ANCESTORS`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
 `HABBLAUD_MENSAGENS`, `HABBLAUD_CODEX`, `HABBLAUD_UPDATE_CHECK`, `HABBLAUD_LANG`, `HABBLAUD_PTY` and the
 `HABBLAUD_REMOTE_*` apply (in `.env` or in the environment), as do `HABBLAUD_CLAUDE_DIRS`, `HABBLAUD_CODEX_DIRS`, `HABBLAUD_USAGE_DIR` and
 `HABBLAUD_ACCOUNTS` (read by `docker:up` on the host); the rest are fixed inside the container. Options: `npm run docker:up -- --no-build` (starts without rebuilding),

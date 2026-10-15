@@ -13,6 +13,7 @@ import {
   hostTimeZone,
   parseArgs,
   planCodexMounts,
+  planHostUser,
   planMounts,
   planUp,
   renderOverride,
@@ -124,6 +125,27 @@ describe('docker-up', () => {
     expect(hostTimeZone({ TZ: ':Europe/Lisbon' })).toBe('Europe/Lisbon');
     expect(hostTimeZone({ TZ: 'x"; rm -rf' })).toBeUndefined();
     expect(hostTimeZone({})).toMatch(/^[A-Za-z]/);
+  });
+
+  it('Linux com UID diferente do da imagem: container roda como o usuário do host, com os dados numa pasta dele', () => {
+    const ids = { uid: 1001, gid: 1002 };
+    expect(planHostUser('darwin', ids, '/d')).toBeUndefined();
+    expect(planHostUser('linux', { uid: 1000, gid: 1000 }, '/d')).toBeUndefined();
+    expect(planHostUser('linux', { uid: 0, gid: 0 }, '/d')).toBeUndefined();
+    expect(planHostUser('linux', undefined, '/d')).toBeUndefined();
+    expect(planHostUser('linux', ids, '/d', { HABBLAUD_DOCKER_USER: 'image' })).toBeUndefined();
+    const user = planHostUser('linux', ids, '/home/fulano/.habblaud/docker-data', {});
+    expect(user).toEqual({ uid: 1001, gid: 1002, dataDir: '/home/fulano/.habblaud/docker-data' });
+
+    const mounts = planMounts(['/home/fulano/.claude'], [acc('.claude')], slash);
+    const yml = renderOverride(mounts, new Date(0), undefined, undefined, [], undefined, [], user);
+    expect(yml).toContain('    user: "1001:1002"');
+    expect(yml).toContain('source: "/home/fulano/.habblaud/docker-data"\n        target: "/data"');
+    // A pasta dos dados é a única montagem gravável.
+    expect(yml.match(/read_only: true/g)?.length).toBe(mounts.flatMap((m) => m.binds).length);
+    expect(renderOverride(mounts)).not.toContain('user:');
+    // Sem contas, ainda monta a pasta dos dados.
+    expect(renderOverride([], new Date(0), undefined, undefined, [], undefined, [], user)).toContain('target: "/data"');
   });
 });
 

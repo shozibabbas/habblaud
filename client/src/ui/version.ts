@@ -103,7 +103,8 @@ export class UpdateToaster implements UiComponent {
   private shown: string | undefined;
 
   render(): void {
-    if (this.ctx.store.connection !== 'open') return;
+    // Embutido e compacto: guarda o aviso para quando o escritório for aberto por inteiro.
+    if (this.ctx.store.connection !== 'open' || this.ctx.isCompact()) return;
     const s = versionInfo(this.ctx.store.liveSnapshot)?.updates;
     if (!s?.available || !s.latest || this.shown === s.latest) return;
     this.shown = s.latest;

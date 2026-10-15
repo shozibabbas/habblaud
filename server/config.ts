@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { discoverClaudeDirs } from './accounts/detect';
 import { parseAllowedHosts } from './http/guard';
 import { parseRemoteConfig, type RemoteConfig } from './http/remote';
+import { parseFrameAncestors } from './http/static';
 import { parseGithubRepo } from './updates/checker';
 import { tr } from '../shared/i18n';
 
@@ -31,6 +32,10 @@ export interface ServerConfig {
   usageDir: string;
   /** Nomes extras aceitos no cabeçalho Host/Origin (HABBLAUD_ALLOWED_HOSTS); localhost e IPs sempre valem. */
   allowedHosts: Set<string>;
+  /** Origens que podem embutir a página num iframe (HABBLAUD_FRAME_ANCESTORS); vazio = nenhuma (X-Frame-Options: DENY). */
+  frameAncestors: string[];
+  /** Entradas de HABBLAUD_FRAME_ANCESTORS ignoradas por não serem uma origem http(s) válida. */
+  frameAncestorsInvalid: string[];
   /**
    * Terminal (GET /api/agents/:id/terminal) ligado: só com bind local, isto é, com o Habblaud acessível apenas
    * pelo próprio computador (ver terminalOffReason). É a trava de tudo o que mostra ou age sobre as sessões.
@@ -157,6 +162,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
   const host = env.HABBLAUD_HOST?.trim() || '127.0.0.1';
   const pkg = readPackage(rootDir);
   const remote = parseRemoteConfig(env, inDocker);
+  const frame = parseFrameAncestors(env.HABBLAUD_FRAME_ANCESTORS);
   return {
     port: Number.isFinite(port) && port > 0 && port < 65536 ? port : 4747,
     host,
@@ -168,6 +174,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     dataDir: resolve(env.HABBLAUD_DATA_DIR?.trim() || (inDocker ? '/data' : join(home, '.habblaud'))),
     usageDir: resolve(env.HABBLAUD_USAGE_DIR?.trim() || join(home, '.habblaud', 'usage')),
     allowedHosts: parseAllowedHosts(env.HABBLAUD_ALLOWED_HOSTS),
+    frameAncestors: frame.origins,
+    frameAncestorsInvalid: frame.invalid,
     terminal: terminalOffReason(env, host, inDocker) === undefined,
     messages: messagesOffReason(env, host, inDocker) === undefined,
     timeline: !env.HABBLAUD_TIMELINE?.trim() || isTruthy(env.HABBLAUD_TIMELINE),

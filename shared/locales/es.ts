@@ -2583,4 +2583,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Acesso pelo celular": "Acceso desde el celular",
   "Sair deste aparelho": "Cerrar sesión en este dispositivo",
   "Encerra o login aqui (uma cópia do cookie também deixa de valer). Para voltar, entre com usuário e senha.": "Cierra el inicio de sesión aquí (una copia de la cookie también deja de valer). Para volver, entra con tu usuario y contraseña.",
+  "   HABBLAUD_FRAME_ANCESTORS: \"{0}\" ignorado (use http(s)://host[:porta], sem caminho nem *).": "   HABBLAUD_FRAME_ANCESTORS: \"{0}\" ignorado (usa http(s)://host[:puerto], sin ruta ni *).",
+  "   Pode ser embutido em: {0}.": "   Puede incrustarse en: {0}.",
+  "Linux: o container roda como o usuário do host ({0}) e guarda os dados em {1}.": "Linux: el contenedor se ejecuta como el usuario del host ({0}) y guarda los datos en {1}.",
 };

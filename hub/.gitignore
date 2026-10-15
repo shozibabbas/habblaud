@@ -1,0 +1,3 @@
+# Real, per-machine configuration: copy the *.example.* files and edit them.
+config.json
+tunnels.conf

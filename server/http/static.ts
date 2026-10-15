@@ -70,9 +70,52 @@ export function isNotModified(req: IncomingMessage, etag: string, mtimeMs: numbe
   return false;
 }
 
-export function createStaticHandler(distDir: string): (req: IncomingMessage, res: ServerResponse, pathname: string) => void {
+/**
+ * HABBLAUD_FRAME_ANCESTORS: origens (espaço ou vírgula) que podem embutir a página num iframe, por exemplo um
+ * painel com vários escritórios. Só vale `http(s)://host[:porta]`: sem caminho, sem `*`, sem usuário. O que não
+ * for válido fica de fora (e volta em `invalid`, para o log).
+ */
+export function parseFrameAncestors(raw: string | undefined): { origins: string[]; invalid: string[] } {
+  const origins: string[] = [];
+  const invalid: string[] = [];
+  for (const item of (raw ?? '').split(/[\s,]+/)) {
+    if (!item) continue;
+    const origin = frameOriginOf(item);
+    if (!origin) invalid.push(item);
+    else if (!origins.includes(origin)) origins.push(origin);
+  }
+  return { origins, invalid };
+}
+
+function frameOriginOf(item: string): string | undefined {
+  if (item.includes('*') || !/^https?:\/\/[^/?#]+\/?$/i.test(item)) return undefined;
+  try {
+    const u = new URL(item);
+    if (u.username || u.password) return undefined;
+    return u.origin;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Cabeçalhos de enquadramento: sem origens, a página não pode ser embutida em lugar nenhum (clickjacking nas
+ * configurações); com origens, só elas podem (frame-ancestors substitui o X-Frame-Options).
+ */
+export function frameHeaders(origins: readonly string[]): Record<string, string> {
+  if (!origins.length) return { 'X-Frame-Options': 'DENY' };
+  return { 'Content-Security-Policy': `frame-ancestors ${origins.join(' ')}` };
+}
+
+export interface StaticOptions {
+  /** Origens que podem embutir a página (HABBLAUD_FRAME_ANCESTORS); vazio = nenhuma. */
+  frameAncestors?: readonly string[];
+}
+
+export function createStaticHandler(distDir: string, opts: StaticOptions = {}): (req: IncomingMessage, res: ServerResponse, pathname: string) => void {
   const root = resolve(distDir);
   const index = join(root, 'index.html');
+  const frame = frameHeaders(opts.frameAncestors ?? []);
 
   const send = (req: IncomingMessage, res: ServerResponse, file: string, st: Stats, cache: string) => {
     const etag = etagOf(st);
@@ -81,8 +124,7 @@ export function createStaticHandler(distDir: string): (req: IncomingMessage, res
       ETag: etag,
       'Last-Modified': new Date(st.mtimeMs).toUTCString(),
       'X-Content-Type-Options': 'nosniff',
-      // A página não deve ser embutida em sites de terceiros (clickjacking nas configurações).
-      'X-Frame-Options': 'DENY',
+      ...frame,
       'Referrer-Policy': 'no-referrer',
     };
     if (isNotModified(req, etag, st.mtimeMs)) {

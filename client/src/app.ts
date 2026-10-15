@@ -4,6 +4,7 @@ import { loadAccess } from './net/access';
 import { OfficeStore } from './net/store';
 import { createWorld } from './world';
 import { createUI } from './ui';
+import { embedRequested } from './ui/embed';
 import { migrateLegacyKeys, safeLocalStorage } from './ui/prefs';
 import { getLocale, tr } from '../../shared/i18n';
 
@@ -21,7 +22,8 @@ export function start(): void {
   const params = new URLSearchParams(location.search);
   const store = new OfficeStore({ mock: params.has('mock') });
   const world = createWorld(document.getElementById('world') as HTMLCanvasElement, store);
-  createUI(document.getElementById('ui') as HTMLElement, store, world);
+  // ?embed=1: dentro do iframe de um painel com vários escritórios (ui/embed.ts).
+  createUI(document.getElementById('ui') as HTMLElement, store, world, { embed: embedRequested(location.search) });
   // O que esta página pode fazer (porta local ou remota com login) chega antes do primeiro snapshot (ou desiste em
   // poucos segundos e fica a regra de antes).
   if (store.mock) store.connect();
