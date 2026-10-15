@@ -2,7 +2,8 @@
 // que o render transforma em pixels e a simulação usa para caminhos e pontos de interesse.
 import type { Dir, FloorKind, FurnitureKind, WallStyle } from '../../art/api';
 
-export type AreaKind = 'reception' | 'restroom' | 'cafe' | 'lounge' | 'room' | 'corridor' | 'meeting';
+export type AreaKind = 'reception' | 'restroom' | 'cafe' | 'lounge' | 'room' | 'corridor' | 'meeting'
+  | 'mosque'; // (aditivo) salão de oração do campus (layout/mosque.ts)
 
 /** Retângulo em tiles (coordenadas absolutas do mundo). */
 export interface TileRect {
@@ -97,7 +98,12 @@ export type SpotKind =
   | 'sink'
   | 'elevator'
   | 'talk'
-  | 'watch'; // ponto em pé da torcida (assistir a uma partida)
+  | 'watch' // ponto em pé da torcida (assistir a uma partida)
+  // --- mesquita (aditivo; layout/mosque.ts)
+  | 'shoes' // diante da sapateira (tirar/calçar os sapatos)
+  | 'headwear' // diante do cesto de topis / cabideiro de hijabs
+  | 'wudu' // banquinho da ablução (assento virado para a torneira)
+  | 'prayer'; // lugar na fila (saf), virado para a qibla
 
 /**
  * Ponto de interesse. O personagem anda até o tile de aproximação (tx, ty), caminhável,

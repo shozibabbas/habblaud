@@ -5,6 +5,7 @@ import { mulberry32 } from '../../../../shared/hash';
 import { BUILDING_H, COL_W, CORRIDOR_Y, EXT_EAST, EXT_NORTH, EXT_SOUTH, EXT_WEST, TILE } from '../constants';
 import { PATH_DY, PATH_H, ROW_PITCH, roomColumnX, type CampusLayout } from './campus';
 import type { ExteriorLayout } from './exterior';
+import { mosqueGrounds } from './mosque';
 import type { ExteriorProp, FloorPatch, TileRect } from './types';
 
 const hit = (r: TileRect, x: number, y: number, m = 0) => x >= r.x - m && y >= r.y - m && x < r.x + r.w + m && y < r.y + r.h + m;
@@ -12,7 +13,9 @@ const hit = (r: TileRect, x: number, y: number, m = 0) => x >= r.x - m && y >= r
 export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
   const inner = campus.inner;
   const bottom = inner.y + inner.h;
-  const bounds: TileRect = { x: inner.x - EXT_WEST, y: -EXT_NORTH, w: inner.w + EXT_WEST + EXT_EAST, h: bottom + EXT_NORTH + EXT_SOUTH };
+  // o topo de `inner` é o da mesquita (com a cúpula), ao norte do Commons
+  const top = inner.y;
+  const bounds: TileRect = { x: inner.x - EXT_WEST, y: top - EXT_NORTH, w: inner.w + EXT_WEST + EXT_EAST, h: bottom - top + EXT_NORTH + EXT_SOUTH };
   const px = (t: number) => t * TILE;
   const floors: FloorPatch[] = [];
   const props: ExteriorProp[] = [];
@@ -79,8 +82,8 @@ export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
 
   // árvores: bosque ao norte e nas laterais, e uma fileira no gramado entre as linhas de prédios
   for (let x = bounds.x + 1; x < bounds.x + bounds.w - 1; x += 4 + Math.floor(rng() * 3)) {
-    props.push({ kind: rng() < 0.25 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(-3) - Math.floor(rng() * 20), seed: seed() });
-    if (rng() < 0.6) props.push({ kind: 'bush', x: px(x + 2), y: px(-1) - 2, seed: seed() });
+    props.push({ kind: rng() < 0.25 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(top - 3) - Math.floor(rng() * 20), seed: seed() });
+    if (rng() < 0.6) props.push({ kind: 'bush', x: px(x + 2), y: px(top - 1) - 2, seed: seed() });
   }
   for (const [row, gap] of [
     [-6, 5],
@@ -88,13 +91,13 @@ export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
     [-14, 8],
   ] as const) {
     for (let x = bounds.x + 2; x < bounds.x + bounds.w - 1; x += gap + Math.floor(rng() * 4)) {
-      props.push({ kind: rng() < 0.3 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(row) - Math.floor(rng() * 12), seed: seed() });
+      props.push({ kind: rng() < 0.3 ? 'pine' : 'tree', x: px(x) + Math.floor(rng() * 8), y: px(top + row) - Math.floor(rng() * 12), seed: seed() });
     }
   }
   for (const side of [-1, 1]) {
     for (const band of [0, 7, 13]) {
       const baseX = side < 0 ? inner.x - 6 - band : inner.x + inner.w + 4 + band;
-      for (let y = 1; y < bottom; y += 3 + Math.floor(rng() * 3)) {
+      for (let y = top + 1; y < bottom; y += 3 + Math.floor(rng() * 3)) {
         props.push({ kind: rng() < 0.3 ? 'pine' : 'tree', x: px(baseX + Math.floor(rng() * 5)), y: px(y + 1), seed: seed() });
       }
     }
@@ -149,6 +152,11 @@ export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
     props.push({ kind: 'totem', x: px(tx) + (b.wing === 'east' ? 6 : -6), y: px(b.y + PATH_DY) - 2, seed: 4 + b.place });
     props.push({ kind: 'bush', x: px(tx) + (b.wing === 'east' ? -2 : 2), y: px(b.y + PATH_DY + PATH_H) + 14, seed: seed() });
   }
+
+  // mesquita ao norte do Commons: caminhos, postes, bancos, canteiros e árvores (layout/mosque.ts)
+  const grounds = mosqueGrounds(campus.mosque, rng);
+  floors.push(...grounds.floors);
+  props.push(...grounds.props);
 
   const streetY = px(bottom + 4);
   const streetH = px(5);

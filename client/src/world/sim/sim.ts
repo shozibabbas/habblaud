@@ -36,6 +36,7 @@ import { RoomFxState } from './github';
 import { RoomState } from './room-state';
 import { countShells, latestShellDone, shellLabel, shellStage, shellWaitSince, spinDir, spinPhase, yawnPhase } from './shell';
 import { SpotRegistry } from './spots';
+import { planPrayerExit, planPrayerVisit, resetPrayer, stepPray, wantsToPray } from './prayer';
 import type { Step } from './steps';
 import { tr } from '../../../../shared/i18n';
 
@@ -1051,6 +1052,8 @@ export class Sim {
       case 'remove':
         ch.gone = true;
         return true;
+      case 'pray':
+        return stepPray(ch, s, ch.stepT + dt * 1000);
     }
   }
 
@@ -1347,6 +1350,8 @@ export class Sim {
   /** Decide o próximo plano. Retorna true se planejou algo. */
   private think(ch: Character, now: number): boolean {
     if (ch.gone) return false;
+    // saindo da mesquita no meio da visita: devolve o topi/hijab e calça os sapatos antes de qualquer coisa
+    if (ch.prayer && planPrayerExit(this, ch)) return true;
     if (ch.mode === 'leave') return this.planLeave(ch, now);
     if (ch.mode === 'deliver') return this.planDeliver(ch, now);
     const room = this.rooms.get(ch.roomId);
@@ -1652,6 +1657,8 @@ export class Sim {
   }
 
   private planOuting(ch: Character, now: number): boolean {
+    // campus: quem reza às vezes vai à mesquita (sim/prayer.ts)
+    if (this.machines && wantsToPray(ch, now) && planPrayerVisit(this, ch, now)) return true;
     const near = { tx: ch.tx, ty: ch.ty };
     const rng = ch.rng;
     const persona = personaFor(ch.info.seed);
@@ -1905,6 +1912,7 @@ export class Sim {
         ch.step = null;
       }
       ch.gathering = null;
+      resetPrayer(ch);
       if (ch.leaving && !ch.gone) ch.gone = true;
       if (ch.gone) {
         this.spots.releaseAll(ch.id);

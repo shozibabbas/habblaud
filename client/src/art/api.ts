@@ -54,7 +54,16 @@ export type Pose =
   | 'game' // jogando videogame: controle (held 'controller') nas duas mãos à frente do peito, polegares mexendo, corpo inclinado para a tela (2). Em pé ou sentado
   | 'rps' // pedra-papel-tesoura. held 'none': punho fechado subindo (quadro 0) e descendo (1) na contagem "jo-ken-pô"; held 'rock'|'paper'|'scissors': braço estendido à frente mostrando o gesto (2). Em pé (sentado também funciona)
   | 'groom' // diante do espelho (normalmente dir 'up', de costas): uma mão perto do rosto/cabelo indo e voltando — batom, pente, ajeitar o cabelo (2). held opcional 'lipstick'|'comb'. Em pé
-  | 'sulk'; // chateado (perdeu a aposta/partida): ombros caídos, cabeça baixa, olhos semicerrados, braços pendurados (2). Em pé ou sentado
+  | 'sulk' // chateado (perdeu a aposta/partida): ombros caídos, cabeça baixa, olhos semicerrados, braços pendurados (2). Em pé ou sentado
+  // --- mesquita (aditivo): oração voluntária (nafl), sempre de perfil virado para a qibla (dir 'left' = oeste).
+  // Desenhadas em character/prayer.ts com as mesmas peças do corpo (roupas e acessórios acompanham a postura).
+  | 'takbir' // em pé, mãos abertas na altura das orelhas (1)
+  | 'qiyam' // em pé, mãos cruzadas à frente (abaixo do umbigo; look 'f': no peito) (1)
+  | 'ruku' // curvado, costas retas na horizontal, mãos nos joelhos (1)
+  | 'sujood' // prostrado: ajoelhado, testa e mãos no chão (1)
+  | 'jalsa' // ajoelhado sentado sobre os calcanhares, mãos nas coxas (jalsa/tashahhud) (1)
+  | 'salam' // ajoelhado, cabeça virada à direita (quadro 0) e depois à esquerda (1) (2)
+  | 'wudu'; // ablução: sentado no banquinho diante da torneira, mãos na água (0) e no rosto (1) (2)
 
 export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book' | 'box' | 'paddle' | 'popcorn'
   // --- vida social (aditivo)
@@ -189,7 +198,19 @@ export type FurnitureKind =
   | 'sink' // 1x1 pia com gabinete (encostada na parede norte; use 'mirror' na parede acima).
   // --- recepção
   | 'reception_desk' // 3x1 balcão de recepção.
-  | 'bench'; // 2x1 banco de espera (assento, olhando para baixo).
+  | 'bench' // 2x1 banco de espera (assento, olhando para baixo).
+  // --- mesquita (aditivo; campus). A qibla fica a oeste: quem reza olha para a esquerda.
+  | 'mihrab' // 1x2 nicho da qibla encostado na parede oeste (arco pontudo, azulejos, lamparina).
+  | 'minbar' // 2x1 púlpito de perfil: degraus subindo para oeste e um pequeno dossel.
+  | 'jali_screen' // 1x1 treliça de madeira entalhada (divisória). variants: 'v' (corre norte-sul) | 'end' (ponta)
+  | 'shoe_rack' // 2x1 sapateira de madeira com sapatos. variants: 'm' | 'f'
+  | 'hijab_rack' // 2x1 cabideiro com hijabs pendurados e uma pilha dobrada.
+  | 'topi_shelf' // 1x1 mesinha com um cesto de topis brancos.
+  | 'wudu_tap' // 1x1 mureta azulejada com torneira de latão (quem usa senta a leste, virado para oeste). state 1 = água correndo.
+  | 'wudu_stool' // 1x1 banquinho baixo de pedra (assento) diante da torneira.
+  | 'quran_shelf' // 2x1 estante baixa com Alcorões encadernados (verde/vinho, filete dourado).
+  | 'arch_window' // (parede) 2 tiles. Janela em arco com treliça; à noite o mundo acende o vidro.
+  | 'prayer_times'; // (parede) 2 tiles. Quadro com os horários das orações (seis mostradores, sem texto).
 
 export interface FurnitureDef {
   mount: 'floor' | 'wall';
@@ -263,6 +284,17 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   sink: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   reception_desk: { mount: 'floor', footprint: { w: 3, h: 1 }, blocks: true },
   bench: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: false, seat: true },
+  mihrab: { mount: 'floor', footprint: { w: 1, h: 2 }, blocks: true },
+  minbar: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true },
+  jali_screen: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['v', 'end'] },
+  shoe_rack: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true, variants: ['m', 'f'] },
+  hijab_rack: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true },
+  topi_shelf: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  wudu_tap: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, states: 2 },
+  wudu_stool: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true },
+  quran_shelf: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true },
+  arch_window: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
+  prayer_times: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
 };
 
 export type FloorKind =

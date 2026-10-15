@@ -14,6 +14,7 @@ import { slotAt } from '../layout/geometry';
 import type { ExteriorProp } from '../layout/types';
 import { screenModeFor } from '../sim/behavior';
 import type { Character } from '../sim/character';
+import { wornAppearance } from '../sim/wear';
 import type { RoomState } from '../sim/room-state';
 import { cobwebScale, hourglassIcon, HOURGLASS_FLIP_MS, STORM_LIFT } from '../sim/shell';
 import type { Sim } from '../sim/sim';
@@ -21,6 +22,7 @@ import { buildAnim, furnitureScale, NO_ANIM, sweepDelay, type BuildAnim } from '
 import { daylightModeOf, parseHourParam } from './daylight';
 import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
+import { drawWuduWater, MosqueRenderer } from './mosque';
 import { Particles } from './particles';
 import { carSprite, propSprite, shadowSprite } from './props';
 import { countBadge, fallbackIcon } from './shell-sprites';
@@ -112,6 +114,8 @@ export class Renderer {
   readonly particles = new Particles();
   /** Festa e alarme das salas (eventos do GitHub). */
   private readonly roomFx = new RoomFxRenderer();
+  /** Campus: tapetes, cúpula, minaretes e luzes da mesquita (render/mosque.ts). */
+  private readonly mosque = new MosqueRenderer();
   /** dt do frame atual (s), para as partículas emitidas durante o desenho. */
   private dt = 0;
   private iconCount = 0;
@@ -417,12 +421,14 @@ export class Renderer {
       const anim = vis.room ? buildAnim(vis.room.phase, vis.room.progress(now)) : NO_ANIM;
       this.drawFloor(vis, anim);
     }
+    this.safe(() => this.mosque.drawFloor(ctx, this.sim.building));
     for (const vis of this.areas.values()) {
       const p = vis.px;
       if (!visible(p.x, p.y - WALL_MARGIN, p.w, p.h + WALL_MARGIN)) continue;
       const anim = vis.room ? buildAnim(vis.room.phase, vis.room.progress(now)) : NO_ANIM;
       this.drawWalls(vis, anim, now, hour);
     }
+    this.safe(() => this.mosque.drawSkyline(ctx, this.sim.building));
     const view = { x0: vx0, y0: vy0, x1: vx1, y1: vy1 };
     // alarme de CI: tom vermelho no piso (por baixo dos móveis e personagens)
     this.roomFx.drawFloor(ctx, this.sim, now, view);
@@ -532,6 +538,7 @@ export class Renderer {
     // ---- luz: noite, salas apagadas, brilhos
     this.night = this.lighting.night;
     this.drawLighting(now, vx0, vy0, vx1, vy1);
+    this.safe(() => this.mosque.drawNight(ctx, this.sim.building, this.areas, this.night, now));
     if (this.theme !== 'none') {
       for (const vis of this.areas.values()) {
         if (vis.room && vis.room.phase !== 'ready') continue;
@@ -779,6 +786,12 @@ export class Renderer {
   private furnState(f: FurnVis, now: number): number {
     if (f.kind === 'coffee_machine') return (this.sim.machineUntil.get(f.id) ?? 0) > now ? 1 : 0;
     if (f.kind === 'toilet_stall') return this.sim.stallBusy.has(f.id) ? 1 : 0;
+    if (f.kind === 'wudu_tap') {
+      // torneira aberta enquanto alguém faz a ablução no banquinho dela
+      const owner = f.seatSpot ? this.sim.spots.ownerOf(f.seatSpot) : undefined;
+      const ch = owner ? this.sim.chars.get(owner) : undefined;
+      return ch && ch.atSpot === f.seatSpot && ch.pose === 'wudu' ? 1 : 0;
+    }
     return 0;
   }
 
@@ -806,6 +819,8 @@ export class Renderer {
         this.safe(() => this.art.drawScreen(ctx, { x: dx + r.x, y: dy + r.y, w: r.w, h: r.h }, mode, now, f.seed));
       } else if (f.kind === 'coffee_machine' && state === 1) {
         this.drawSteam(f.ax, dy + 2, now, f.seed);
+      } else if (f.kind === 'wudu_tap' && state === 1) {
+        drawWuduWater(ctx, f.ax + 4, f.ay - 19, now);
       } else if (f.kind === 'arcade' && s.rects?.screen) {
         // duelo no fliperama: as duas máquinas mostram a partida
         const seed = this.sim.social.arcadeSeed();
@@ -863,12 +878,13 @@ export class Renderer {
     }
     let sprite: Sprite | null = null;
     const req: CharacterFrameRequest = this.req;
-    req.appearance = ch.appearance;
+    req.appearance = wornAppearance(ch);
     req.dir = ch.dir;
     req.pose = ch.pose;
     req.held = ch.held;
     req.seated = ch.seated;
-    req.costume = seasonalCostume(this.theme, ch.info.seed);
+    // na mesquita, sem fantasia sazonal
+    req.costume = ch.prayer ? undefined : seasonalCostume(this.theme, ch.info.seed);
     try {
       sprite = this.charSprite(req, ch.animT);
     } catch {

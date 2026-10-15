@@ -7,6 +7,8 @@ import type { Mode } from './behavior';
 import type { Gathering } from '../social/gathering';
 import type { ShellStage } from './shell';
 import type { Step } from './steps';
+import type { WearLook } from './wear';
+import type { PrayerVisit } from './prayer';
 
 export class Character {
   readonly id: string;
@@ -117,6 +119,11 @@ export class Character {
   shellDoneAt = 0;
   /** Render: próxima pipoca que pula do balde (epoch ms). */
   popcornAt = 0;
+
+  /** Peças usadas só durante uma atividade (topi, hijab, pés descalços), aplicadas no desenho (sim/wear.ts). */
+  wear: Map<string, WearLook> | null = null;
+  /** Visita à mesquita em andamento (sim/prayer.ts): o que precisa ser devolvido/calçado na saída. */
+  prayer: PrayerVisit | null = null;
 
   constructor(info: AgentInfo, appearance: Appearance) {
     this.id = info.id;

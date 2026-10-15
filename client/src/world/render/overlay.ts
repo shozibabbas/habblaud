@@ -57,6 +57,9 @@ const CORE_NAMES: Record<string, string> = {
   'core:banheiros': tr('Banheiros'),
   'core:copa': tr('Copa'),
   'core:lounge': tr('Lounge'),
+  // campus: as duas alas da mesquita (layout/mosque.ts)
+  'mosque:homens': tr('Mesquita'),
+  'mosque:mulheres': tr('Ala feminina'),
 };
 /** Campus: sala de reunião ao sul do saguão de cada prédio e a etiqueta de máquina desconectada. */
 const MEETING_NAME = tr('Reunião');

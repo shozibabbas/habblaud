@@ -2597,4 +2597,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Reunião": "Reunión",
   "offline": "sin conexión",
   "Máquina: {0}": "Máquina: {0}",
+
+  // client/src/world/render/overlay.ts (campus: mesquita)
+  "Mesquita": "Mezquita",
+  "Ala feminina": "Sección de mujeres",
 };

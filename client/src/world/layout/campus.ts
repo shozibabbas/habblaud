@@ -20,6 +20,7 @@ import { AreaBuilder } from './builder';
 import { paintArea, type BuildingLayout } from './building';
 import { COMMONS_W, commonsAreas } from './commons';
 import { ELEVATOR_CX } from './core';
+import { mosqueAreas, mosqueSite, type MosqueSite } from './mosque';
 import { slotShell, type SlotShell } from './exterior';
 import { slotColumn } from './geometry';
 import { translateShell } from './translate';
@@ -80,6 +81,8 @@ export interface CampusLayout {
   inner: TileRect;
   rows: number;
   key: string;
+  /** Mesquita ao norte do Commons (layout/mosque.ts): o prédio e os caminhos dela (fora de `paths`). */
+  mosque: MosqueSite;
 }
 
 export function placeOf(place: number): { wing: 'east' | 'west'; row: number } {
@@ -151,6 +154,7 @@ export function layoutCampus(machines: readonly CampusMachineInput[]): CampusLay
       else paths.push({ x: b.lobbyX + COL_W, y, w: walkX + PATH_H - (b.lobbyX + COL_W), h: PATH_H });
     }
   }
+  const mosque = mosqueSite(commons, { west: WEST_WALK_X, east: EAST_WALK_X, rowY: PATH_DY, h: PATH_H });
   let x0 = commons.x;
   let x1 = commons.x + commons.w;
   let y1 = commons.y + commons.h;
@@ -159,9 +163,10 @@ export function layoutCampus(machines: readonly CampusMachineInput[]): CampusLay
     x1 = Math.max(x1, b.rect.x + b.rect.w);
     y1 = Math.max(y1, b.rect.y + b.rect.h);
   }
-  const inner: TileRect = { x: x0, y: 0, w: x1 - x0, h: y1 };
+  // a visão geral enquadra também a mesquita, com a cúpula e os minaretes
+  const inner: TileRect = { x: x0, y: mosque.skyY, w: x1 - x0, h: y1 - mosque.skyY };
   const key = `campus|${buildings.map((b) => `${b.id}@${b.place}:${b.cols}:${b.online ? 1 : 0}`).join(',')}`;
-  return { buildings, commons, paths, inner, rows, key };
+  return { buildings, commons, paths, inner, rows, key, mosque };
 }
 
 // =================================================================== áreas de cada prédio
@@ -331,9 +336,10 @@ export function assembleCampus(campus: CampusLayout, rooms: readonly AreaLayout[
   const corridor = core.find((a) => a.kind === 'corridor')!;
   const fixed: AreaLayout[] = [...core];
   for (const b of campus.buildings) fixed.push(...cachedBuildingAreas(b));
+  fixed.push(...mosqueAreas(campus.mosque));
   const r = campus.inner;
   const grid = new WalkGrid(r.w + 2, r.h + 2, version, r.x - 1, r.y - 1);
-  for (const p of campus.paths) grid.fill(p.x, p.y, p.w, p.h, FREE);
+  for (const p of [...campus.paths, ...campus.mosque.paths]) grid.fill(p.x, p.y, p.w, p.h, FREE);
   const all = [...fixed, ...rooms];
   for (const a of all) paintArea(grid, a);
   const spots: SpotDef[] = [];

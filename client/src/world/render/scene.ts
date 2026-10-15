@@ -212,6 +212,8 @@ function tintFloor(ctx: CanvasRenderingContext2D, px: { x: number; y: number; w:
 export function buildAreaVis(art: ArtModule, layout: AreaLayout, room: RoomState | undefined, assets: WorldAssets | null, theme: SeasonalTheme = 'none'): AreaVis {
   const r = layout.rect;
   const px = { x: r.x * TILE, y: r.y * TILE, w: r.w * TILE, h: r.h * TILE };
+  // a mesquita não recebe as decorações de Halloween/Natal
+  if (layout.kind === 'mosque') theme = 'none';
 
   // ---- piso + tapetes
   const [floor, fctx] = makeCanvas(px.w, px.h);

@@ -6,6 +6,7 @@ import { luminance, mix, ramp, shade, type Ramp } from '../core/color';
 import { PixelBuf, type Palette } from '../core/pixbuf';
 import type { BufSprite } from '../core/sprite';
 import { HAIR, HEAD_BASE, TEXTURED, type HeadView, type Tpl } from './hair';
+import { drawCoverFallback, isPrayerPose, renderPrayer } from './prayer';
 
 export const CHAR_W = 24;
 export const CHAR_H = 34;
@@ -20,11 +21,13 @@ export const SEAT_DROP = 4;
 export const POSE_FRAMES: Readonly<Record<Pose, number>> = {
   stand: 2, walk: 4, run: 4, sit: 2, type: 4, sleep: 2, drink: 2, use: 2, raise_hand: 2, talk: 2, stretch: 2,
   read: 2, play: 2, wait: 2, cheer: 2, laugh: 2, game: 2, rps: 2, groom: 2, sulk: 2,
+  takbir: 1, qiyam: 1, ruku: 1, sujood: 1, jalsa: 1, salam: 2, wudu: 2,
 };
 
 export const POSE_DURATION: Readonly<Record<Pose, number>> = {
   stand: 650, walk: 140, run: 95, sit: 800, type: 120, sleep: 1000, drink: 700, use: 380, raise_hand: 320, talk: 280,
   stretch: 800, read: 1100, play: 200, wait: 480, cheer: 260, laugh: 190, game: 150, rps: 300, groom: 420, sulk: 1300,
+  takbir: 1000, qiyam: 1000, ruku: 1000, sujood: 1000, jalsa: 1000, salam: 1300, wudu: 700,
 };
 
 const SEATED_ONLY: ReadonlySet<Pose> = new Set<Pose>(['sit', 'type', 'sleep', 'wait']);
@@ -1485,6 +1488,7 @@ function itemPos(dc: Dc): Pt | null {
 
 /** Usa o mesmo rig da cabeça para acompanhar quique, cochilo e poses sentadas. */
 function drawCostume(dc: Dc, costume: CharacterFrameRequest['costume']): void {
+  drawCoverFallback(dc);
   if (!costume) return;
   const { b, r } = dc;
   const x = HX + r.lean;
@@ -1518,6 +1522,7 @@ function drawCostume(dc: Dc, costume: CharacterFrameRequest['costume']): void {
 }
 
 export function renderCharacter(req: CharacterFrameRequest): BufSprite {
+  if (isPrayerPose(req.pose)) return renderPrayer(req);
   if (req.dir === 'right') {
     const left = renderCharacter({ ...req, dir: 'left' });
     return { buf: left.buf.flipped(), ax: CHAR_W - left.ax, ay: left.ay };
@@ -1622,3 +1627,24 @@ export function renderCharacter(req: CharacterFrameRequest): BufSprite {
   if (!r.seated) b.shadow(CHAR_AX, CHAR_AY - 0.5, 6, 2, '#1c2034', 0.2);
   return { buf: b, ax: CHAR_AX, ay: CHAR_AY };
 }
+
+// ---------------------------------------------------------------- peças para outras composições
+
+/** Peças do corpo para quem compõe poses fora daqui (character/prayer.ts): as mesmas roupas e acessórios. */
+export type { Arm, CharPal, Dc, Rig };
+export const CHAR_PARTS = {
+  HX,
+  HY,
+  arm,
+  paletteOf,
+  makeRig,
+  sleeveLength,
+  drawHead,
+  drawFacialHair,
+  drawHair,
+  drawAccessory,
+  drawCostume,
+  drawArm,
+  drawLegs,
+  drawTorso,
+} as const;

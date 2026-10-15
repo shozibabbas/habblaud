@@ -27,7 +27,8 @@ export function seasonalCostume(theme: SeasonalTheme, seed: number): CharacterFr
 
 /** Reutiliza footprints de plantas: nenhuma nova colisão ou mudança de caminhos. */
 export function seasonalFurniture(theme: SeasonalTheme, kind: FurnitureKind, area: AreaLayout, seed: number): Sprite | null {
-  if (theme === 'none' || area.kind === 'restroom') return null;
+  // (a mesquita não recebe as decorações de Halloween/Natal)
+  if (theme === 'none' || area.kind === 'restroom' || area.kind === 'mosque') return null;
   if (kind === 'plant_tall') {
     const first = area.furniture.find((f) => f.kind === 'plant_tall');
     if (!first || hash32(first.id) !== seed) return null;
@@ -145,7 +146,7 @@ function glowSprite(theme: SeasonalTheme): HTMLCanvasElement {
 
 /** Luz decorativa suave, limitada à face da parede. Não interfere com salas apagadas. */
 export function drawSeasonalLights(ctx: CanvasRenderingContext2D, theme: SeasonalTheme, layout: AreaLayout, light: number): void {
-  if (theme === 'none' || light <= 0.01) return;
+  if (theme === 'none' || light <= 0.01 || layout.kind === 'mosque') return;
   ctx.save();
   for (const wall of layout.walls) {
     if (wall.kind !== 'face') continue;

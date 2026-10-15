@@ -1,6 +1,7 @@
 // Passos da fila de ações de um personagem. Criados no planejamento (nunca por frame).
 import type { Dir, HeldItem, IconName, Pose } from '../../art/api';
 import type { Gathering } from '../social/gathering';
+import type { PrayStep } from './prayer';
 
 export type Step =
   /** Anda (ou corre) até o tile (tx, ty); depois, opcionalmente, até a posição fina (fx, fy) e vira para `dir`. */
@@ -26,4 +27,6 @@ export type Step =
   /** Efeito colateral imediato. */
   | { t: 'do'; fn: () => void }
   /** Remove o personagem do mundo. */
-  | { t: 'remove' };
+  | { t: 'remove' }
+  /** Reza no lugar da fila da mesquita (sim/prayer.ts); chegando trabalho, abrevia em vez de parar. */
+  | PrayStep;

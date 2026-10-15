@@ -3,6 +3,7 @@
 import { FURNITURE, type FurnitureKind } from '../api';
 import { trim, type BufFurniture } from '../core/sprite';
 import * as C from './common';
+import * as Q from './mosque';
 import * as O from './office';
 import * as W from './wall';
 
@@ -125,6 +126,28 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
       return C.receptionDesk(seed);
     case 'bench':
       return C.bench();
+    case 'mihrab':
+      return Q.mihrab();
+    case 'minbar':
+      return Q.minbar();
+    case 'jali_screen':
+      return Q.jaliScreen(variant);
+    case 'shoe_rack':
+      return Q.shoeRack(variant);
+    case 'hijab_rack':
+      return Q.hijabRack();
+    case 'topi_shelf':
+      return Q.topiShelf();
+    case 'wudu_tap':
+      return Q.wuduTap(state);
+    case 'wudu_stool':
+      return Q.wuduStool();
+    case 'quran_shelf':
+      return Q.quranShelf();
+    case 'arch_window':
+      return Q.archWindow();
+    case 'prayer_times':
+      return Q.prayerTimes();
   }
 }
 

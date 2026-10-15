@@ -6,6 +6,7 @@ import { FURNITURE, TILE, type Accessory, type Appearance, type Dir, type FloorK
 import { appearanceFromSeed, appearanceKey, editorConflict, editorOptions, fitToOptions } from './character/appearance';
 import { HAIR, HEAD_BASE } from './character/hair';
 import { CHAR_AX, CHAR_AY, CHAR_H, CHAR_W, POSE_DURATION, POSE_FRAMES, isSeated, renderCharacter } from './character/render';
+import { isPrayerPose, PRAYER_AX, PRAYER_W } from './character/prayer';
 import { PixelBuf } from './core/pixbuf';
 import type { BufSprite } from './core/sprite';
 import { drawBoard, drawClock, drawScreen, drawWindowView } from './dynamic';
@@ -127,9 +128,11 @@ describe('personagens', () => {
         for (let frame = 0; frame < POSE_FRAMES[pose]; frame++) {
           for (const held of HELD) {
             const s = renderCharacter({ appearance: a, dir, pose, frame, held });
-            expect(s.buf.w).toBe(CHAR_W);
+            // posturas da oração: folha mais larga (character/prayer.ts), pés no mesmo ponto
+            const wide = isPrayerPose(pose);
+            expect(s.buf.w).toBe(wide ? PRAYER_W : CHAR_W);
             expect(s.buf.h).toBe(CHAR_H);
-            expect(s.ax).toBe(CHAR_AX);
+            expect(s.ax).toBe(wide ? (dir === 'right' ? PRAYER_W - PRAYER_AX : PRAYER_AX) : CHAR_AX);
             expect(s.ay).toBe(CHAR_AY);
             expect(s.buf.countOpaque()).toBeGreaterThan(150);
           }

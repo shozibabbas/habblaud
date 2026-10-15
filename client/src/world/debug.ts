@@ -7,6 +7,7 @@ import { hash32 } from '../../../shared/hash';
 import { TILE } from '../art/api';
 import type { Camera } from './camera';
 import type { Renderer } from './render/renderer';
+import { planPrayerVisit, prays } from './sim/prayer';
 import { oldestShell } from './sim/shell';
 import type { Sim } from './sim/sim';
 import type { GatherKind } from './social/gathering';
@@ -24,6 +25,8 @@ export interface SpawnOptions {
   name?: string;
   /** Id da conta (AccountInfo.id). */
   account?: string;
+  /** Aparência do principal ('m'/'f'); padrão: alterna pela sequência. */
+  look?: 'm' | 'f';
   status?: AgentStatus;
   /** Quantos subagentes (trabalhando) disparar junto. */
   subs?: number;
@@ -59,6 +62,8 @@ export interface WorldDebug {
   fastForward(): void;
   /** Faz todos os ociosos saírem para passear agora. */
   wanderNow(): void;
+  /** Campus: manda agentes ociosos rezar na mesquita agora (todos os que rezam, ou só `ids`). Retorna quem foi. */
+  pray(ids?: string[]): string[];
   /**
    * Começa uma roda agora com quem estiver ocioso/esperando shell (ou com `ids`): todos voltam à mesa
    * na hora e saem juntos. Retorna os nomes dos participantes ou null.
@@ -227,6 +232,7 @@ export function createDebug(sim: Sim, renderer: Renderer, camera: Camera, onCame
         account,
         sessionId,
         status: opts.status ?? 'working',
+        ...(opts.look ? { look: opts.look } : {}),
         title: `Sessão de teste ${n}`,
       });
       if (opts.shell) {
@@ -335,6 +341,18 @@ export function createDebug(sim: Sim, renderer: Renderer, camera: Camera, onCame
 
     wanderNow: () => {
       for (const c of sim.chars.values()) c.nextOutingAt = 1;
+    },
+
+    pray: (ids) => {
+      const t = now();
+      const went: string[] = [];
+      for (const c of sim.chars.values()) {
+        if (ids ? !ids.includes(c.id) : !prays(c.info.seed)) continue;
+        if (c.mode !== 'idle' || c.prayer || c.leaving) continue;
+        sim.clearPlan(c);
+        if (planPrayerVisit(sim, c, t)) went.push(c.id);
+      }
+      return went;
     },
 
     socialize: (kind, ids) => {
