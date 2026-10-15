@@ -185,6 +185,8 @@ export interface AgentInfo {
    * e perguntou pela caixa de entrada há pouco. Ver POST /api/messages.
    */
   canMessage?: boolean;
+  /** Escritório combinado (HABBLAUD_PEERS): máquina onde a sessão roda. */
+  machine?: MachineRef;
 }
 
 export interface RoomInfo {
@@ -206,6 +208,10 @@ export interface RoomInfo {
   createdAt: number;
   /** Efeito visual temporário na sala (eventos do GitHub detectados nos transcripts; ver shared/github.ts). */
   effect?: RoomEffect;
+  /** Escritório combinado (HABBLAUD_PEERS): máquina da sala. Ausente fora do modo combinado. */
+  machine?: MachineRef;
+  /** Escritório combinado: o nome da sala sem a etiqueta da máquina (o `name` vem como "máquina · sala"). */
+  baseName?: string;
 }
 
 /**
@@ -250,6 +256,25 @@ export interface UpdateStatus {
   /** A release mais recente é mais nova que a versão em uso. */
   available: boolean;
   /** Motivo da falha (state "error"). */
+  error?: string;
+}
+
+/** Máquina de origem no escritório combinado (vários Habblauds juntos: HABBLAUD_PEERS, ver server/federation). */
+export interface MachineRef {
+  /** "local" para este computador; senão o id do par em HABBLAUD_PEERS. */
+  id: string;
+  /** Nome exibido (HABBLAUD_MACHINE_NAME para este computador). */
+  name: string;
+}
+
+/** Estado de cada máquina do escritório combinado (OfficeSnapshot.meta.machines). */
+export interface MachineStatus extends MachineRef {
+  local?: boolean;
+  /** Conectada agora (a local sempre). Desconectada: as salas dela ficam por um tempo, depois saem. */
+  online: boolean;
+  /** Desde quando está no estado atual (epoch ms). */
+  since: number;
+  version?: string;
   error?: string;
 }
 
@@ -325,6 +350,8 @@ export interface AccountInfo {
    * - disabled: sem números (tap de statusline não instalado e nenhum cache do /usage).
    */
   usageStatus: 'ok' | 'stale' | 'disabled';
+  /** Escritório combinado: máquina da conta. */
+  machine?: MachineRef;
 }
 
 export interface OfficeSnapshot {
@@ -364,6 +391,8 @@ export interface OfficeSnapshot {
     pty?: PtyStatus;
     /** Verificação de versão nova no GitHub (ausente nos testes e no timelapse). */
     updates?: UpdateStatus;
+    /** Escritório combinado (HABBLAUD_PEERS): as máquinas e se estão conectadas. Ausente fora desse modo. */
+    machines?: MachineStatus[];
   };
 }
 

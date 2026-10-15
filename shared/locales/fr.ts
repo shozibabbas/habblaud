@@ -2602,4 +2602,8 @@ export const FR: Readonly<Record<string, string>> = {
   "   HABBLAUD_FRAME_ANCESTORS: \"{0}\" ignorado (use http(s)://host[:porta], sem caminho nem *).": "   HABBLAUD_FRAME_ANCESTORS : « {0} » ignoré (utilisez http(s)://hôte[:port], sans chemin ni *).",
   "   Pode ser embutido em: {0}.": "   Peut être intégré dans : {0}.",
   "Linux: o container roda como o usuário do host ({0}) e guarda os dados em {1}.": "Linux : le conteneur tourne avec l'utilisateur de l'hôte ({0}) et garde ses données dans {1}.",
+  "   Escritório combinado: {0} ({1}) + {2}.": "   Bureau combiné : {0} ({1}) + {2}.",
+  "   HABBLAUD_PEERS: \"{0}\" ignorado (use id=http://host:porta; id com letras minúsculas, números e -).": "   HABBLAUD_PEERS : « {0} » ignoré (utilisez id=http://hôte:port ; id en minuscules, chiffres et -).",
+  "a máquina do agente não respondeu ({0})": "la machine de l'agent n'a pas répondu ({0})",
+  "este computador": "cet ordinateur",
 };

@@ -23,6 +23,10 @@ services:
       - "${HABBLAUD_BIND:-127.0.0.1}:${HABBLAUD_PORT:-4747}:4747"
       # A porta do acesso pelo celular (com login) só é publicada depois do npm run remote:setup: quem a junta é o
       # docker-compose.override.yml que o docker:up gera.
+    # host.docker.internal também no Linux (no Docker Desktop já existe): é por ele que o escritório combinado chega
+    # aos túneis abertos no host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - habblaud-data:/data
     # Opções que podem vir do .env (ou do ambiente) para dentro do container.
@@ -39,6 +43,10 @@ services:
       # 0 desliga a verificação de versão nova (consulta às releases no GitHub a cada 6 h).
       HABBLAUD_UPDATE_CHECK: ${HABBLAUD_UPDATE_CHECK:-}
       HABBLAUD_LANG: ${HABBLAUD_LANG:-}
+      # Escritório combinado: outros Habblauds juntados neste (id=http://host:porta, separados por vírgula) e o nome
+      # deste computador. Do container, um túnel no host é http://host.docker.internal:<porta>.
+      HABBLAUD_PEERS: ${HABBLAUD_PEERS:-}
+      HABBLAUD_MACHINE_NAME: ${HABBLAUD_MACHINE_NAME:-}
       # 0 desliga as sessões do Codex no escritório.
       HABBLAUD_CODEX: ${HABBLAUD_CODEX:-}
       # 1 liga o Novo agente pelo escritório (no Docker, quem começa a sessão é o auxiliar do host, npm run

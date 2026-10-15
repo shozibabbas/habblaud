@@ -5,6 +5,7 @@ import type { AccessInfo, AgentInfo, ModSummary, OfficeSnapshot, SourceInfo, Upd
 import type { AccountsService } from '../accounts/service';
 import { handleCodexEvent } from '../codex/http';
 import type { DayStatsService } from '../history/daystats';
+import type { Federation } from '../federation/federation';
 import type { Office } from '../model/office';
 import type { CodexLive } from '../sources/codex/live';
 import type { SessionLookup } from '../sources/source';
@@ -25,6 +26,8 @@ import { HOST_WAIT_MS } from '../host-wait';
 
 export interface ApiDeps {
   office: Office;
+  /** Escritório combinado (HABBLAUD_PEERS): agentes dos pares são buscados no par dono deles. */
+  federation?: Federation;
   hub: Hub;
   accounts: AccountsService;
   sources: () => SourceInfo[];
@@ -637,6 +640,16 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
         id = decodeURIComponent(path.slice('/api/agents/'.length));
       } catch {
         sendJson(res, 400, { error: tr('id inválido') });
+        return true;
+      }
+      if (deps.federation?.owner(id)) {
+        deps.federation
+          .detail(id)
+          .then((detail) => {
+            if (detail) sendJson(res, 200, detail);
+            else sendJson(res, 404, { error: tr('agente não encontrado') });
+          })
+          .catch((err: unknown) => sendJson(res, 502, { error: tr('a máquina do agente não respondeu ({0})', [String((err as Error)?.message ?? err)]) }));
         return true;
       }
       const detail = office.detail(id);

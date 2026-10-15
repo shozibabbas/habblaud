@@ -3,6 +3,7 @@
 // Snapshots saem com throttle (~200 ms); feed e avisos vão em lote logo depois do snapshot.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { OfficeSnapshot } from '../../shared/types';
+import type { Federation } from '../federation/federation';
 import type { Office } from '../model/office';
 import { isLoopbackHost } from './guard';
 
@@ -22,18 +23,23 @@ export class Hub {
   private readonly pingMs: number;
   /** Quem pode responder pelo escritório; padrão: Host local. A porta remota (http/remote.ts) troca a regra. */
   private readonly canAnswer: (req: IncomingMessage) => boolean;
+  /** Escritório combinado (HABBLAUD_PEERS): junta os pares a cada commit. */
+  private readonly federation: Federation | undefined;
+  private unsubscribeFederation: (() => void) | null = null;
 
   constructor(
     private readonly office: Office,
-    opts: { throttleMs?: number; pingMs?: number; canAnswer?: (req: IncomingMessage) => boolean } = {},
+    opts: { throttleMs?: number; pingMs?: number; canAnswer?: (req: IncomingMessage) => boolean; federation?: Federation } = {},
   ) {
     this.throttleMs = opts.throttleMs ?? 200;
     this.pingMs = opts.pingMs ?? 15_000;
     this.canAnswer = opts.canAnswer ?? ((req) => isLoopbackHost(req.headers.host));
+    this.federation = opts.federation;
   }
 
   start(): void {
     this.unsubscribe = this.office.onChange(() => this.schedule());
+    this.unsubscribeFederation = this.federation?.onChange(() => this.schedule()) ?? null;
     this.pinger = setInterval(() => this.writeAll(': ping\n\n'), this.pingMs);
     this.pinger.unref?.();
   }
@@ -41,6 +47,8 @@ export class Hub {
   stop(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.unsubscribeFederation?.();
+    this.unsubscribeFederation = null;
     if (this.timer) clearTimeout(this.timer);
     if (this.pinger) clearInterval(this.pinger);
     this.timer = null;
@@ -79,7 +87,7 @@ export class Hub {
     const snapshot = this.current();
     res.write('retry: 2000\n\n');
     res.write(frame('snapshot', snapshot));
-    res.write(frame('feed', this.office.recentFeed(50)));
+    res.write(frame('feed', this.federation ? this.federation.recentFeed(this.office.recentFeed(50), 50) : this.office.recentFeed(50)));
     this.clients.add(res);
     if (this.canAnswer(req)) this.local.add(res);
     const drop = () => this.clients.delete(res);
@@ -93,7 +101,7 @@ export class Hub {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.lastFlush = Date.now();
-    const r = this.office.commit();
+    const r = this.combine(this.office.commit());
     if (r.changed) {
       this.writeAll(frame('snapshot', r.snapshot));
       for (const cb of this.snapshotCbs) {
@@ -107,6 +115,14 @@ export class Hub {
     if (r.feed.length) this.writeAll(frame('feed', r.feed));
     for (const n of r.notices) this.writeAll(frame('notice', n));
     return r.snapshot;
+  }
+
+  /** Com o escritório combinado, junta os pares ao commit do Office (snapshot, feed e avisos). */
+  private combine(r: ReturnType<Office['commit']>): ReturnType<Office['commit']> {
+    const fed = this.federation;
+    if (!fed) return r;
+    const merged = fed.merge(r.snapshot, r.changed);
+    return { ...r, changed: merged.changed, snapshot: merged.snapshot, feed: fed.mergeFeed(r.feed), notices: fed.mergeNotices(r.notices) };
   }
 
   /** Snapshot atual (depois de transmitir o que estiver pendente), com `serverTime` de agora. */

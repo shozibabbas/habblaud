@@ -67,8 +67,9 @@ export class RoomRenamer {
     const room = this.ctx.store.room(roomId);
     if (!room) return;
     this.roomId = roomId;
-    this.original = room.name;
-    this.input.value = room.name;
+    // No escritório combinado o nome vem com a etiqueta da máquina ("Mac · repo"): renomeia-se só a sala.
+    this.original = room.baseName ?? room.name;
+    this.input.value = this.original;
     setText(this.hint, tr('Enter salva · Esc cancela · vazio volta a “{0}”', [room.path.split(/[\\/]/).filter(Boolean).pop() ?? room.path]));
     this.hint.classList.remove('is-error');
     this.el.hidden = false;

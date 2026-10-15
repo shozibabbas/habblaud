@@ -2586,4 +2586,8 @@ export const ES: Readonly<Record<string, string>> = {
   "   HABBLAUD_FRAME_ANCESTORS: \"{0}\" ignorado (use http(s)://host[:porta], sem caminho nem *).": "   HABBLAUD_FRAME_ANCESTORS: \"{0}\" ignorado (usa http(s)://host[:puerto], sin ruta ni *).",
   "   Pode ser embutido em: {0}.": "   Puede incrustarse en: {0}.",
   "Linux: o container roda como o usuário do host ({0}) e guarda os dados em {1}.": "Linux: el contenedor se ejecuta como el usuario del host ({0}) y guarda los datos en {1}.",
+  "   Escritório combinado: {0} ({1}) + {2}.": "   Oficina combinada: {0} ({1}) + {2}.",
+  "   HABBLAUD_PEERS: \"{0}\" ignorado (use id=http://host:porta; id com letras minúsculas, números e -).": "   HABBLAUD_PEERS: \"{0}\" ignorado (usa id=http://host:puerto; id con minúsculas, números y -).",
+  "a máquina do agente não respondeu ({0})": "la máquina del agente no respondió ({0})",
+  "este computador": "este equipo",
 };

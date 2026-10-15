@@ -10,6 +10,7 @@ import { isTruthy, loadConfig, messagesOffReason, terminalOffReason } from './co
 import { createApiHandler, sendJson } from './http/app';
 import { createRequestGuard, isLoopbackHost } from './http/guard';
 import { createRemoteGate, isRemoteRequest, loadSecret, RemoteSessions, startRemoteListener, type RemoteListener } from './http/remote';
+import { Federation } from './federation/federation';
 import { Hub } from './http/sse';
 import { createStaticHandler } from './http/static';
 import { TerminalStreams } from './http/terminal';
@@ -116,8 +117,11 @@ if (codex) agents.add(codex);
 const codexLive: CodexLive | undefined = codex;
 late.office = office;
 late.agents = agents;
+// Escritório combinado (HABBLAUD_PEERS): os escritórios dos pares entram neste, com a etiqueta da máquina.
+const federation = config.peers.length ? new Federation({ machineName: config.machineName, peers: config.peers }) : undefined;
 // Página que pode responder pelo escritório: Host local na porta local; na remota, só com permissions liberado.
 const hub = new Hub(office, {
+  federation,
   canAnswer: (req) => (isRemoteRequest(req) ? !!config.remote?.allow.has('permissions') : isLoopbackHost(req.headers.host)),
 });
 // "Meu dia": amostra o escritório a cada segundo e persiste em <dataDir>/stats/ (ver history/daystats.ts).
@@ -258,6 +262,7 @@ if (config.demo) office.setDemo(true);
 void agents.start();
 accounts.start();
 hub.start();
+federation?.start();
 if (timeline) {
   timeline.start();
   timeline.ingest(hub.current());
@@ -275,6 +280,7 @@ const ticker = setInterval(() => {
 }, 250);
 
 const api = createApiHandler({
+  federation,
   renameRoom: (id, name) => {
     const path = office.roomPath(id);
     if (!path) return undefined;
@@ -428,6 +434,8 @@ server.listen(config.port, config.host, () => {
   }
   for (const item of config.frameAncestorsInvalid) log.warn(tr('   HABBLAUD_FRAME_ANCESTORS: "{0}" ignorado (use http(s)://host[:porta], sem caminho nem *).', [item]));
   if (config.frameAncestors.length) log.info(tr('   Pode ser embutido em: {0}.', [config.frameAncestors.join(' ')]));
+  for (const item of config.peersInvalid) log.warn(tr('   HABBLAUD_PEERS: "{0}" ignorado (use id=http://host:porta; id com letras minúsculas, números e -).', [item]));
+  if (federation) log.info(tr('   Escritório combinado: {0} ({1}) + {2}.', [config.machineName, tr('este computador'), federation.peers.map((p) => `${p.id} (${p.url})`).join(', ')]));
   if (office.isDemo()) log.info(tr('   Modo demonstração ligado (agentes simulados misturados aos reais).'));
   if (config.terminal) log.info(tr('   Terminal: ligado (acesso só local).'));
   else log.info(tr('   Terminal: desligado ({0}).', [terminalOffReason(process.env, config.host, config.inDocker)]));
@@ -474,6 +482,7 @@ function shutdown(signal: string): void {
   agents.stop();
   accounts.stop();
   hub.stop();
+  federation?.stop();
   terminals?.stop();
   timeline?.stop();
   permissions?.stop();
