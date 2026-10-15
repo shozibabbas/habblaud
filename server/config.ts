@@ -11,6 +11,7 @@ import { parseRemoteConfig, type RemoteConfig } from './http/remote';
 import { parseFrameAncestors } from './http/static';
 import { parseGithubRepo } from './updates/checker';
 import { tr } from '../shared/i18n';
+import { parseNameSet, type NameSet } from '../shared/names';
 
 export interface ServerConfig {
   port: number;
@@ -43,6 +44,8 @@ export interface ServerConfig {
   peersInvalid: string[];
   /** Nome deste computador no escritório combinado (HABBLAUD_MACHINE_NAME ou o hostname). */
   machineName: string;
+  /** Conjunto de nomes dos personagens (HABBLAUD_NAMES: br, o padrão, ou pk). */
+  nameSet: NameSet;
   /**
    * Terminal (GET /api/agents/:id/terminal) ligado: só com bind local, isto é, com o Habblaud acessível apenas
    * pelo próprio computador (ver terminalOffReason). É a trava de tudo o que mostra ou age sobre as sessões.
@@ -187,6 +190,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     peers: peers.peers,
     peersInvalid: peers.invalid,
     machineName: machineName(env),
+    nameSet: parseNameSet(env.HABBLAUD_NAMES),
     terminal: terminalOffReason(env, host, inDocker) === undefined,
     messages: messagesOffReason(env, host, inDocker) === undefined,
     timeline: !env.HABBLAUD_TIMELINE?.trim() || isTruthy(env.HABBLAUD_TIMELINE),

@@ -67,7 +67,7 @@ if (!config.inDocker) {
 const legacyEnv = legacyEnvWarning(Object.keys(process.env));
 if (legacyEnv) log.warn(legacyEnv);
 
-const names = new NameStore(join(config.dataDir, 'names.json'));
+const names = new NameStore(join(config.dataDir, 'names.json'), { nameSet: config.nameSet });
 names.load();
 // Nomes de sala escolhidos pelo usuário (botão direito > Renomear).
 const roomAliases = new RoomAliases(join(config.dataDir, 'rooms.json'));

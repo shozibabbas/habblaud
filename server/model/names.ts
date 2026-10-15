@@ -4,7 +4,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { parseAppearanceParts, parseCharacterName, parseSeed, type AppearanceParts } from '../../shared/appearance';
-import { pickName, type PersonName } from '../../shared/names';
+import { fromOtherNameSet, pickName, type NameSet, type PersonName } from '../../shared/names';
 import { errMsg, log } from '../log';
 import { tr } from '../../shared/i18n';
 
@@ -62,13 +62,16 @@ export class NameStore {
   private rooms = new Map<string, StoredCharacter>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private readonly now: () => number;
+  /** Conjunto de nomes dos personagens novos (HABBLAUD_NAMES). */
+  private readonly nameSet: NameSet;
 
   /** `file` null = só em memória (testes ou diretório de dados indisponível). */
   constructor(
     private readonly file: string | null,
-    opts: { now?: () => number } = {},
+    opts: { now?: () => number; nameSet?: NameSet } = {},
   ) {
     this.now = opts.now ?? Date.now;
+    this.nameSet = opts.nameSet ?? 'br';
   }
 
   load(): void {
@@ -90,15 +93,18 @@ export class NameStore {
     }
   }
 
-  /** Nome de `key`: o persistido, se não colidir com `used`; senão um novo do pool. */
+  /**
+   * Nome de `key`: o persistido, se não colidir com `used` e não for de outro conjunto (trocar HABBLAUD_NAMES renomeia
+   * quem tinha um nome do outro conjunto; nomes escolhidos no editor ficam); senão um novo do pool.
+   */
   assign(key: string, used: ReadonlySet<string>): PersonName {
     const stored = this.names.get(key);
-    if (stored && !used.has(stored.name)) {
+    if (stored && !used.has(stored.name) && !fromOtherNameSet(stored.name, this.nameSet)) {
       stored.at = this.now();
       this.scheduleFlush();
       return { name: stored.name, look: stored.look };
     }
-    const person = pickName(key, used);
+    const person = pickName(key, used, this.nameSet);
     this.remember(key, person);
     return person;
   }

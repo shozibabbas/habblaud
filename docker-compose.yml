@@ -47,6 +47,8 @@ services:
       # deste computador. Do container, um túnel no host é http://host.docker.internal:<porta>.
       HABBLAUD_PEERS: ${HABBLAUD_PEERS:-}
       HABBLAUD_MACHINE_NAME: ${HABBLAUD_MACHINE_NAME:-}
+      # Conjunto de nomes dos personagens: br (padrão) ou pk.
+      HABBLAUD_NAMES: ${HABBLAUD_NAMES:-}
       # 0 desliga as sessões do Codex no escritório.
       HABBLAUD_CODEX: ${HABBLAUD_CODEX:-}
       # 1 liga o Novo agente pelo escritório (no Docker, quem começa a sessão é o auxiliar do host, npm run

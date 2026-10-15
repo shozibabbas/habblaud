@@ -373,7 +373,7 @@ uninstallers leave `settings.json.habblaud-backup-<data>` copies in each account
 | **Subagent done** | Walks over to the agent that called it, delivers the result and leaves by elevator. |
 | **Session ended** | Leaves; if it was the last one in the room, it turns off the lights on the way out. |
 
-Each character has a **unique Brazilian name** (Marina, Henrique, Luan…) that stays as long as the session exists, and
+Each character has a **unique name** (Brazilian by default, like Marina, Henrique, Luan…, or Pakistani with `HABBLAUD_NAMES=pk`, like Ayesha, Hamza, Zainab…) that stays as long as the session exists, and
 a **colored chip with the account letter** (C, D…).
 
 ### Interface
@@ -779,6 +779,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_FRAME_ANCESTORS` | — (no framing) | Origins allowed to show the office in an iframe, space- or comma-separated (e.g. `http://localhost:4700`): only `http(s)://host[:port]`, no paths or `*`. See [Embed mode](#embed-mode). |
 | `HABBLAUD_PEERS` | — | Combined office: other Habblauds to show in this one, `id=http://host:port` separated by commas (ids: lowercase letters, digits and `-`). See [Combined office](#combined-office-preview). |
 | `HABBLAUD_MACHINE_NAME` | hostname | This computer's name in the combined office. |
+| `HABBLAUD_NAMES` | `br` | Name set for the characters: `br` (Brazilian) or `pk` (Pakistani). Characters that already had a name from the other set get a new one. |
 | `HABBLAUD_TERMINAL` | on (local access only) | `0` turns off the terminal, answering and sending messages from the office, and the character editor. With the port exposed they're already off, with no way to turn them on. |
 | `HABBLAUD_PTY` | off | `1` turns on the interactive terminal (open, take over and end Claude Code sessions from the office; local access only and outside Docker) and **New agent** (also in Docker, through `npm run codex:bridge`). Read the warning in [Privacy and security](#privacy-and-security). |
 | `HABBLAUD_CLAUDE_BIN` | `claude` from PATH | The Claude Code executable that the interactive terminal and New agent run. |
@@ -791,7 +792,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_LANG` | system language (except English), otherwise `pt-BR` | Language of the texts the server builds (activities, notices, logs): `pt-BR`, `en`, `es` or `fr`. The interface follows the browser or the choice in Settings › Language. See [Languages](#languages). |
 | `HABBLAUD_ACCOUNTS` | — | JSON to customize name, letter or color, matched by the account folder name. E.g. `[{"id":".claude-conta2","name":"Trabalho","short":"T","color":"#5cc97b"}]`. |
 
-**In Docker**, `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_FRAME_ANCESTORS`, `HABBLAUD_PEERS`, `HABBLAUD_MACHINE_NAME`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
+**In Docker**, `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_FRAME_ANCESTORS`, `HABBLAUD_PEERS`, `HABBLAUD_MACHINE_NAME`, `HABBLAUD_NAMES`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
 `HABBLAUD_MENSAGENS`, `HABBLAUD_CODEX`, `HABBLAUD_UPDATE_CHECK`, `HABBLAUD_LANG`, `HABBLAUD_PTY` and the
 `HABBLAUD_REMOTE_*` apply (in `.env` or in the environment), as do `HABBLAUD_CLAUDE_DIRS`, `HABBLAUD_CODEX_DIRS`, `HABBLAUD_USAGE_DIR` and
 `HABBLAUD_ACCOUNTS` (read by `docker:up` on the host); the rest are fixed inside the container. Options: `npm run docker:up -- --no-build` (starts without rebuilding),
