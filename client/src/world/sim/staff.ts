@@ -127,6 +127,8 @@ export interface StaffRoleDef<S = unknown> {
   joinPrayer?(m: StaffMember<S>, crew: StaffCrew, now: number): boolean;
   /** Vai embora (dispensada): devolve o que é dela. */
   dispose?(m: StaffMember<S>, crew: StaffCrew): void;
+  /** A cada quadro (barato): ajustes finos de posição (ex.: o dono puxando a cadeira para junto da mesa). */
+  tick?(m: StaffMember<S>, crew: StaffCrew, now: number): void;
   /** Baixa frequência (~1 s): manutenção da função (ex.: a escala de limpeza). */
   housekeeping?(crew: StaffCrew, now: number): void;
 }
@@ -391,8 +393,11 @@ export class StaffCrew {
   update(now: number): void {
     for (const [id, m] of this.members) {
       if (m.ch.gone || this.sim.chars.get(id) !== m.ch) this.members.delete(id);
-      // ninguém da equipe "cochila de tédio": o relógio do status (ocioso há muito tempo) não corre
-      else m.ch.info.statusSince = now;
+      else {
+        // ninguém da equipe "cochila de tédio": o relógio do status (ocioso há muito tempo) não corre
+        m.ch.info.statusSince = now;
+        roleOf(m.role)?.tick?.(m, this, now);
+      }
     }
     if (now >= this.nextHousekeeping) {
       this.nextHousekeeping = now + 1000;

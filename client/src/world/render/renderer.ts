@@ -838,8 +838,10 @@ export class Renderer {
     if (!fs) return;
     const s = front ? fs.front : seasonalFurniture(this.theme, f.kind, area.layout, f.seed) ?? fs.base;
     if (!s) return;
-    const dx = Math.round(f.ax - s.ax);
-    const dy = Math.round(f.ay - s.ay);
+    // móvel que anda (a cadeira do dono puxada para junto da mesa: sim/ceo.ts)
+    const shift = this.sim.furnShift.get(f.id);
+    const dx = Math.round(f.ax - s.ax + (shift?.dx ?? 0));
+    const dy = Math.round(f.ay - s.ay + (shift?.dy ?? 0));
     const scaled = scale !== 1;
     if (scaled) {
       ctx.save();

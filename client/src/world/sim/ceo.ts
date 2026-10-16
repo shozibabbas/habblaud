@@ -73,6 +73,11 @@ const VIDEO_MS: readonly [number, number] = [35_000, 70_000];
 export const MEETING_MS: readonly [number, number] = [120_000, 240_000];
 /** O motor da mesa (ms) entre as duas alturas. */
 const DESK_MOVE_MS = 1_500;
+/** Sentado: quanto ele e a cadeira andam para a frente até encostar na mesa (px), e em quanto tempo. */
+export const TUCK_PX = 8;
+export const TUCK_MS = 500;
+/** Em pé à mesa erguida: quanto chega mais perto do tampo (px). */
+export const LEAN_PX = 6;
 /** Noite pelo relógio do ciclo dia/noite. */
 export const NIGHT_FROM = 19;
 export const NIGHT_UNTIL = 6;
@@ -98,6 +103,20 @@ export interface CeoState {
   readyAt: Partial<Record<CeoActivity, number>>;
   /** Com quem está conversando (ronda). */
   visiting: string | null;
+  /** A cadeira puxada para junto da mesa (ou ele encostado na mesa erguida): ver `tick`. */
+  tuck: Tuck;
+}
+
+/**
+ * Junto da mesa: `v` vai de 0 (afastado) a 1 (encostado) em TUCK_MS. `mode` diz se é a cadeira (sentado) ou ele em pé;
+ * `hold` = já empurrou a cadeira para levantar (não puxa de novo até sair do lugar).
+ */
+export interface Tuck {
+  v: number;
+  to: number;
+  at: number;
+  mode: 'desk' | 'stand';
+  hold: boolean;
 }
 
 type Boss = StaffMember<CeoState>;
@@ -256,14 +275,24 @@ function claimOwn(crew: StaffCrew, m: Boss): CeoSpots {
   return sp;
 }
 
-/** Agentes livres para um convite: ociosos, na própria mesa, sem nada planejado (nunca quem trabalha ou espera). */
+/**
+ * Agentes livres para um convite: ociosos (nunca quem trabalha, espera um shell ou precisa do usuário), na mesa ou num
+ * passeio à toa; fora de rodas, da mesquita, de cabines, elevadores e cápsulas, e de quem está chegando ou saindo.
+ */
 export function freeAgents(crew: StaffCrew, now: number): Character[] {
   const out: Character[] = [];
   for (const c of crew.sim.chars.values()) {
-    if (crew.member(c.id) || c.mode !== 'idle') continue;
-    if (crew.sim.social.canJoin(c, now)) out.push(c);
+    if (crew.member(c.id) || c.mode !== 'idle' || c.gone || c.leaving || c.arriving || c.inside || c.gathering || c.prayer) continue;
+    const t = c.step?.t;
+    if (t === 'stall' || t === 'elevIn' || t === 'elevOut' || t === 'switch' || t === 'pod' || t === 'pray' || now < c.reactUntil || !c.homeSpot) continue;
+    out.push(c);
   }
   return out;
+}
+
+/** Tira os convidados do passeio (o plano novo sai de onde cada um está). */
+function invite(crew: StaffCrew, guests: readonly Character[]): void {
+  for (const g of guests) crew.sim.clearPlan(g);
 }
 
 /** Até `n` tiles livres (caminháveis, sem ninguém, fora de `taken`) em anéis ao redor de (x, y), a partir do anel `minR`. */
@@ -467,7 +496,7 @@ function planVideo(crew: StaffCrew, m: Boss, sp: CeoSpots): boolean {
     left -= part;
     const r = ch.rng();
     // de vez em quando gira na cadeira (ou dá meia-volta em pé) enquanto fala
-    const dir: Dir = ch.rng() < 0.3 ? (ch.rng() < 0.5 ? 'left' : 'right') : 'up';
+    const dir: Dir = standing && ch.rng() < 0.3 ? (ch.rng() < 0.5 ? 'left' : 'right') : 'up';
     if (r < 0.4) {
       steps.push({ t: 'do', fn: () => say(crew, ch, pick(CEO_LINES.video, ch.rng)) }, { t: 'act', pose: 'talk', ms: part, dir, seated: !standing });
     } else if (r < 0.55) steps.push({ t: 'act', pose: 'laugh', ms: Math.min(part, 2_400), dir, seated: !standing });
@@ -544,6 +573,7 @@ export function planMeeting(crew: StaffCrew, m: Boss, sp: CeoSpots, now: number,
   // os mais perto primeiro (ninguém atravessa o campus inteiro para uma reunião de três minutos)
   free.sort((a, b) => Math.abs(a.tx - ch.tx) + Math.abs(a.ty - ch.ty) - (Math.abs(b.tx - ch.tx) + Math.abs(b.ty - ch.ty)));
   const guests = free.slice(0, n);
+  invite(crew, guests);
   const chairs = sp.meeting.filter((c) => sim.spots.isFree(c.id, m.id));
   if (chairs.length < guests.length + 1 || !sim.reserveTemp(ch, chairs[0])) return false;
   const meet: Meeting = {
@@ -815,6 +845,7 @@ function planGame(crew: StaffCrew, m: Boss, now: number): boolean {
   if (!kinds.length) return false;
   const kind = kinds.length > 1 && ch.rng() < 0.4 ? 'tennis' : kinds[0];
   const partners = free.slice(0, free.length >= 3 && ch.rng() < 0.3 ? 3 : 1);
+  invite(crew, partners);
   return sim.social.startWith(kind, ch, partners, now);
 }
 
@@ -825,7 +856,9 @@ function planTv(crew: StaffCrew, m: Boss, now: number): boolean {
   if (sim.social.joinOpen('tv', ch, now)) return true;
   const free = freeAgents(crew, now);
   if (!free.length) return false;
-  return sim.social.startWith('tv', ch, free.slice(0, 1 + Math.floor(ch.rng() * 2)), now);
+  const guests = free.slice(0, 1 + Math.floor(ch.rng() * 2));
+  invite(crew, guests);
+  return sim.social.startWith('tv', ch, guests, now);
 }
 
 function planKitchen(crew: StaffCrew, m: Boss, now: number): boolean {
@@ -835,7 +868,9 @@ function planKitchen(crew: StaffCrew, m: Boss, now: number): boolean {
   if (sim.social.joinOpen('kitchen', ch, now)) return true;
   const free = freeAgents(crew, now);
   if (!free.length) return false;
-  return sim.social.startWith('kitchen', ch, free.slice(0, 1 + Math.floor(ch.rng() * 2)), now);
+  const guests = free.slice(0, 1 + Math.floor(ch.rng() * 2));
+  invite(crew, guests);
+  return sim.social.startWith('kitchen', ch, guests, now);
 }
 
 // ------------------------------------------------------------------ o sorteio
@@ -940,7 +975,19 @@ export const CEO: StaffRoleDef<CeoState> = {
   // as peças vêm da configuração (identity); só o crachá de visitante não
   dress: (base: Appearance) => ({ ...base, lanyard: null }),
 
-  init: () => ({ doing: 'desk', last: null, next: null, call: null, cup: false, poke: false, holdUntil: 0, chaiAt: 0, readyAt: {}, visiting: null }),
+  init: (_m, _crew, now) => ({
+    doing: 'desk',
+    last: null,
+    next: null,
+    call: null,
+    cup: false,
+    poke: false,
+    holdUntil: 0,
+    chaiAt: 0,
+    readyAt: {},
+    visiting: null,
+    tuck: { v: 0, to: 0, at: now, mode: 'desk', hold: false },
+  }),
 
   think(m, crew, now) {
     const ch = m.ch;
@@ -992,6 +1039,9 @@ export const CEO: StaffRoleDef<CeoState> = {
     if (at) crew.seat(m.ch, at);
     else crew.standNear(m.ch, m.ch.tx, m.ch.ty);
     s.doing = standing ? 'stand' : 'desk';
+    // já encostado na mesa (sem a animação de puxar a cadeira)
+    s.tuck = { v: at ? 1 : 0, to: at ? 1 : 0, at: crew.now, mode: standing ? 'stand' : 'desk', hold: false };
+    tuckTick(m, crew, crew.now);
     // ao abrir a página (ou voltar à aba), ele está trabalhando: o sorteio vem depois deste bloco
     s.next = standing ? 'stand' : 'desk';
   },
@@ -1060,14 +1110,74 @@ export const CEO: StaffRoleDef<CeoState> = {
 
   dispose(m, crew) {
     relax(crew, m);
-    const desk = ceoSpots(crew.sim).desk?.deskId;
-    if (desk) crew.sim.furnStates.delete(desk);
+    const sp = ceoSpots(crew.sim);
+    if (sp.desk?.deskId) crew.sim.furnStates.delete(sp.desk.deskId);
+    if (sp.desk?.furnitureId) crew.sim.furnShift.delete(sp.desk.furnitureId);
   },
+
+  tick: (m, crew, now) => tuckTick(m, crew, now),
 
   housekeeping(crew, now) {
     runMeeting(crew, now);
   },
 };
+
+// ------------------------------------------------------------------ junto da mesa
+
+const smooth = (v: number) => v * v * (3 - 2 * v);
+
+/**
+ * A cada quadro: sentado à mesa, ele puxa a cadeira para a frente até encostar (o corpo cobre a borda do tampo e a parte
+ * de perto do teclado; a cadeira anda junto, Sim.furnShift); em pé à mesa erguida, chega junto ao tampo (com a
+ * profundidade de quem senta, para ficar na frente da mesa). Antes de qualquer saída do lugar (planos dele, menu
+ * Atividades, oração, rodas: todos começam com 'exit'), primeiro empurra a cadeira para trás, depois levanta.
+ */
+export function tuckTick(m: Boss, crew: StaffCrew, now: number): void {
+  const sim = crew.sim;
+  const ch = m.ch;
+  const t = m.state.tuck;
+  const desk = sim.spots.ofKind('ceo_desk')[0];
+  const stand = sim.spots.ofKind('ceo_stand')[0];
+  if (!desk) return;
+  const atDesk = ch.atSpot === desk.id;
+  const atStand = !!stand && ch.atSpot === stand.id;
+  const at = atDesk || atStand;
+  if (at) t.mode = atDesk ? 'desk' : 'stand';
+  else t.hold = false;
+  const next = ch.step ?? ch.queue[0];
+  if (at && t.v > 0.01 && !t.hold && next?.t === 'exit') {
+    // a saída já começou neste quadro (um plano de fora): volta ao lugar e empurra a cadeira antes
+    if (ch.step?.t === 'exit') {
+      ch.queue.unshift(ch.step);
+      ch.step = null;
+      ch.stepT = 0;
+      ch.stepStarted = false;
+      ch.seated = atDesk;
+      ch.setPose(atDesk ? 'sit' : 'stand', ch.held);
+    }
+    t.hold = true;
+    t.to = 0;
+    ch.queue.unshift({ t: 'act', pose: atDesk ? 'sit' : 'stand', held: ch.held, ms: TUCK_MS + 60, dir: 'up', seated: atDesk });
+  } else if (at && !t.hold && ch.step?.t !== 'enter' && next?.t !== 'exit') t.to = 1;
+  if (!at) t.to = 0;
+  const dt = Math.min(100, Math.max(0, now - t.at));
+  t.at = now;
+  const k = dt / TUCK_MS;
+  t.v = t.to > t.v ? Math.min(t.to, t.v + k) : Math.max(t.to, t.v - k);
+  const e = smooth(t.v);
+  if (at && ch.step?.t !== 'exit' && ch.step?.t !== 'enter') {
+    const s = atDesk ? desk : stand!;
+    ch.x = s.x;
+    ch.y = s.y - e * (atDesk ? TUCK_PX : LEAN_PX);
+    // em pé, mais perto do tampo do que o tile manda: desenhado na frente da mesa, como quem senta
+    if (atStand) ch.sortY = desk.sortY ?? null;
+  }
+  const chair = desk.furnitureId;
+  if (!chair) return;
+  const dy = t.mode === 'desk' ? -e * TUCK_PX : 0;
+  if (dy) sim.furnShift.set(chair, { dx: 0, dy });
+  else sim.furnShift.delete(chair);
+}
 
 // ------------------------------------------------------------------ depuração
 
