@@ -84,9 +84,14 @@ describe('turbah no sujood (estilo shia)', () => {
     expect(res.sent.length).toBeGreaterThan(0);
     const seen = new Map<string, number>();
     const bad: string[] = [];
+    // o fim no estilo shia: três takbirs sentado e nenhum salam virando a cabeça, para todos
+    const takbirs = new Map<string, number>();
+    const turned: string[] = [];
     run(sim, clock, 420, () => {
       const drawn = turbahsOf(sim);
       for (const c of sim.chars.values()) {
+        if (c.step?.t === 'pray' && c.pose === 'takbir_seated') takbirs.set(kind(sim, c.id), (takbirs.get(kind(sim, c.id)) ?? 0) + 1);
+        if (c.step?.t === 'pray' && c.pose === 'salam') turned.push(c.id);
         if (c.step?.t !== 'pray' || c.pose !== 'sujood') continue;
         const k = kind(sim, c.id);
         seen.set(k, (seen.get(k) ?? 0) + 1);
@@ -96,6 +101,8 @@ describe('turbah no sujood (estilo shia)', () => {
     });
     expect(bad).toEqual([]);
     for (const k of ['agent', 'cleric', 'cleaner', 'ceo', 'secretary']) expect(seen.get(k) ?? 0, k).toBeGreaterThan(0);
+    for (const k of ['agent', 'cleric', 'cleaner', 'ceo', 'secretary']) expect(takbirs.get(k) ?? 0, `takbir ${k}`).toBeGreaterThan(0);
+    expect(turned).toEqual([]);
   });
 
   it('o nafl dos religiosos também (a turbah fica sempre no lugar do imam); no estilo sunni, nenhuma turbah', () => {

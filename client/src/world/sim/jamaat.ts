@@ -10,7 +10,7 @@ import type { PrayerName } from '../../../../shared/prayer-times';
 import type { MosqueSection } from '../layout/mosque';
 import { TURBAH_DX } from '../../art/character/prayer';
 import type { Character } from './character';
-import { makeupSequence, missedRakahs, phaseAt, prayersFor, RAKAHS, sequenceMs, sessionSequence, standing, type PrayerPhase, type Posture } from './salat';
+import { endingMs, makeupSequence, missedRakahs, phaseAt, prayersFor, RAKAHS, sequenceMs, sessionSequence, standing, type PrayerPhase, type Posture } from './salat';
 import type { Sim } from './sim';
 
 /** Quanto o imam espera os atrasados antes de começar (o chamado leva gente do campus inteiro até a mesquita). */
@@ -160,8 +160,8 @@ export function followPose(f: Follow, now: number, rng: () => number): Posture |
     const at = phaseAt(j.seq, t);
     return at ? at.phase.pose : null;
   }
-  // atrasado: acompanha até o tashahhud final do imam (sem o salam dele) e completa sozinho
-  const salam = j.seq[j.seq.length - 1].ms;
+  // atrasado: acompanha até o tashahhud final do imam (sem o fim dele: salam, takbirs) e completa sozinho
+  const salam = endingMs(j.seq);
   if (t < total - salam) return phaseAt(j.seq, t)?.phase.pose ?? standing(j.style);
   const own = phaseAt(f.makeup!, t - (total - salam));
   return own ? own.phase.pose : null;

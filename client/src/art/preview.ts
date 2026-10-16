@@ -34,7 +34,7 @@ const POSE_PT: Record<Pose, string> = {
   wait: 'esperando', cheer: 'comemorando', laugh: 'gargalhando', game: 'videogame', rps: 'jokenpô', groom: 'no espelho', sulk: 'chateado',
   takbir: 'takbir', qiyam: 'qiyam', ruku: 'ruku', sujood: 'sujood', jalsa: 'jalsa', salam: 'salam', wudu: 'ablução',
   phone: 'ao celular', phone_walk: 'andando ao celular', type_stand: 'digitando em pé', mop: 'passando mop', vacuum: 'aspirando', push: 'empurrando carrinho', scrub: 'esfregando o vaso', wipe: 'passando pano',
-  sadl: 'qiyam (mãos ao lado)', qunoot: 'qunoot', dars: 'dars (majlis)',
+  sadl: 'qiyam (mãos ao lado)', qunoot: 'qunoot', dars: 'dars (majlis)', takbir_seated: 'takbir sentado',
 };
 /** Poses que sempre são sentadas (as demais podem ser em pé ou sentadas). */
 const SEATED_POSES: readonly Pose[] = ['sit', 'type', 'sleep', 'wait'];

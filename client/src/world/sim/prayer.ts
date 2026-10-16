@@ -71,7 +71,7 @@ export function stepPray(ch: Character, s: PrayStep, elapsed: number, now = elap
     const whole = () => sessionSequence(ch.rng, j.prayers.map((p) => RAKAHS[p]), j.style);
     if (!s.hurried && calledAway(ch) && !f.lead) {
       // chamado no meio: termina depressa a partir da postura em que está
-      solo(hurrySequence([{ pose: (ch.pose as Posture) ?? standing(j.style), ms: 600 }], 0));
+      solo(hurrySequence([{ pose: (ch.pose as Posture) ?? standing(j.style), ms: 600 }], 0, j.style));
       s.hurried = true;
     } else if (j.startAt === null && now - j.calledAt > START_WAIT_MS * 1.5) {
       // a congregação não começou (ninguém para puxar): reza sozinho
