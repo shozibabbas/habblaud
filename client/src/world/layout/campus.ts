@@ -18,12 +18,13 @@ import { BUILDING_H, COL_W, CORRIDOR_H, CORRIDOR_Y, NORTH_Y, ROOM_H, SOUTH_Y } f
 import { FREE, WalkGrid } from '../path/grid';
 import { AreaBuilder } from './builder';
 import { paintArea, type BuildingLayout } from './building';
+import { ceoAreas, ceoSite, type CeoSite } from './ceo';
 import { COMMONS_W, commonsAreas } from './commons';
 import { ELEVATOR_CX } from './core';
 import { mosqueAreas, mosqueSite, type MosqueSite } from './mosque';
 import { slotShell, type SlotShell } from './exterior';
 import { slotColumn } from './geometry';
-import { layoutRecreation, REC_WALK_Y, type RecreationLayout } from './recreation';
+import { layoutRecreation, REC_WALK_H, REC_WALK_Y, type RecreationLayout } from './recreation';
 import { translateShell } from './translate';
 import type { AreaLayout, SpotDef, TileRect } from './types';
 
@@ -86,6 +87,13 @@ export interface CampusLayout {
   recreation: RecreationLayout;
   /** Mesquita ao norte da faixa de recreação (layout/mosque.ts): o prédio e os caminhos dela (fora de `paths`). */
   mosque: MosqueSite;
+  /** Diretoria (layout/ceo.ts), só com um dono configurado: o prédio e o calçadão até ele (fora de `paths`). */
+  ceo?: CeoSite;
+}
+
+export interface CampusOptions {
+  /** Há um dono (OfficeSnapshot.meta.owner): o campus ganha a diretoria. */
+  ceo?: boolean;
 }
 
 export function placeOf(place: number): { wing: 'east' | 'west'; row: number } {
@@ -133,7 +141,7 @@ export function campusBuilding(m: CampusMachineInput): CampusBuilding {
   };
 }
 
-export function layoutCampus(machines: readonly CampusMachineInput[]): CampusLayout {
+export function layoutCampus(machines: readonly CampusMachineInput[], opts: CampusOptions = {}): CampusLayout {
   const buildings = [...machines].sort((a, b) => a.place - b.place).map(campusBuilding);
   const commons: TileRect = { x: 0, y: 0, w: COMMONS_W, h: BUILDING_H };
   const paths: TileRect[] = [];
@@ -160,8 +168,11 @@ export function layoutCampus(machines: readonly CampusMachineInput[]): CampusLay
   const recreation = layoutRecreation();
   // a mesquita fica ao norte da faixa de recreação; os caminhos dela descem até o calçadão da recreação
   const mosque = mosqueSite(commons, { west: WEST_WALK_X, east: EAST_WALK_X, h: PATH_H }, recreation.rect.y, REC_WALK_Y + PATH_H);
+  // a diretoria fica a leste da área de fumantes, com a parede sul encostada no calçadão da recreação
+  const ceo = opts.ceo ? ceoSite(REC_WALK_Y, REC_WALK_H, recreation.rect.x + recreation.rect.w) : undefined;
   let x0 = Math.min(commons.x, recreation.rect.x);
   let x1 = Math.max(commons.x + commons.w, recreation.rect.x + recreation.rect.w);
+  if (ceo) for (const p of ceo.paths) x1 = Math.max(x1, p.x + p.w);
   let y1 = commons.y + commons.h;
   for (const b of buildings) {
     x0 = Math.min(x0, b.rect.x);
@@ -171,8 +182,8 @@ export function layoutCampus(machines: readonly CampusMachineInput[]): CampusLay
   // a visão geral enquadra também a recreação e a mesquita (com a cúpula e os minaretes), ao norte
   const y0 = Math.min(0, recreation.rect.y, mosque.skyY);
   const inner: TileRect = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
-  const key = `campus|${buildings.map((b) => `${b.id}@${b.place}:${b.cols}:${b.online ? 1 : 0}`).join(',')}`;
-  return { buildings, commons, paths, inner, rows, key, recreation, mosque };
+  const key = `campus|${buildings.map((b) => `${b.id}@${b.place}:${b.cols}:${b.online ? 1 : 0}`).join(',')}${ceo ? '|ceo' : ''}`;
+  return { buildings, commons, paths, inner, rows, key, recreation, mosque, ...(ceo ? { ceo } : {}) };
 }
 
 // =================================================================== áreas de cada prédio
@@ -344,9 +355,10 @@ export function assembleCampus(campus: CampusLayout, rooms: readonly AreaLayout[
   for (const b of campus.buildings) fixed.push(...cachedBuildingAreas(b));
   fixed.push(...campus.recreation.areas);
   fixed.push(...mosqueAreas(campus.mosque));
+  if (campus.ceo) fixed.push(...ceoAreas(campus.ceo));
   const r = campus.inner;
   const grid = new WalkGrid(r.w + 2, r.h + 2, version, r.x - 1, r.y - 1);
-  for (const p of [...campus.paths, ...campus.recreation.paths, ...campus.mosque.paths]) grid.fill(p.x, p.y, p.w, p.h, FREE);
+  for (const p of [...campus.paths, ...campus.recreation.paths, ...campus.mosque.paths, ...(campus.ceo?.paths ?? [])]) grid.fill(p.x, p.y, p.w, p.h, FREE);
   const all = [...fixed, ...rooms];
   for (const a of all) paintArea(grid, a);
   const spots: SpotDef[] = [];

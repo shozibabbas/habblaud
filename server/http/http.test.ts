@@ -3,11 +3,12 @@ import type { AddressInfo } from 'node:net';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ModSummary, OfficeSnapshot, PermissionRequestInfo, UpdateStatus } from '../../shared/types';
+import type { ModSummary, OfficeSnapshot, OwnerInfo, PermissionRequestInfo, UpdateStatus } from '../../shared/types';
 import { AccountsService } from '../accounts/service';
 import { setQuiet } from '../log';
 import { NameStore } from '../model/names';
 import { Office, type OfficeDeps } from '../model/office';
+import { OwnerStore } from '../owner';
 import { tempDir } from '../test/fixtures';
 import { createApiHandler, type ApiDeps } from './app';
 import { createRequestGuard, hostAllowed, hostnameOf, isLoopbackHost, originAllowed, parseAllowedHosts } from './guard';
@@ -335,6 +336,93 @@ describe('personagem do projeto (PUT/DELETE /api/agents/:id/character)', () => {
     const get = await fetch(url());
     expect(get.status).toBe(405);
     expect(get.headers.get('allow')).toBe('PUT, DELETE');
+  });
+});
+
+describe('dono do escritório (GET/PUT/DELETE /api/owner)', () => {
+  let env: Awaited<ReturnType<typeof start>>;
+  let store: OwnerStore;
+  const boot = async (terminal: boolean, fallback?: OwnerInfo) => {
+    store = new OwnerStore(null, fallback);
+    const late: { office?: Office } = {};
+    env = await start(
+      {
+        terminal,
+        owner: {
+          get: () => store.get(),
+          source: () => store.source(),
+          set: (o) => {
+            store.set(o);
+            late.office?.markDirty();
+          },
+        },
+      },
+      { owner: () => store.get() },
+    );
+    late.office = env.office;
+  };
+  afterEach(async () => {
+    await env.close();
+    env.cleanup();
+  });
+  const url = () => `${env.base}/api/owner`;
+  const put = (body: unknown) => fetch(url(), { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(body) });
+
+  it('HABBLAUD_OWNER é só o padrão: o PUT grava, o snapshot muda junto e o nome vazio tira o dono', async () => {
+    await boot(true, { name: 'Env', look: 'm' });
+    expect(await (await fetch(url())).json()).toEqual({ owner: { name: 'Env', look: 'm' }, source: 'env' });
+    expect((await snapshotOf(env.base)).meta.owner).toEqual({ name: 'Env', look: 'm' });
+    const res = await put({ name: ' Ana ', title: '', look: 'f', parts: { topStyle: 'jacket' }, secretary: { name: 'Rafael', look: 'm' } });
+    expect(res.status).toBe(200);
+    const ana = { name: 'Ana', look: 'f', parts: { topStyle: 'jacket' }, secretary: { name: 'Rafael', look: 'm' } };
+    expect(await res.json()).toEqual({ owner: ana, source: 'settings' });
+    await vi.waitFor(async () => expect((await snapshotOf(env.base)).meta.owner).toEqual(ana));
+    // secretária sem nome some; cargo fica
+    expect(await (await put({ name: 'Ana', title: 'CEO', look: 'f', secretary: { name: '', look: 'f' } })).json()).toMatchObject({ owner: { name: 'Ana', title: 'CEO', look: 'f' } });
+    expect(store.get()?.secretary).toBeUndefined();
+    // nome vazio: sem dono (e o HABBLAUD_OWNER não volta)
+    expect(await (await put({ name: '' })).json()).toEqual({ owner: null, source: 'none' });
+    await vi.waitFor(async () => expect((await snapshotOf(env.base)).meta.owner).toBeUndefined());
+    await put({ name: 'Ana', look: 'f' });
+    const del = await fetch(url(), { method: 'DELETE', headers: JSON_HEADERS, body: '{}' });
+    expect(await del.json()).toEqual({ owner: null, source: 'none' });
+    expect(store.get()).toBeUndefined();
+  });
+
+  it('400 com o campo para o que estiver fora do formato (e nada muda)', async () => {
+    await boot(true);
+    await put({ name: 'Ana', look: 'f' });
+    for (const [body, field] of [
+      [{ name: 'a'.repeat(25), look: 'f' }, 'name'],
+      [{ name: 'Ana', look: 'x' }, 'look'],
+      [{ name: 'Ana', look: 'f', parts: { skin: 'red' } }, 'parts'],
+      [{ name: 'Ana', look: 'f', boss: true }, 'boss'],
+      [{ name: 'Ana', look: 'f', secretary: { name: 'Rafael', look: 'q' } }, 'secretary.look'],
+      [[1, 2], 'JSON'],
+    ] as const) {
+      const res = await put(body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(((await res.json()) as { field: string }).field).toBe(field);
+    }
+    expect(store.get()).toEqual({ name: 'Ana', look: 'f' });
+  });
+
+  it('PUT e DELETE só pelo próprio computador e com a trava do terminal; GET é livre; 405 para POST', async () => {
+    await boot(false);
+    expect((await put({ name: 'Ana', look: 'f' })).status).toBe(403);
+    expect((await fetch(url(), { method: 'DELETE', headers: JSON_HEADERS, body: '{}' })).status).toBe(403);
+    expect((await fetch(url())).status).toBe(200);
+    await env.close();
+    env.cleanup();
+    await boot(true);
+    const port = new URL(env.base).port;
+    const r = await raw(env.base, '/api/owner', { method: 'PUT', headers: { ...JSON_HEADERS, Host: `habblaud.lan:${port}` }, body: JSON.stringify({ name: 'Ana', look: 'f' }) });
+    expect(r.status).toBe(403);
+    expect(r.body).toMatch(/próprio computador/);
+    expect(store.get()).toBeUndefined();
+    const post = await fetch(url(), { method: 'POST', headers: JSON_HEADERS, body: '{}' });
+    expect(post.status).toBe(405);
+    expect(post.headers.get('allow')).toBe('GET, PUT, DELETE');
   });
 });
 

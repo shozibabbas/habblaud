@@ -178,7 +178,7 @@ export type FurnitureKind =
   | 'plant_tall' // 1x1 planta alta (até ~2 tiles de altura). variants: 'palm' | 'ficus' | 'monstera' | 'bonsai'
   | 'glass_partition' // 1x1 segmento de divisória de vidro sobre base branca (meia-parede + vidro azulado com reflexo). variants: 'h' (corre leste-oeste) | 'v' (corre norte-sul) | 'end' (ponta/coluna)
   | 'binder_shelf' // 1x1 estante alta e estreita com pastas coloridas (azul/laranja/verde) e caixas.
-  | 'meeting_table' // 3x2 mesa de reunião/bancada para subagentes.
+  | 'meeting_table' // 3x2 mesa de reunião/bancada para subagentes. (Aditivo) variants: 'rect' (padrão) | 'oval' (mesa oval de nogueira da diretoria, para 4)
   | 'stool' // 1x1 assento simples (banqueta). Personagem pode sentar em qualquer direção.
   | 'floor_lamp' // 1x1 luminária de chão. rects.glow = centro da luz.
   | 'water_cooler' // 1x1 bebedouro com galão azul. Uso: personagem fica ao SUL, virado para cima.
@@ -237,7 +237,17 @@ export type FurnitureKind =
   | 'wudu_stool' // 1x1 banquinho baixo de pedra (assento) diante da torneira.
   | 'quran_shelf' // 2x1 estante baixa com Alcorões encadernados (verde/vinho, filete dourado).
   | 'arch_window' // (parede) 2 tiles. Janela em arco com treliça; à noite o mundo acende o vidro.
-  | 'prayer_times'; // (parede) 2 tiles. Quadro com os horários das orações (seis mostradores, sem texto).
+  | 'prayer_times' // (parede) 2 tiles. Quadro com os horários das orações (seis mostradores, sem texto).
+  // --- diretoria (aditivo; campus; art/furniture/ceo.ts). Nogueira escura, couro, alumínio prateado e preto.
+  | 'exec_desk' // 4x1 mesa de altura regulável (pés telescópicos de aço grafite, tampo de nogueira): Studio Display no meio (rects.screen), caixas de som dos dois lados, MacBook aberto num suporte (rects.screen2), Magic Keyboard, Magic Mouse, headset no suporte e luminária de mesa (rects.glow). state 0 = altura de sentar, 1 = altura de ficar em pé (tampo e tudo em cima ~7px mais alto, colunas mais longas)
+  | 'exec_chair' // 1x1 assento: cadeira executiva ergonômica de tela com apoio de cabeça, virada para cima (front = encosto alto). state 0 = junto à mesa, 1 = rolada para o lado (mesa em pé)
+  | 'meeting_chair' // 1x1 assento: cadeira de reunião de couro caramelo com base cromada. variants como cafe_chair ('up' tem front)
+  | 'coffee_bar' // 3x1 aparador de nogueira com máquina de espresso, chaleira de chai (doodh patti) no fogareiro, xícaras e copinhos, pote de biscoitos e prato de samosas. state 1 = em uso (o mundo desenha o vapor)
+  | 'exec_sofa' // 2x1 assento: sofá de couro de dois lugares, de frente para a câmera
+  | 'exec_credenza' // 3x1 aparador baixo de nogueira encostado na parede norte: livros, globo, troféu e porta-retrato
+  | 'secretary_desk' // 3x1 mesa da secretária: monitor (rects.screen), telefone de mesa, bandejas de documentos e impressora pequena
+  | 'door_plate' // 1x1 placa de latão com "CEO" presa na coluna de vidro ao lado da porta (divide o tile com a coluna: dy +1)
+  | 'award_wall' // (parede) 2 tiles. Prateleira de prêmios: diplomas emoldurados, troféu e placa de cristal
 
 export interface FurnitureDef {
   mount: 'floor' | 'wall';
@@ -277,7 +287,7 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   plant_tall: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['palm', 'ficus', 'monstera', 'bonsai'] },
   glass_partition: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true, variants: ['h', 'v', 'end'] },
   binder_shelf: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
-  meeting_table: { mount: 'floor', footprint: { w: 3, h: 2 }, blocks: true },
+  meeting_table: { mount: 'floor', footprint: { w: 3, h: 2 }, blocks: true, variants: ['rect', 'oval'] },
   stool: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true },
   floor_lamp: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   water_cooler: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
@@ -330,6 +340,15 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   quran_shelf: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true },
   arch_window: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
   prayer_times: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
+  exec_desk: { mount: 'floor', footprint: { w: 4, h: 1 }, blocks: true, states: 2 },
+  exec_chair: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true, states: 2 },
+  meeting_chair: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: false, seat: true, variants: ['up', 'down', 'left', 'right'] },
+  coffee_bar: { mount: 'floor', footprint: { w: 3, h: 1 }, blocks: true, states: 2 },
+  exec_sofa: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: false, seat: true },
+  exec_credenza: { mount: 'floor', footprint: { w: 3, h: 1 }, blocks: true },
+  secretary_desk: { mount: 'floor', footprint: { w: 3, h: 1 }, blocks: true },
+  door_plate: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  award_wall: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
 };
 
 export type FloorKind =
@@ -341,7 +360,8 @@ export type FloorKind =
   | 'marble' // recepção
   | 'grass' // área externa
   | 'sidewalk' // calçada externa
-  | 'street'; // rua externa (faixas desenhadas pelo render se quiser)
+  | 'street' // rua externa (faixas desenhadas pelo render se quiser)
+  | 'walnut'; // (aditivo) tábuas de nogueira escura (sala da diretoria)
 
 export type WallPattern = 'plain' | 'stripes' | 'tiles' | 'wood_panel' | 'brick' | 'glass' | 'marble';
 

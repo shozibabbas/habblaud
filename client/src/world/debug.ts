@@ -76,6 +76,11 @@ export interface WorldDebug {
   nap(agentId: string): boolean;
   /** Campus: manda o agente fumar um cigarro na área de fumantes agora (mesmo sem o traço). */
   smoke(agentId: string): boolean;
+  /**
+   * Campus com dono: estado de um móvel da diretoria (Sim.furnStates). `kind` = 'exec_desk' (1 = em pé) ou
+   * 'coffee_bar' (1 = em uso); sem `state`, alterna. Retorna o estado novo, ou null sem diretoria.
+   */
+  ceoFurniture(kind: 'exec_desk' | 'coffee_bar', state?: number): number | null;
   /** Soma (ou tira) moedinhas da carteira de um agente. Retorna o saldo. */
   coins(agentId: string, delta: number): number;
   /**
@@ -377,6 +382,15 @@ export function createDebug(sim: Sim, renderer: Renderer, camera: Camera, onCame
       if (!ch) return false;
       sim.clearPlan(ch);
       return planSmoke(sim, ch, true);
+    },
+
+    ceoFurniture: (kind, state) => {
+      const f = sim.building.areas.filter((a) => a.ceo).flatMap((a) => a.furniture).find((x) => x.kind === kind);
+      if (!f) return null;
+      const next = state ?? ((sim.furnStates.get(f.id) ?? 0) ? 0 : 1);
+      if (next) sim.furnStates.set(f.id, next);
+      else sim.furnStates.delete(f.id);
+      return next;
     },
 
     gatherings: () =>

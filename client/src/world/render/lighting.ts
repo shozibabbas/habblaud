@@ -14,6 +14,7 @@ import type { Sim } from '../sim/sim';
 import { buildAnim } from './anim';
 import { ambientAt, ambientDistance, approachAmbient, effectiveHour, isNeutral, mixRgb, rgbCss, sunbeamAt, WHITE, type Ambient, type DaylightMode, type Rgb } from './daylight';
 import { glowSprite } from './props';
+import { ceoHalos, drawCeoGlows } from './ceo';
 import { drawRecreationGlows, recreationHalos } from './recreation';
 import { furnitureSprites, wallItemOrigin, wallSprites, type AreaVis, type FurnVis, type WallVis } from './scene';
 
@@ -446,6 +447,7 @@ export class Lighting {
       } else if (prop.kind === 'totem') halo(cool, prop.x, prop.y - 4, 34, 22, 0.6 * k);
     }
     recreationHalos(scene.areas.values(), (cx, cy, w, h, a) => halo(haloSprite(FLOOD, 64), cx, cy, w, h, a), k);
+    ceoHalos(this.sim, scene.areas.values(), (cx, cy, w, h, a) => halo(lamp, cx, cy, w, h, a), k);
     this.paintWindowSpill(scene, lit, k, halo, street);
     m.globalAlpha = 1;
     m.globalCompositeOperation = 'source-over';
@@ -533,6 +535,7 @@ export class Lighting {
     }
     this.drawSunbeams(ctx, scene, view);
     drawRecreationGlows(ctx, this.sim, scene.areas.values(), n, view);
+    drawCeoGlows(ctx, this.sim, scene.areas.values(), n, view);
     ctx.globalCompositeOperation = 'lighter';
     if (n > 0.2) {
       for (const prop of scene.exterior.props) {

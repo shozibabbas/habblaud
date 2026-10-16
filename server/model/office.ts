@@ -13,6 +13,7 @@ import type {
   Notice,
   NoticeLevel,
   OfficeSnapshot,
+  OwnerInfo,
   PermissionDecision,
   PermissionRequestInfo,
   Provider,
@@ -81,6 +82,8 @@ export interface OfficeDeps {
   updates?: () => UpdateStatus;
   /** Terminais interativos (PtyManager): estado do recurso e os abertos. */
   ptys?: () => { status: PtyStatus; list: PtyInfo[] };
+  /** Dono do escritório (owner.json ou HABBLAUD_OWNER; server/owner.ts): vai para OfficeSnapshot.meta.owner. */
+  owner?: () => OwnerInfo | undefined;
   now?: () => number;
 }
 
@@ -992,6 +995,7 @@ export class Office {
     const sessions = new Map<string, number>();
     for (const a of real) if (a.kind === 'main' && a.status !== 'offline') sessions.set(a.account, (sessions.get(a.account) ?? 0) + 1);
     const ptys = this.deps.ptys?.();
+    const owner = this.deps.owner?.();
     return {
       rev: this.rev,
       serverTime: now,
@@ -1009,6 +1013,7 @@ export class Office {
         messages: this.deps.messages !== undefined,
         ...(ptys ? { pty: ptys.status } : {}),
         updates: this.deps.updates?.(),
+        ...(owner ? { owner } : {}),
       },
     };
   }

@@ -401,7 +401,22 @@ export interface OfficeSnapshot {
     updates?: UpdateStatus;
     /** Escritório combinado (HABBLAUD_PEERS): as máquinas e se estão conectadas. Ausente fora desse modo. */
     machines?: MachineStatus[];
+    /**
+     * Dono do escritório (HABBLAUD_OWNER): no campus ganha a sala da diretoria com a secretária na antessala
+     * (client/src/world/layout/ceo.ts). Ausente = sem diretoria.
+     */
+    owner?: OwnerInfo;
   };
+}
+
+/** Dono do escritório e a secretária dele (OfficeSnapshot.meta.owner). `parts` segue o editor do personagem. */
+export interface OwnerInfo {
+  name: string;
+  /** Cargo na placa (ex.: "CEO"). Ausente = "CEO". */
+  title?: string;
+  look: 'f' | 'm';
+  parts?: AppearanceParts;
+  secretary?: { name: string; look: 'f' | 'm'; parts?: AppearanceParts };
 }
 
 /**

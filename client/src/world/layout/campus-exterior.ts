@@ -4,6 +4,7 @@
 import { mulberry32 } from '../../../../shared/hash';
 import { BUILDING_H, COL_W, CORRIDOR_Y, EXT_EAST, EXT_NORTH, EXT_SOUTH, EXT_WEST, TILE } from '../constants';
 import { PATH_DY, PATH_H, ROW_PITCH, roomColumnX, type CampusLayout } from './campus';
+import { ceoGrounds } from './ceo';
 import type { ExteriorLayout } from './exterior';
 import { mosqueGrounds } from './mosque';
 import type { ExteriorProp, FloorPatch, TileRect } from './types';
@@ -166,6 +167,14 @@ export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
   const clearOfMosque = props.filter((p) => !grounds.keepOut.some((r) => hit(r, p.x / TILE, p.y / TILE)));
   props.length = 0;
   props.push(...clearOfMosque, ...grounds.props);
+  // diretoria (layout/ceo.ts, só com um dono): o calçadão estendido, os canteiros e as árvores dela
+  if (campus.ceo) {
+    const ceo = ceoGrounds(campus.ceo);
+    floors.push(...ceo.floors);
+    const clearOfCeo = props.filter((p) => !ceo.keepOut.some((r) => hit(r, p.x / TILE, p.y / TILE)));
+    props.length = 0;
+    props.push(...clearOfCeo, ...ceo.props);
+  }
 
   const streetY = px(bottom + 4);
   const streetH = px(5);

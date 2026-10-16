@@ -25,7 +25,8 @@ export const SMOKING_ID = 'rec:fumantes';
 
 /** Calçadão (linha de cima e altura) na frente da faixa de recreação. */
 export const REC_WALK_Y = -4;
-const WALK_H = CORRIDOR_H - 2;
+export const REC_WALK_H = CORRIDOR_H - 2;
+const WALK_H = REC_WALK_H;
 /** Linha das entradas do Commons (a mesma faixa dos caminhos até os prédios). */
 const ENTRY_Y = CORRIDOR_Y + 1;
 /** Ligações do calçadão com as pontas do corredor do Commons (o mesmo x dos calçadões das alas: ver campus.ts). */

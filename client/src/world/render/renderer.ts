@@ -19,6 +19,7 @@ import type { RoomState } from '../sim/room-state';
 import { cobwebScale, hourglassIcon, HOURGLASS_FLIP_MS, STORM_LIFT } from '../sim/shell';
 import type { Sim } from '../sim/sim';
 import { buildAnim, furnitureScale, NO_ANIM, sweepDelay, type BuildAnim } from './anim';
+import { ceoFurnState, drawCeoFacade, drawCeoFurniture } from './ceo';
 import { daylightModeOf, parseHourParam } from './daylight';
 import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
@@ -436,6 +437,7 @@ export class Renderer {
       this.drawWalls(vis, anim, now, hour);
     }
     this.safe(() => this.mosque.drawSkyline(ctx, this.sim.building));
+    this.safe(() => drawCeoFacade(ctx, this.sim.building, this.night));
     const view = { x0: vx0, y0: vy0, x1: vx1, y1: vy1 };
     // alarme de CI: tom vermelho no piso (por baixo dos móveis e personagens)
     this.roomFx.drawFloor(ctx, this.sim, now, view);
@@ -806,7 +808,8 @@ export class Renderer {
       return ch && ch.atSpot === f.seatSpot && ch.pose === 'wudu' ? 1 : 0;
     }
     if (f.kind === 'sleep_pod') return this.sim.podBusy.has(f.id) ? 1 : 0;
-    return 0;
+    // diretoria: mesa de pé, a cadeira que rola junto e o bar em uso (render/ceo.ts)
+    return ceoFurnState(this.sim, f, now, this.areas) ?? 0;
   }
 
   private drawFurniture(f: FurnVis, area: AreaVis, scale: number, front: boolean, now: number): void {
@@ -842,6 +845,8 @@ export class Renderer {
         this.drawSteam(f.ax, dy + 2, now, f.seed);
       } else if (f.kind === 'wudu_tap' && state === 1) {
         drawWuduWater(ctx, f.ax + 4, f.ay - 19, now);
+      } else if (area.layout.ceo) {
+        this.safe(() => drawCeoFurniture(ctx, this.art, this.sim, f, area, s, dx, dy, state, now));
       } else if (f.kind === 'arcade' && s.rects?.screen) {
         // duelo no fliperama: as duas máquinas mostram a partida
         const seed = this.sim.social.arcadeSeed();

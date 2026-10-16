@@ -2,13 +2,14 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { PassThrough } from 'node:stream';
 import { NAME_MAX, parseAppearanceParts, parseCharacterName, parseSeed } from '../../shared/appearance';
-import type { AccessInfo, AgentInfo, ModSummary, OfficeSnapshot, SourceInfo, UpdateStatus } from '../../shared/types';
+import type { AccessInfo, AgentInfo, ModSummary, OfficeSnapshot, OwnerInfo, SourceInfo, UpdateStatus } from '../../shared/types';
 import type { AccountsService } from '../accounts/service';
 import { handleCodexEvent } from '../codex/http';
 import type { DayStatsService } from '../history/daystats';
 import type { Federation } from '../federation/federation';
 import { parsePresence, type RemotePresence } from '../federation/presence';
 import type { Office } from '../model/office';
+import { ownerFromBody, type OwnerSource } from '../owner';
 import type { CodexLive } from '../sources/codex/live';
 import type { SessionLookup } from '../sources/source';
 import { isJsonContentType, isLoopbackHost } from './guard';
@@ -87,6 +88,11 @@ export interface ApiDeps {
   files?: FileFetcher;
   /** Renomeia a sala (POST /api/rooms/rename {id, name}; vazio volta ao padrão). Devolve o nome em uso, ou undefined se a sala não existe. */
   renameRoom?: (id: string, name: string) => string | undefined;
+  /**
+   * Dono do escritório (GET/PUT/DELETE /api/owner; server/owner.ts): `set` grava no owner.json (null = sem dono) e o
+   * snapshot muda junto. No escritório combinado só vale o deste computador (o dos pares nunca entra).
+   */
+  owner?: { get(): OwnerInfo | undefined; source(): OwnerSource; set(owner: OwnerInfo | null): void };
   /** Estatísticas do "Meu dia" (GET /api/stats, http/stats.ts). */
   stats?: DayStatsService;
   /** Verificação de versão nova no GitHub (GET /api/updates, POST /api/updates/check; updates/checker.ts). */
@@ -695,6 +701,39 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
             const name = deps.renameRoom?.(b.id, b.name);
             if (name === undefined) throw new HttpError(404, tr('sala não encontrada'));
             sendJson(res, 200, { name });
+          })
+          .catch((err) => fail(res, err));
+      return true;
+    }
+    if (path === '/api/owner') {
+      // Ler é livre (o dono já vai no snapshot); gravar age sobre o escritório: a mesma trava de renomear salas e
+      // editar o personagem (bind local + Host local). Nunca vai a um par: o dono é do escritório que o mostra.
+      const owner = deps.owner;
+      if (!isRead && method !== 'PUT' && method !== 'DELETE') methodNotAllowed(res, 'GET, PUT, DELETE');
+      else if (!owner) {
+        req.resume();
+        sendJson(res, 404, { error: tr('rota desconhecida') });
+      } else if (isRead) sendJson(res, 200, { owner: owner.get() ?? null, source: owner.source() });
+      else if (!deps.terminal) {
+        req.resume();
+        sendJson(res, 403, { error: tr('mudar o dono desligado: só funciona com o Habblaud acessível apenas pelo próprio computador') });
+      } else if (!trusted(req)) {
+        req.resume();
+        sendJson(res, 403, { error: denied(req, tr('o dono do escritório só é mudado pelo próprio computador (http://localhost)')) });
+      } else if (method === 'DELETE') {
+        req.resume();
+        owner.set(null);
+        sendJson(res, 200, { owner: null, source: owner.source() });
+      } else
+        readJson(req)
+          .then((body) => {
+            const r = ownerFromBody(body);
+            if ('invalid' in r) {
+              sendJson(res, 400, { error: tr('dono do escritório: campo "{0}" fora do formato', [r.invalid]), field: r.invalid });
+              return;
+            }
+            owner.set(r.owner);
+            sendJson(res, 200, { owner: r.owner, source: owner.source() });
           })
           .catch((err) => fail(res, err));
       return true;

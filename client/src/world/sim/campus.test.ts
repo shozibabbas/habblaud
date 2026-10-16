@@ -233,4 +233,28 @@ describe('demonstração do campus no mock', () => {
     }
     for (const a of out.agents) expect(a.machine).toEqual(out.rooms.find((r) => r.id === a.roomId)!.machine);
   });
+
+  it('com um dono (meta.owner) o campus ganha a diretoria; sem dono, ou no prédio único, nada muda', () => {
+    const sim = newSim();
+    const rooms = [room('/p/a', 0, LAPTOP), room('/p/b', 1, SRV)];
+    const withOwner = (s: OfficeSnapshot): OfficeSnapshot => ({ ...s, meta: { ...s.meta, owner: { name: 'Ana', look: 'f' } } });
+    sim.applySnapshot(snap(rooms, [], MACHINES), T0);
+    expect(sim.building.campus?.ceo).toBeUndefined();
+    sim.applySnapshot(withOwner(snap(rooms, [], MACHINES, 2)), T0 + 1000);
+    expect(sim.building.campus?.ceo).toBeDefined();
+    expect(sim.building.areas.filter((a) => a.ceo).map((a) => a.id).sort()).toEqual(['ceo:office', 'ceo:reception']);
+    expect(sim.spots.ofKind('ceo_desk')).toHaveLength(1);
+    sim.applySnapshot(snap(rooms, [], MACHINES, 3), T0 + 2000);
+    expect(sim.building.campus?.ceo).toBeUndefined();
+    expect(sim.spots.ofKind('ceo_desk')).toHaveLength(0);
+    // prédio único: o dono não cria nada
+    const single = newSim();
+    single.applySnapshot(withOwner(snap([room('/p/a', 0)], [])), T0);
+    expect(single.building.campus).toBeUndefined();
+    expect(single.spots.ofKind('ceo_desk')).toHaveLength(0);
+    // o mock inventa um dono com owner=1
+    expect(campusMockFrom('?machines=4&owner=1')).toEqual({ machines: 4, owner: true });
+    expect(mockCampusSnapshot(snap(rooms, []), { machines: 2, owner: true }).meta.owner?.name).toBeTruthy();
+    expect(mockCampusSnapshot(snap(rooms, []), { machines: 2 }).meta.owner).toBeUndefined();
+  });
 });
