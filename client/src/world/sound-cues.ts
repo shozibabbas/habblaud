@@ -175,7 +175,9 @@ export class SoundCues {
     let sx = 0;
     const smoking = new Set<string>();
     for (const ch of this.sim.chars.values()) {
-      if (ch.gone || ch.alpha < 0.5 || !this.inView(ch.x, ch.y, view)) continue;
+      // quem dorme na cápsula fica escondido lá dentro (alpha 0), mas ronca do mesmo jeito
+      const inPod = ch.step?.t === 'pod' && ch.pose === 'sleep';
+      if (ch.gone || (ch.alpha < 0.5 && !inPod) || !this.inView(ch.x, ch.y, view)) continue;
       if (ch.pose === 'wudu') {
         wudu++;
         wx += ch.x;
