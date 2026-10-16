@@ -9,7 +9,9 @@ import { appearanceFromSeed } from '../../art/character/appearance';
 import { renderCleaningProp } from '../../art/furniture/cleaning';
 import { DEFAULT_WORLD_OPTIONS, type WorldOptions } from '../api';
 import { STAFF_REST } from '../layout/staff';
-import { cartAt, cleanerUniform, cleaningAreas, lastCleanedOf, oldestArea, schedule, spreadPatches, UNIFORM, type CleanerState } from './cleaner';
+import { AREA_MS, cartAt, cleanerUniform, cleaningAreas, isWashroom, lastCleanedOf, nextArea, oldestArea, schedule, spreadPatches, UNIFORM, WASHROOM_MS, type CleanerState } from './cleaner';
+import { deskOf, receptionUniform, RECEPTION_UNIFORM, type ReceptionState } from './receptionist';
+import { STAFF_DESK, STAFF_DESK_SWAP } from '../layout/staff';
 import { MAX_SHINE, SHINE_FADE_MS, ShineList, shineExpired, shineLevel, type ShinePatch } from './shine';
 import { sendAll } from './send-all';
 import { Sim } from './sim';
@@ -87,6 +89,8 @@ function office(agents: AgentInfo[], nMachines = 0, opts: Partial<WorldOptions> 
 }
 
 const staffOf = (sim: Sim) => [...sim.chars.values()].filter(isStaff);
+const cleanersOf = (sim: Sim) => staffOf(sim).filter((c) => c.id.startsWith('staff:cleaner:'));
+const clerksOf = (sim: Sim) => staffOf(sim).filter((c) => c.id.startsWith('staff:receptionist:'));
 const cleanerState = (sim: Sim, id: string) => sim.staff.member(id)!.state as CleanerState;
 
 describe('equipe: quem é e quantos', () => {
@@ -94,16 +98,19 @@ describe('equipe: quem é e quantos', () => {
     expect(isStaffId('staff:cleaner:0')).toBe(true);
     expect(isStaffId('.claude:123')).toBe(false);
     expect(isStaffId(null)).toBe(false);
-    expect(staffOf(office([agent('ana')]).sim)).toHaveLength(2);
-    expect(staffOf(office([agent('ana', { campus: true })], 2).sim)).toHaveLength(3);
-    expect(staffOf(office([agent('ana', { campus: true })], 4).sim)).toHaveLength(4);
+    expect(cleanersOf(office([agent('ana')]).sim)).toHaveLength(2);
+    expect(cleanersOf(office([agent('ana', { campus: true })], 2).sim)).toHaveLength(3);
+    expect(cleanersOf(office([agent('ana', { campus: true })], 4).sim)).toHaveLength(4);
+    // recepção: a recepcionista e a substituta, nos dois tipos de escritório
+    expect(clerksOf(office([agent('ana')]).sim)).toHaveLength(2);
+    expect(clerksOf(office([agent('ana', { campus: true })], 2).sim)).toHaveLength(2);
     expect(staffOf(office([agent('ana')], 0, { staff: false }).sim)).toHaveLength(0);
   });
 
   it('na carga inicial cada um está na sua banqueta do canto da limpeza; desligar tira todos', () => {
     const { sim, clock, options } = office([agent('ana')]);
     const rest = new Set(sim.spots.ofKind('staff').filter((s) => s.group === STAFF_REST).map((s) => s.id));
-    const seats = staffOf(sim).map((c) => c.atSpot);
+    const seats = cleanersOf(sim).map((c) => c.atSpot);
     expect(seats.every((id) => !!id && rest.has(id))).toBe(true);
     expect(new Set(seats).size).toBe(seats.length);
     options.staff = false;
@@ -115,7 +122,8 @@ describe('equipe: quem é e quantos', () => {
     // religada: voltam (pelo elevador)
     options.staff = true;
     sim.staff.resync(clock.now);
-    expect(staffOf(sim)).toHaveLength(2);
+    expect(cleanersOf(sim)).toHaveLength(2);
+    expect(clerksOf(sim)).toHaveLength(2);
     run(sim, clock, 60, () => staffOf(sim).every((c) => !c.inside && c.alpha >= 1));
     expect(staffOf(sim).every((c) => !c.inside)).toBe(true);
   });
@@ -164,7 +172,7 @@ describe('equipe: nunca conta como agente', () => {
     sim.applySnapshot(s, clock.now);
     // o snapshot (o que a interface conta) não muda
     expect(s.agents.map((a) => a.id)).toEqual(['ana', 'bia', 'caio']);
-    expect(staffOf(sim).length).toBe(3);
+    expect(cleanersOf(sim).length).toBe(3);
     // menu: livres + ocupados = só os agentes
     const tv = sendAll(sim, 'tv', clock.now)!;
     expect(tv.sent.every((id) => !isStaffId(id))).toBe(true);
@@ -183,11 +191,11 @@ describe('equipe: nunca conta como agente', () => {
     const res = sendAll(sim, 'prayer', clock.now)!;
     expect(res.sent.sort()).toEqual(['ana', 'bia']);
     expect(res.busy).toBe(0);
-    const praying = staffOf(sim).filter((c) => !!c.prayer);
+    const praying = cleanersOf(sim).filter((c) => !!c.prayer);
     expect(praying.length).toBe(3);
     // e depois voltam ao trabalho
-    run(sim, clock, 240, () => staffOf(sim).every((c) => !c.prayer));
-    expect(staffOf(sim).every((c) => !c.prayer)).toBe(true);
+    run(sim, clock, 240, () => cleanersOf(sim).every((c) => !c.prayer));
+    expect(cleanersOf(sim).every((c) => !c.prayer)).toBe(true);
   });
 
   it('quem está no meio de um trecho de piso termina a limpeza em vez de ir rezar', () => {
@@ -364,5 +372,199 @@ describe('uniforme e kit', () => {
       expect(s.buf.countOpaque(), kind).toBeGreaterThan(30);
       expect(s.ay).toBeLessThanOrEqual(s.buf.h);
     }
+  });
+});
+
+describe('banheiros: mais vezes e com rotina própria', () => {
+  it('um banheiro sem limpeza há mais de WASHROOM_MS passa na frente de qualquer sala, mesmo mais antiga', () => {
+    const office = { id: 'sala', layout: { kind: 'room' } as never };
+    const wc = { id: 'wc', layout: { kind: 'restroom' } as never };
+    const wudu = { id: 'wudu', layout: { kind: 'mosque' } as never, look: 'm' as const };
+    expect(isWashroom(wc)).toBe(true);
+    expect(isWashroom(wudu)).toBe(true);
+    expect(isWashroom(office)).toBe(false);
+    const now = 10_000_000;
+    const last: Record<string, number> = { sala: now - 60 * 60_000, wc: now - WASHROOM_MS - 1000, wudu: now - 60_000 };
+    expect(nextArea([office, wc, wudu], now, (id) => last[id], () => false)?.id).toBe('wc');
+    // limpo há pouco: a sala mais antiga vem primeiro
+    last.wc = now - WASHROOM_MS / 3;
+    expect(nextArea([office, wc, wudu], now, (id) => last[id], () => false)?.id).toBe('sala');
+    // dois banheiros vencidos: o mais antigo
+    last.wc = now - WASHROOM_MS * 2;
+    last.wudu = now - WASHROOM_MS * 3;
+    expect(nextArea([office, wc, wudu], now, (id) => last[id], () => false)?.id).toBe('wudu');
+    // tudo limpo há pouco: ninguém (descanso); a sala só volta depois de AREA_MS, bem mais que o banheiro
+    Object.assign(last, { sala: now - AREA_MS / 2, wc: now - WASHROOM_MS / 2, wudu: now - WASHROOM_MS / 2 });
+    expect(nextArea([office, wc, wudu], now, (id) => last[id], () => false)).toBeNull();
+    expect(WASHROOM_MS).toBeLessThanOrEqual(AREA_MS / 2);
+  });
+
+  it('numa simulação de 30 min o banheiro é limpo mais vezes que qualquer outra área', () => {
+    const { sim, clock } = office([agent('ana')]);
+    const sched = schedule(sim.staff);
+    const counts = new Map<string, number>();
+    const seen = new Map<string, number>();
+    for (let i = 0; i < 30 * 60 * 10; i++) {
+      clock.now += 100;
+      sim.update(0.1, clock.now);
+      if (i % 10) continue;
+      for (const [id, at] of sched.last) {
+        if (seen.get(id) !== at) {
+          if (seen.has(id)) counts.set(id, (counts.get(id) ?? 0) + 1);
+          seen.set(id, at);
+        }
+      }
+    }
+    const wc = counts.get('core:banheiros') ?? 0;
+    expect(wc).toBeGreaterThanOrEqual(3);
+    for (const [id, n] of counts) if (id !== 'core:banheiros') expect(n, id).toBeLessThan(wc);
+  });
+
+  it('cabines, pias e espelhos com brilho, reposição e placa na porta; nunca entra numa cabine ocupada', () => {
+    const { sim, clock } = office([agent('ana')]);
+    const id = 'staff:cleaner:0';
+    const ch = sim.chars.get(id)!;
+    const stalls = sim.spots.ofKind('stall').filter((sp) => sp.areaId === 'core:banheiros');
+    expect(stalls.length).toBeGreaterThan(1);
+    // alguém na primeira cabine (a porta fecha) durante toda a limpeza
+    const busy = stalls[0];
+    sim.spots.reserve(busy.id, 'ana');
+    sim.stallBusy.add(busy.furnitureId!);
+    cleanerState(sim, id).forced = 'core:banheiros';
+    sim.clearPlan(ch);
+    const scrubbed = new Set<string>();
+    const poses = new Set<string>();
+    let signNearDoor = false;
+    const door = sim.building.core.find((a) => a.id === 'core:banheiros')!.door!;
+    const kit: KitItem[] = [];
+    run(sim, clock, 300, () => {
+      poses.add(ch.pose);
+      if (ch.pose === 'scrub') {
+        const near = stalls.find((sp) => sp.tx === ch.tx && sp.ty === ch.ty);
+        if (near) scrubbed.add(near.id);
+      }
+      sim.staff.kit(kit, clock.now);
+      const sign = kit.find((k) => k.kind === 'sign');
+      if (sign && Math.abs(sign.x / 16 - (door.x + door.w / 2)) < 3 && Math.abs(sign.y / 16 - (door.y + door.h)) < 3) signNearDoor = true;
+      return cleanerState(sim, id).area === null && poses.has('mop');
+    });
+    expect(scrubbed.has(busy.id)).toBe(false);
+    expect(scrubbed.size).toBe(stalls.length - 1);
+    expect(poses.has('wipe')).toBe(true);
+    expect(poses.has('use')).toBe(true); // reposição no carrinho
+    expect(signNearDoor).toBe(true);
+    const gleams = sim.staff.shine.items.filter((p) => p.gleam);
+    const mirrors = sim.building.core.find((a) => a.id === 'core:banheiros')!.wallItems.filter((w) => w.kind === 'mirror').length;
+    // um no vaso de cada cabine limpa, um em cada pia e um em cada espelho
+    expect(gleams.length).toBeGreaterThanOrEqual(stalls.length - 1 + mirrors);
+    expect(sim.staff.shine.items.some((p) => !p.gleam)).toBe(true);
+    // e a cabine ocupada continua de quem está nela
+    expect(sim.spots.ownerOf(busy.id)).toBe('ana');
+  });
+
+  it('não para numa pia em uso: deixa para depois', () => {
+    const { sim, clock } = office([agent('ana')]);
+    const id = 'staff:cleaner:0';
+    const ch = sim.chars.get(id)!;
+    const sinks = sim.spots.ofKind('sink').filter((sp) => sp.areaId === 'core:banheiros');
+    sim.spots.reserve(sinks[0].id, 'ana');
+    cleanerState(sim, id).forced = 'core:banheiros';
+    sim.clearPlan(ch);
+    let wipedBusy = false;
+    run(sim, clock, 300, () => {
+      if (ch.pose === 'wipe' && ch.tx === sinks[0].tx && ch.ty === sinks[0].ty) wipedBusy = true;
+      return cleanerState(sim, id).area === null && sim.staff.shine.items.some((p) => !p.gleam);
+    });
+    expect(wipedBusy).toBe(false);
+  });
+});
+
+describe('recepção', () => {
+  const chairOf = (sim: Sim) => sim.spots.ofKind('staff').find((sp) => sp.group === STAFF_DESK)!;
+  /** Alguém da recepção sentado na cadeira do balcão ou ao lado dela (na troca). */
+  const staffed = (sim: Sim) => {
+    const chair = chairOf(sim);
+    return clerksOf(sim).some((c) => c.atSpot === chair.id || Math.max(Math.abs(c.tx - chair.tx), Math.abs(c.ty - chair.ty)) <= 1);
+  };
+
+  it('na carga inicial a recepcionista está sentada no balcão e a substituta no arquivo; uniforme arrumado', () => {
+    for (const machines of [0, 2]) {
+      const { sim } = office([agent('ana', { campus: machines > 0 })], machines);
+      const [a, b] = ['staff:receptionist:0', 'staff:receptionist:1'].map((id) => sim.chars.get(id)!);
+      expect(a.atSpot).toBe(chairOf(sim).id);
+      expect(a.seated).toBe(true);
+      expect(b.atSpot).not.toBe(chairOf(sim).id);
+      expect(deskOf(sim.staff).holder).toBe(a.id);
+      expect(sim.staff.card(a.id)?.role).toBe('Recepcionista');
+    }
+    const m = receptionUniform(appearanceFromSeed(3, { look: 'm' }), undefined);
+    expect([m.topStyle, m.top, m.topAccent]).toEqual(['shirt_tie', RECEPTION_UNIFORM.white, RECEPTION_UNIFORM.navy]);
+    const f = receptionUniform({ ...appearanceFromSeed(4, { look: 'f' }), look: 'f' }, 'pk');
+    expect([f.topStyle, f.bottomStyle, f.accessory === 'dupatta' || f.accessory === 'hijab']).toEqual(['shalwar_kameez', 'shalwar', true]);
+    const k = receptionUniform({ ...appearanceFromSeed(5, { look: 'm' }), look: 'm' }, 'pk');
+    expect(k.topStyle).toBe('kurta_waistcoat');
+  });
+
+  it('o balcão nunca fica vazio numa pausa: a substituta chega primeiro, a recepcionista sai e depois volta', () => {
+    const { sim, clock } = office([agent('ana')]);
+    const a = sim.chars.get('staff:receptionist:0')!;
+    const b = sim.chars.get('staff:receptionist:1')!;
+    const sa = sim.staff.member(a.id)!.state as ReceptionState;
+    const chair = chairOf(sim);
+    const swap = sim.spots.ofKind('staff').find((sp) => sp.group === STAFF_DESK_SWAP)!;
+    sa.shiftEnd = clock.now;
+    let reliefSat = false;
+    let primaryAway = false;
+    let backAgain = false;
+    let leftBeforeRelief = false;
+    for (let i = 0; i < 300 * 30 && !backAgain; i++) {
+      clock.now += 1000 / 30;
+      sim.update(1 / 30, clock.now);
+      expect(staffed(sim), `balcão vazio em ${i}`).toBe(true);
+      // quando a recepcionista levanta, a substituta já está ao lado da cadeira
+      if (a.step?.t === 'exit' && a.atSpot === chair.id && !(b.tx === swap.tx && b.ty === swap.ty)) leftBeforeRelief = true;
+      if (b.atSpot === chair.id) reliefSat = true;
+      if (Math.abs(a.tx - chair.tx) + Math.abs(a.ty - chair.ty) > 4) primaryAway = true;
+      if (primaryAway && reliefSat && a.atSpot === chair.id) backAgain = true;
+    }
+    expect(leftBeforeRelief).toBe(false);
+    expect(reliefSat).toBe(true);
+    expect(primaryAway).toBe(true);
+    expect(backAgain).toBe(true);
+    expect(deskOf(sim.staff).holder).toBe(a.id);
+    // a substituta volta para a papelada
+    run(sim, clock, 10);
+    expect(b.atSpot).not.toBe(chair.id);
+  });
+
+  it('chamado para a oração: a substituta cobre o balcão e a recepcionista vai depois da troca', () => {
+    const { sim, clock } = office([agent('ana', { campus: true })], 2);
+    const a = sim.chars.get('staff:receptionist:0')!;
+    const b = sim.chars.get('staff:receptionist:1')!;
+    sendAll(sim, 'prayer', clock.now);
+    expect(b.prayer).toBeNull();
+    let prayed = false;
+    for (let i = 0; i < 120 * 30 && !prayed; i++) {
+      clock.now += 1000 / 30;
+      sim.update(1 / 30, clock.now);
+      expect(staffed(sim)).toBe(true);
+      if (a.prayer) prayed = true;
+    }
+    expect(prayed).toBe(true);
+    run(sim, clock, 5);
+    expect(staffed(sim)).toBe(true);
+    expect(b.atSpot).toBe(chairOf(sim).id);
+    expect(b.prayer).toBeNull();
+  });
+
+  it('cumprimenta quem chega pelo elevador (aceno), sem contar como agente', () => {
+    const { sim, clock } = office([agent('ana')]);
+    const a = sim.chars.get('staff:receptionist:0')!;
+    sim.applySnapshot(snap([agent('ana'), agent('bia', { look: 'f' })], 0, 2), clock.now);
+    let waved = false;
+    run(sim, clock, 20, () => (waved ||= a.pose === 'raise_hand' && a.chatEmoji === '👋'));
+    expect(waved).toBe(true);
+    const tv = sendAll(sim, 'tv', clock.now)!;
+    expect(tv.sent.length + tv.busy + tv.full).toBe(2);
   });
 });

@@ -548,6 +548,8 @@ export class Renderer {
     // ralis (bola e placar das mesas/quadra) e a fumaça dos cigarros
     drawRallies(ctx, this.sim, now, view);
     drawSmoke(ctx, this.sim, this.heads, now, view);
+    // brilho das pias, espelhos e vasos recém-limpos (por cima dos móveis)
+    this.safe(() => this.staff.drawGleams(ctx, this.sim, now, view, reducedMotion()));
     // ---- espera de shell: teias de aranha, confete/pipoca/chuva (por cima das entidades)
     this.drawCobwebs(now);
     this.drainEffects(now);

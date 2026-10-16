@@ -10,10 +10,10 @@ import type { BufSprite } from '../core/sprite';
 import type { HeadView } from './hair';
 import { CHAR_PARTS as P, isSeated, type Arm, type Dc } from './render';
 
-export type CleaningPose = Extract<Pose, 'mop' | 'vacuum' | 'push'>;
+export type CleaningPose = Extract<Pose, 'mop' | 'vacuum' | 'push' | 'scrub' | 'wipe'>;
 export type CleaningTool = Extract<HeldItem, 'mop' | 'vacuum'>;
 
-const POSES: ReadonlySet<string> = new Set<CleaningPose>(['mop', 'vacuum', 'push']);
+const POSES: ReadonlySet<string> = new Set<CleaningPose>(['mop', 'vacuum', 'push', 'scrub', 'wipe']);
 const TOOLS: ReadonlySet<string> = new Set<CleaningTool>(['mop', 'vacuum']);
 
 /** Quadros das poses de limpeza (POSE_FRAMES em render.ts): o vaivém e a passada têm 4. */
@@ -48,6 +48,10 @@ const TOOL = {
   mopDk: '#bdb39d',
   mopWet: '#a9b6bf',
   vac: '#d94f3a',
+  bristle: '#f4f6f8',
+  bristleDk: '#9fb4c4',
+  cloth: '#58c4c4',
+  clothDk: '#2f8f94',
   vacLt: '#f07a5c',
   vacDk: '#9c3326',
   base: '#3c4251',
@@ -66,6 +70,7 @@ export function renderCleaning(req: CharacterFrameRequest): BufSprite {
   const f = ((Math.floor(req.frame) % n) + n) % n;
   if (pose === 'mop' || pose === 'vacuum') drawSweep(req, b, view, pose, f);
   else if (pose === 'push') drawPush(req, b, view, f);
+  else if (pose === 'scrub' || pose === 'wipe') drawHandTool(req, b, view, pose, f);
   else drawCarry(req, b, view);
   b.outline();
   b.shadow(AX, AY - 0.5, 6, 2, '#1c2034', 0.2);
@@ -244,4 +249,64 @@ function drawCarry(req: CharacterFrameRequest, b: PixelBuf, view: HeadView): voi
   headStack(dc);
   tool(18);
   arm(dc, P.arm([16, 18], [17, 20], [17, 21]));
+}
+
+/**
+ * Escova de vaso ('scrub') ou pano ('wipe') numa mão, em movimento; a outra mão no lugar. De costas (na porta da cabine,
+ * diante da pia), o braço sobe à frente e a ferramenta aparece ao lado da cabeça; de frente e de perfil, à frente.
+ */
+function drawHandTool(req: CharacterFrameRequest, b: PixelBuf, view: HeadView, pose: 'scrub' | 'wipe', f: number): void {
+  const dc = context(req, b, view, 'stand', 0);
+  const ub = dc.r.ub;
+  const scrub = pose === 'scrub';
+  const dx = [-1, 0, 1, 0][f] * (scrub ? 1 : 2);
+  const dy = scrub ? [0, 1, 2, 1][f] : 0;
+  const tool = (hx: number, hy: number, up: boolean): void => {
+    if (scrub) {
+      // cabo curto e a cabeça de cerdas na ponta (para cima de costas, para baixo de frente/perfil)
+      const ex = hx + (up ? 1 : -1);
+      const ey = hy + (up ? -5 : 5) + ub;
+      b.line(hx, hy + ub, ex, ey, TOOL.pole);
+      b.set(hx, hy + ub, TOOL.grip);
+      b.rect(ex - 1, up ? ey - 2 : ey, 3, 2, TOOL.bristle);
+      b.hline(ex - 1, ex + 1, up ? ey - 2 : ey + 1, TOOL.bristleDk);
+    } else {
+      b.rect(hx - 1, hy - 1 + ub, 3, 3, TOOL.cloth);
+      b.set(hx + 1, hy + 1 + ub, TOOL.clothDk);
+      b.set(hx - 1, hy - 1 + ub, '#9ee6e2');
+    }
+  };
+  if (view === 'up') {
+    P.drawLegs(dc);
+    P.drawTorso(dc);
+    arm(dc, dc.r.armA);
+    P.drawHair(dc, 'back');
+    headStack(dc);
+    const hx = scrub ? 17 + dx : 16 + dx;
+    const hy = scrub ? 14 + dy : 11;
+    arm(dc, P.arm([16, 18], [18, 16], [hx, hy]));
+    tool(hx, hy, true);
+    return;
+  }
+  if (view === 'down') {
+    P.drawHair(dc, 'back');
+    P.drawLegs(dc);
+    P.drawTorso(dc);
+    arm(dc, dc.r.armA);
+    headStack(dc);
+    const hx = 14 + dx;
+    const hy = scrub ? 21 + dy : 19;
+    tool(hx, hy, false);
+    arm(dc, P.arm([16, 18], [17, 20], [hx, hy]));
+    return;
+  }
+  arm(dc, dc.r.armA, true);
+  P.drawHair(dc, 'back');
+  P.drawLegs(dc);
+  P.drawTorso(dc);
+  headStack(dc);
+  const hx = 5 + dx;
+  const hy = scrub ? 20 + dy : 16;
+  tool(hx, hy, false);
+  arm(dc, P.arm([10, 18], [8, 19], [hx, hy]));
 }

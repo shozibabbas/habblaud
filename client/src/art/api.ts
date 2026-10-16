@@ -68,7 +68,9 @@ export type Pose =
   // --- equipe de limpeza (aditivo; character/cleaning.ts): sempre em pé
   | 'mop' // passando o mop: as duas mãos no cabo, a ponta indo e voltando no chão à frente (4)
   | 'vacuum' // o mesmo vaivém com o aspirador vertical (carpete) (4)
-  | 'push'; // andando e empurrando o carrinho de limpeza (o carrinho é desenhado pelo mundo) (4)
+  | 'push' // andando e empurrando o carrinho de limpeza (o carrinho é desenhado pelo mundo) (4)
+  | 'scrub' // escova de vaso subindo e descendo (normalmente dir 'up', na porta da cabine) (4)
+  | 'wipe'; // pano na mão indo e voltando (pia, espelho, torneira) (4)
 
 export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book' | 'box' | 'paddle' | 'popcorn'
   // --- vida social (aditivo)

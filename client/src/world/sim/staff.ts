@@ -6,7 +6,7 @@
 // Cada pessoa da equipe é um Character comum em sim.chars (anda pelos mesmos caminhos, elevadores e reservas de spots
 // que os agentes), com id `staff:<função>:<n>`, nome do conjunto de nomes ativo (sem repetir o de nenhum agente),
 // aparência sorteada pela semente + o uniforme da função, e um comportamento próprio: o planejador do Sim, com a fila
-// vazia, chama `think` da função (ver StaffRoleDef). Funções: registerStaffRole (hoje, só a limpeza já vem registrada).
+// vazia, chama `think` da função (ver StaffRoleDef). Funções: registerStaffRole (a limpeza e a recepção já vêm registradas).
 //
 // Para criar uma função nova (ex.: 'ceo', 'secretary'): um arquivo sim/<função>.ts exportando um StaffRoleDef
 // (rótulo, quantas pessoas, uniforme, estado inicial, `think` e `settle`; opcionais: `identity` para nome e peças fixos,
@@ -19,10 +19,11 @@ import type { AgentInfo, AppearanceProfile } from '../../../../shared/types';
 import type { Appearance, ArtModule } from '../../art/api';
 import type { CleaningProp } from '../../art/furniture/cleaning';
 import { FOOT_DX, FOOT_DY, TILE } from '../constants';
-import { STAFF_CART, STAFF_REST, STAFF_SINK } from '../layout/staff';
+import { STAFF_REST } from '../layout/staff';
 import type { SpotDef } from '../layout/types';
 import { Character } from './character';
 import { CLEANER } from './cleaner';
+import { RECEPTIONIST } from './receptionist';
 import { ShineList } from './shine';
 import type { Sim } from './sim';
 import type { Step } from './steps';
@@ -105,8 +106,8 @@ export interface StaffRoleDef<S = unknown> {
   housekeeping?(crew: StaffCrew, now: number): void;
 }
 
-/** Registro das funções da equipe, na ordem de chegada (a limpeza já vem registrada). */
-const ROLES: StaffRoleDef<unknown>[] = [CLEANER as StaffRoleDef<unknown>];
+/** Registro das funções da equipe, na ordem de chegada (a limpeza e a recepção já vêm registradas). */
+const ROLES: StaffRoleDef<unknown>[] = [CLEANER as StaffRoleDef<unknown>, RECEPTIONIST as StaffRoleDef<unknown>];
 
 /** Registra (ou substitui, pelo nome) uma função. Retorna como desfazer. */
 export function registerStaffRole<S>(def: StaffRoleDef<S>): () => void {
@@ -407,7 +408,7 @@ export class StaffCrew {
   // ------------------------------------------------------------------ base (canto da limpeza)
 
   /** Spots 'staff' de um grupo (descanso, tanque, vagas de carrinho). */
-  base(group: typeof STAFF_REST | typeof STAFF_SINK | typeof STAFF_CART): SpotDef[] {
+  base(group: string): SpotDef[] {
     return this.sim.spots.ofKind('staff').filter((s) => s.group === group);
   }
 
@@ -415,7 +416,7 @@ export class StaffCrew {
    * Lugar fixo da pessoa num grupo (banqueta, vaga do carrinho): o mesmo enquanto existir, reservado em nome dela.
    * Prefere o de índice igual ao da pessoa (cada um sempre na sua banqueta).
    */
-  claim(m: StaffMember<unknown>, group: typeof STAFF_REST | typeof STAFF_CART): SpotDef | null {
+  claim(m: StaffMember<unknown>, group: string): SpotDef | null {
     const list = this.base(group);
     for (const s of list) if (this.sim.spots.ownerOf(s.id) === m.id) return s;
     const pref = list[m.index];

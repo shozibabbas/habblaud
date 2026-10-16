@@ -2719,4 +2719,17 @@ export const FR: Readonly<Record<string, string>> = {
   "Guardando o carrinho": "Range le chariot",
   "Descansando": "En pause",
   "Faxineiros que passam pelo escritório limpando o piso de tempos em tempos. Não são agentes.": "Des agents d'entretien passent régulièrement dans les bureaux pour laver le sol. Ce ne sont pas des agents IA.",
+
+  // client/src/world/sim/cleaner.ts (banheiros) e receptionist.ts
+  "Limpando as cabines: {0}": "Nettoie les toilettes : {0}",
+  "Limpando pias e espelhos: {0}": "Nettoie lavabos et miroirs : {0}",
+  "Limpando as torneiras: {0}": "Nettoie les robinets : {0}",
+  "Repondo papel e sabonete: {0}": "Remet papier et savon : {0}",
+  "Recepcionista": "Réceptionniste",
+  "No balcão da recepção": "À l'accueil",
+  "Atendendo o telefone": "Au téléphone",
+  "Cumprimentando quem chega": "Salue un arrivant",
+  "Assumindo o balcão": "Prend le relais à l'accueil",
+  "Em pausa": "En pause",
+  "Organizando a papelada": "Range les papiers",
 };

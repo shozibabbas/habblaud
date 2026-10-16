@@ -4,6 +4,9 @@
 // sapateiras, nunca o carpete da oração) —, vai até lá empurrando o carrinho, estaciona na entrada (com a placa de
 // "piso molhado" quando o piso é duro), passa o mop (ou o aspirador, no carpete e nos tapetes) em alguns trechos
 // espalhados pela área e volta ao carrinho. Cada trecho limpo brilha e o brilho some em ~2,5 min (sim/shine.ts).
+// Banheiros e as alas de ablução da mesquita têm prioridade (passados WASHROOM_MS sem limpeza, são os próximos) e
+// rotina própria: esfregar os vasos das cabines (nunca numa cabine ocupada), passar pano nas pias e nos espelhos (ou nas
+// torneiras da ablução, sem atrapalhar quem as usa), repor papel e sabonete do carrinho e passar o mop, com a placa na porta.
 // Entre as rondas a pessoa guarda o carrinho, enxágua o mop no tanque e descansa na sua banqueta do canto da limpeza.
 // Nunca limpa em cima de quem está parado nem nos lugares de uso (mesas, máquinas, assentos), e não entra numa ala da
 // mesquita durante uma oração nem na sala de descanso com alguém dormindo.
@@ -126,6 +129,25 @@ export function oldestArea<T extends { id: string }>(areas: readonly T[], lastCl
   return best;
 }
 
+/** Banheiros e ablução: passado este tempo sem limpeza, são os próximos (antes de qualquer outra área). */
+export const WASHROOM_MS = 6 * 60_000;
+/** As outras áreas: não voltam a ser limpas antes disto (num escritório pequeno a equipe descansa mais). */
+export const AREA_MS = 15 * 60_000;
+
+/**
+ * A próxima área da escala: um banheiro (ou ala de ablução) sem limpeza há mais de WASHROOM_MS vem primeiro (o mais
+ * antigo deles); senão, a área de há mais tempo sem limpeza entre as que passaram de AREA_MS; senão, nenhuma (descanso).
+ */
+export function nextArea<T extends { id: string; layout: CleanArea['layout']; look?: CleanArea['look'] }>(
+  areas: readonly T[],
+  now: number,
+  lastCleaned: (id: string) => number,
+  skip: (a: T) => boolean,
+): T | null {
+  const wash = oldestArea(areas, lastCleaned, (a) => skip(a) || !isWashroom(a) || now - lastCleaned(a.id) < WASHROOM_MS);
+  return wash ?? oldestArea(areas, lastCleaned, (a) => skip(a) || isWashroom(a) || now - lastCleaned(a.id) < AREA_MS);
+}
+
 /** Escala da equipe: quando cada área foi limpa e quem está com qual. */
 export interface Schedule {
   last: Map<string, number>;
@@ -153,7 +175,13 @@ export function lastCleanedOf(last: Map<string, number>, id: string, now: number
 
 // ------------------------------------------------------------------ estado de cada pessoa
 
-type Doing = 'rest' | 'going' | 'mop' | 'vacuum' | 'back';
+type Doing = 'rest' | 'going' | 'mop' | 'vacuum' | 'back' | 'scrub' | 'wipe' | 'taps' | 'restock';
+
+/** Uma tarefa dentro da área: trecho de piso, cabine, pia (e o espelho), torneira da ablução, reposição. */
+type Task =
+  | { k: 'mop'; x: number; y: number }
+  | { k: 'stall' | 'sink' | 'tap'; spot: string; tries: number }
+  | { k: 'restock' };
 
 /** Carrinho: com a pessoa (empurrando) ou estacionado; `tx/ty/dir` = de onde se empurra para pegá-lo de volta. */
 interface Cart {
@@ -184,6 +212,12 @@ export interface CleanerState {
   rinse: boolean;
   /** Depuração: área pedida agora ('' = a próxima da escala). */
   forced: string | null;
+  /** Tarefas que faltam na área em andamento (null = ainda não começou). */
+  todo: Task[] | null;
+  /** Onde o carrinho fica estacionado na área (o tile de quem empurra). */
+  park: { x: number; y: number; dir: Dir } | null;
+  /** Já chegou à área com o carrinho. */
+  arrived: boolean;
 }
 
 /** Descanso entre as rondas (ms). */
@@ -366,6 +400,9 @@ function release(crew: StaffCrew, m: Cleaner): void {
   const s = m.state;
   if (s.area && schedule(crew).claims.get(s.area) === m.id) schedule(crew).claims.delete(s.area);
   s.area = null;
+  s.todo = null;
+  s.park = null;
+  s.arrived = false;
 }
 
 /** Vai até o carrinho estacionado e pega (empurrando a partir dali). */
@@ -384,70 +421,241 @@ function fetchCart(m: Cleaner, steps: Step[]): void {
   );
 }
 
-/** Planeja a limpeza de uma área: carrinho até a entrada, placa, trechos com mop/aspirador e de volta ao carrinho. */
-function planArea(crew: StaffCrew, m: Cleaner, a: CleanArea): boolean {
+/** Banheiros e alas de ablução: limpos com mais frequência e com a rotina própria (cabines, pias, espelhos, reposição). */
+export function isWashroom(a: Pick<CleanArea, 'layout' | 'look'>): boolean {
+  return a.layout.kind === 'restroom' || !!a.look;
+}
+
+/** Tarefas de uma área: trechos de piso; no banheiro, antes, cabines, pias e espelhos (ou torneiras) e a reposição. */
+function areaTasks(crew: StaffCrew, m: Cleaner, a: CleanArea, tiles: readonly { x: number; y: number }[]): Task[] {
+  const rng = m.ch.rng;
+  const tasks: Task[] = [];
+  if (isWashroom(a)) {
+    const mine = [...crew.sim.spots.all()].filter((sp) => sp.areaId === a.id);
+    for (const sp of mine) if (sp.kind === 'stall') tasks.push({ k: 'stall', spot: sp.id, tries: 0 });
+    for (const sp of mine) if (sp.kind === 'sink') tasks.push({ k: 'sink', spot: sp.id, tries: 0 });
+    // ablução: três torneiras espalhadas pela fileira
+    const taps = mine.filter((sp) => sp.kind === 'wudu');
+    for (const i of new Set([0, Math.floor(taps.length / 2), taps.length - 1])) if (taps[i]) tasks.push({ k: 'tap', spot: taps[i].id, tries: 0 });
+    if (tasks.some((t) => t.k === 'stall' || t.k === 'sink')) tasks.push({ k: 'restock' });
+  }
+  const k = isWashroom(a) ? Math.min(3, Math.max(2, Math.round(tiles.length / 30))) : Math.max(2, Math.min(5, Math.round(tiles.length / 28)));
+  for (const p of spreadPatches(tiles, k, rng)) tasks.push({ k: 'mop', x: p.x, y: p.y });
+  return tasks;
+}
+
+/** Placa de piso molhado na porta do banheiro (do lado de dentro, sem tapar a passagem); sem porta, ao lado do carrinho. */
+function doorSign(crew: StaffCrew, a: CleanArea): { x: number; y: number } | null {
+  const d = a.layout.door;
+  if (!d) return null;
+  const grid = crew.sim.building.grid;
+  const cx = d.x + d.w / 2 - 0.5;
+  const cy = d.y + d.h / 2 - 0.5;
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (let y = d.y - 2; y <= d.y + d.h + 1; y++) {
+    for (let x = d.x - 2; x <= d.x + d.w + 1; x++) {
+      if (!inRect(a.layout.rect, x, y) || grid.get(x, y) !== FREE) continue;
+      // fora da faixa da porta (quem entra não tropeça na placa)
+      if (x >= d.x && x < d.x + d.w) continue;
+      const dist = Math.abs(x - cx) + Math.abs(y - cy) * 1.5;
+      if (dist < bestD) {
+        bestD = dist;
+        best = { x, y };
+      }
+    }
+  }
+  return best ? { x: best.x * TILE + TILE / 2, y: best.y * TILE + 13 } : null;
+}
+
+/** Brilho de louça/espelho/metal (mais curto e pequeno que o do piso, some no mesmo ritmo). */
+function gleam(crew: StaffCrew, m: Cleaner, x: number, y: number, grow: number): void {
+  crew.shine.add({ x, y, rx: 5, ry: 4, at: crew.now, grow, seed: hash32(`${m.id}:${x}:${y}:${crew.now}`), carpet: false, gleam: true });
+}
+
+/** Espelho acima de uma pia (o item de parede mais perto na horizontal), em px: o centro do vidro. */
+function mirrorOver(a: CleanArea, x: number): { x: number; y: number } | null {
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (const w of a.layout.wallItems) {
+    if (w.kind !== 'mirror') continue;
+    const d = Math.abs(w.cx - x);
+    if (d < bestD && d < TILE) {
+      bestD = d;
+      best = { x: w.cx, y: w.baseY - 17 };
+    }
+  }
+  return best;
+}
+
+/**
+ * Começa (ou recomeça) uma área: escolhe as tarefas e onde estacionar. O resto é planejado uma tarefa por vez
+ * (planNext), com a situação da hora: assim a privacidade das cabines e de quem usa a pia vale no momento certo, e uma
+ * interrupção (chamado à oração, sala que mudou) retoma de onde parou.
+ */
+function startArea(crew: StaffCrew, m: Cleaner, a: CleanArea): boolean {
   const ch = m.ch;
   const s = m.state;
-  const rng = ch.rng;
   const tiles = cleanTiles(crew, m, a);
-  const k = Math.max(2, Math.min(5, Math.round(tiles.length / 28)));
-  const patches = spreadPatches(tiles, k, rng);
   const from = s.cart.withMe ? { x: ch.tx, y: ch.ty } : { x: s.cart.tx, y: s.cart.ty };
-  const park = patches.length ? parkingTile(crew, tiles, from, a) : null;
-  if (!park) {
+  const park = tiles.length ? parkingTile(crew, tiles, from, a) : null;
+  const todo = park ? areaTasks(crew, m, a, tiles) : [];
+  if (!park || !todo.length) {
     // nada a fazer aqui agora (área lotada): conta como limpa e segue a escala
     finishArea(crew, m);
     return false;
   }
   s.areaName = a.name;
+  s.todo = todo;
+  s.park = park;
+  s.arrived = false;
+  return planNext(crew, m, a);
+}
+
+/** Próximo pedaço do trabalho na área: chegar com o carrinho, a próxima tarefa ou voltar ao carrinho. */
+function planNext(crew: StaffCrew, m: Cleaner, a: CleanArea): boolean {
+  const ch = m.ch;
+  const s = m.state;
+  const sim = crew.sim;
+  const park = s.park!;
   const steps: Step[] = [];
   if (ch.atSpot) steps.push({ t: 'exit' });
-  steps.push({ t: 'do', fn: () => (s.doing = 'going') });
-  fetchCart(m, steps);
-  const hard = patches.some((p) => !carpetAt(a.layout, p.x, p.y));
-  steps.push(
-    { t: 'go', tx: park.x, ty: park.y, dir: park.dir, walkPose: 'push' },
-    {
-      t: 'do',
-      fn: () => {
-        const p = cartAt(ch.x, ch.y, park.dir);
-        Object.assign(s.cart, { withMe: false, home: false, x: p.x, y: p.y, tx: park.x, ty: park.y, dir: park.dir });
-        if (hard) s.sign = signSpot(crew, park, a);
-      },
-    },
-  );
-  let tool: HeldItem = 'mop';
-  for (const p of patches) {
-    const carpet = carpetAt(a.layout, p.x, p.y);
-    tool = carpet ? 'vacuum' : 'mop';
-    const dir: Dir = (['left', 'right', 'down', 'down'] as const)[Math.floor(rng() * 4) % 4];
-    const ms = Math.round(carpet ? between(rng, 5000, 7000) : between(rng, 6500, 9500));
-    const pose = carpet ? 'vacuum' : 'mop';
+  if (!s.arrived) {
+    steps.push({ t: 'do', fn: () => (s.doing = 'going') });
+    fetchCart(m, steps);
+    const hard = isWashroom(a) || s.todo!.some((t) => t.k === 'mop' && !carpetAt(a.layout, t.x, t.y));
     steps.push(
-      { t: 'go', tx: p.x, ty: p.y, held: tool },
+      { t: 'go', tx: park.x, ty: park.y, dir: park.dir, walkPose: 'push' },
       {
         t: 'do',
         fn: () => {
-          s.doing = pose;
-          ch.dir = dir;
-          const c = patchCenter(ch.x, ch.y, dir);
-          crew.shine.add({ x: c.x, y: c.y, rx: 22, ry: 11, at: crew.now, grow: ms, seed: hash32(`${m.id}:${crew.now}`), carpet });
-          // o balde fica no chão do outro lado (de quem passa o mop)
-          if (!carpet) s.bucket = dir === 'left' ? { x: ch.x + 11, y: ch.y + 1 } : dir === 'right' ? { x: ch.x - 11, y: ch.y + 1 } : { x: ch.x + 12, y: ch.y - 1 };
+          const p = cartAt(ch.x, ch.y, park.dir);
+          Object.assign(s.cart, { withMe: false, home: false, x: p.x, y: p.y, tx: park.x, ty: park.y, dir: park.dir });
+          if (hard) s.sign = (isWashroom(a) ? doorSign(crew, a) : null) ?? signSpot(crew, park, a);
+          s.arrived = true;
         },
       },
-      { t: 'act', pose, ms, dir },
-      { t: 'do', fn: () => (s.bucket = null) },
     );
+    ch.queue.push(...steps);
+    return true;
   }
+  const todo = s.todo!;
+  const done = () => steps.push({ t: 'do', fn: () => todo.shift() });
+  // a primeira tarefa que dá para fazer agora; cabine ocupada ou pia em uso vão para o fim (três tentativas e desiste)
+  for (let n = todo.length; n > 0 && todo.length; n--) {
+    const t = todo[0];
+    if (t.k === 'mop') {
+      if (sim.building.grid.get(t.x, t.y) !== FREE || sim.busyTiles(m.id).has(sim.building.grid.key(t.x, t.y))) {
+        todo.shift();
+        continue;
+      }
+      const carpet = carpetAt(a.layout, t.x, t.y);
+      const tool: HeldItem = carpet ? 'vacuum' : 'mop';
+      const rng = ch.rng;
+      const dir: Dir = (['left', 'right', 'down', 'down'] as const)[Math.floor(rng() * 4) % 4];
+      const ms = Math.round(carpet ? between(rng, 5000, 7000) : between(rng, 6500, 9500));
+      const pose = carpet ? 'vacuum' : 'mop';
+      steps.push(
+        { t: 'go', tx: t.x, ty: t.y, held: tool },
+        {
+          t: 'do',
+          fn: () => {
+            s.doing = pose;
+            ch.dir = dir;
+            const c = patchCenter(ch.x, ch.y, dir);
+            crew.shine.add({ x: c.x, y: c.y, rx: 22, ry: 11, at: crew.now, grow: ms, seed: hash32(`${m.id}:${crew.now}`), carpet });
+            // o balde fica no chão do outro lado (de quem passa o mop)
+            if (!carpet) s.bucket = dir === 'left' ? { x: ch.x + 11, y: ch.y + 1 } : dir === 'right' ? { x: ch.x - 11, y: ch.y + 1 } : { x: ch.x + 12, y: ch.y - 1 };
+          },
+        },
+        { t: 'act', pose, ms, dir },
+        { t: 'do', fn: () => (s.bucket = null) },
+      );
+      done();
+      ch.queue.push(...steps);
+      return true;
+    }
+    if (t.k === 'restock') {
+      // pega rolos de papel e refil de sabonete no carrinho e repõe nas pias
+      const c = s.cart;
+      const sink = [...sim.spots.all()].find((sp) => sp.areaId === a.id && (sp.kind === 'sink' || sp.kind === 'stall') && sim.spots.isFree(sp.id, m.id));
+      steps.push({ t: 'do', fn: () => (s.doing = 'restock') }, { t: 'go', tx: c.tx, ty: c.ty, dir: c.dir }, { t: 'act', pose: 'use', ms: 1300, dir: c.dir });
+      if (sink) steps.push({ t: 'go', tx: sink.tx, ty: sink.ty, dir: 'up', held: 'box' }, { t: 'act', pose: 'use', ms: 1500, dir: 'up' });
+      done();
+      ch.queue.push(...steps);
+      return true;
+    }
+    const sp = sim.spots.get(t.spot);
+    if (!sp) {
+      todo.shift();
+      continue;
+    }
+    // privacidade: cabine ocupada (ou reservada por quem vai entrar), pia ou banquinho em uso
+    const owner = sim.spots.ownerOf(sp.id);
+    const busy = (owner !== undefined && owner !== m.id) || (t.k === 'stall' && sim.stallBusy.has(sp.furnitureId ?? sp.id)) || sim.busyTiles(m.id).has(sim.building.grid.key(sp.tx, sp.ty));
+    if (busy || !sim.reserveTemp(ch, sp)) {
+      todo.shift();
+      if (++t.tries < 3) todo.push(t);
+      continue;
+    }
+    const release = () => steps.push({ t: 'do', fn: () => sim.spots.release(sp.id, m.id) });
+    if (t.k === 'stall') {
+      // na porta da cabine, de frente para o vaso, com a escova
+      const ms = Math.round(between(ch.rng, 4200, 5600));
+      steps.push(
+        { t: 'go', tx: sp.tx, ty: sp.ty, dir: 'up' },
+        { t: 'go', tx: sp.tx, ty: sp.ty, fx: sp.x, fy: sp.y + 5, dir: 'up' },
+        { t: 'do', fn: () => ((s.doing = 'scrub'), gleam(crew, m, sp.x, sp.y - 19, ms)) },
+        { t: 'act', pose: 'scrub', ms, dir: 'up' },
+        { t: 'go', tx: sp.tx, ty: sp.ty },
+      );
+    } else if (t.k === 'sink') {
+      // pano na pia e no espelho (o espelho dá um brilho rápido ao fim, o "rangido")
+      const ms = Math.round(between(ch.rng, 2600, 3400));
+      const mirror = mirrorOver(a, sp.x);
+      steps.push(
+        { t: 'go', tx: sp.tx, ty: sp.ty, fx: sp.x, fy: sp.y, dir: sp.dir },
+        {
+          t: 'do',
+          fn: () => {
+            s.doing = 'wipe';
+            gleam(crew, m, sp.x, sp.y - 15, ms * 0.5);
+            if (mirror) gleam(crew, m, mirror.x, mirror.y, ms);
+          },
+        },
+        { t: 'act', pose: 'wipe', ms, dir: sp.dir },
+      );
+    } else {
+      // torneira da ablução: em pé ao lado do banquinho, pano na torneira
+      const ms = Math.round(between(ch.rng, 2200, 2800));
+      steps.push(
+        { t: 'go', tx: sp.tx, ty: sp.ty, dir: sp.dir },
+        { t: 'do', fn: () => ((s.doing = 'taps'), gleam(crew, m, sp.x - 13, sp.y - 9, ms)) },
+        { t: 'act', pose: 'wipe', ms, dir: sp.dir },
+      );
+    }
+    release();
+    done();
+    ch.queue.push(...steps);
+    return true;
+  }
+  if (todo.length) {
+    // só sobrou o que está ocupado: espera um pouco ali perto (sem entrar)
+    steps.push({ t: 'until', cond: () => false, minMs: 2500, maxMs: 2500, pose: 'stand' });
+    ch.queue.push(...steps);
+    return true;
+  }
+  // tudo feito: volta ao carrinho e pega (a placa sai junto)
   steps.push(
     { t: 'do', fn: () => (s.doing = 'back') },
-    { t: 'go', tx: park.x, ty: park.y, dir: park.dir, held: tool },
+    { t: 'go', tx: park.x, ty: park.y, dir: park.dir },
     {
       t: 'do',
       fn: () => {
         s.cart.withMe = true;
         s.sign = null;
+        s.todo = null;
+        s.park = null;
         finishArea(crew, m);
       },
     },
@@ -528,6 +736,9 @@ export const CLEANER: StaffRoleDef<CleanerState> = {
     doing: 'rest',
     rinse: false,
     forced: null,
+    todo: null,
+    park: null,
+    arrived: false,
   }),
 
   think(m, crew, now) {
@@ -542,7 +753,12 @@ export const CLEANER: StaffRoleDef<CleanerState> = {
     // área em andamento (interrompida por um chamado à oração, uma sala que mudou de lugar...): continua
     if (s.area) {
       const a = findArea(crew, s.area);
-      if (a && canClean(crew, m, a)) return planArea(crew, m, a);
+      if (a && canClean(crew, m, a)) {
+        const park = s.park;
+        // retoma as tarefas que faltam (se a vaga do carrinho ainda existe); senão recomeça a área
+        if (s.todo && park && crew.sim.building.grid.get(park.x, park.y) === FREE) return planNext(crew, m, a);
+        return startArea(crew, m, a);
+      }
       release(crew, m);
     }
     const forced = s.forced;
@@ -552,8 +768,9 @@ export const CLEANER: StaffRoleDef<CleanerState> = {
       const want = forced ? areas.find((a) => a.id === forced || a.name.toLowerCase() === forced.toLowerCase()) : undefined;
       const pick =
         want ??
-        oldestArea(
+        nextArea(
           areas,
+          now,
           (id) => lastCleanedOf(sched.last, id, now),
           (a) => (!!sched.claims.get(a.id) && sched.claims.get(a.id) !== m.id) || !canClean(crew, m, a),
         );
@@ -561,7 +778,7 @@ export const CLEANER: StaffRoleDef<CleanerState> = {
         if (s.roundLeft <= 0) s.roundLeft = ch.rng() < 0.5 ? 2 : 1;
         sched.claims.set(pick.id, m.id);
         s.area = pick.id;
-        if (planArea(crew, m, pick)) return true;
+        if (startArea(crew, m, pick)) return true;
       } else {
         s.roundLeft = 0;
         s.nextRoundAt = now + between(ch.rng, REST_MS[0], REST_MS[1]) * 0.5;
@@ -598,6 +815,14 @@ export const CLEANER: StaffRoleDef<CleanerState> = {
         return tr('Passando o mop: {0}', [s.areaName]);
       case 'vacuum':
         return tr('Aspirando: {0}', [s.areaName]);
+      case 'scrub':
+        return tr('Limpando as cabines: {0}', [s.areaName]);
+      case 'wipe':
+        return tr('Limpando pias e espelhos: {0}', [s.areaName]);
+      case 'taps':
+        return tr('Limpando as torneiras: {0}', [s.areaName]);
+      case 'restock':
+        return tr('Repondo papel e sabonete: {0}', [s.areaName]);
       case 'back':
         return s.area ? tr('Limpando: {0}', [s.areaName]) : tr('Guardando o carrinho');
       default:

@@ -10,7 +10,7 @@
 import { COL_W, CORRIDOR_H, CORRIDOR_Y, NORTH_Y, ROOM_H, SOUTH_Y, TILE } from '../constants';
 import { AreaBuilder, SEATED_SORT_BIAS } from './builder';
 import { CAFE_ID, CORE_WALLS, LOUNGE_ID, RECEPTION_ID, RESTROOM_ID } from './core';
-import { COMMONS_JANITOR_CORNER, janitorCorner } from './staff';
+import { COMMONS_JANITOR_CORNER, COMMONS_RECEPTION_DESK, janitorCorner, receptionDesk } from './staff';
 import type { AreaLayout } from './types';
 
 /** Colunas do Commons. */
@@ -69,6 +69,7 @@ export function layoutCommonsReception(): AreaLayout {
   b.spot('talk', 8, 6, 'left', { group: 'talk:recepcao', dx: 1 });
   b.spot('talk', 7, 9, 'right', { group: 'talk:recepcao:2', dx: -1 });
   b.spot('talk', 8, 9, 'left', { group: 'talk:recepcao:2', dx: 1 });
+  receptionDesk(b, COMMONS_RECEPTION_DESK);
   return b.build();
 }
 

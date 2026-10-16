@@ -168,6 +168,7 @@ export class StaffRenderer {
     if (!list.length) return;
     ctx.save();
     for (const p of list) {
+      if (p.gleam) continue;
       const level = shineLevel(p, now);
       const x = Math.round(p.x - p.rx);
       const y = Math.round(p.y - p.ry);
@@ -182,7 +183,7 @@ export class StaffRenderer {
     }
     if (!still) {
       for (const p of list) {
-        if (p.carpet) continue;
+        if (p.carpet || p.gleam) continue;
         const level = shineLevel(p, now);
         let g = glintCache.get(p);
         if (!g) glintCache.set(p, (g = glints(p)));
@@ -198,6 +199,37 @@ export class StaffRenderer {
     ctx.restore();
   }
 
+  /**
+   * Brilho do que foi limpo à mão (vaso, pia, espelho, torneira), por cima dos móveis: um reflexo diagonal e uma
+   * estrelinha que somem no ritmo do piso. Logo depois do pano, o reflexo atravessa a peça (o "rangido" do espelho).
+   */
+  drawGleams(ctx: CanvasRenderingContext2D, sim: Sim, now: number, view: ShineView, still: boolean): void {
+    const list = sim.staff.shine.visible(view, now, this.vis);
+    if (!list.length) return;
+    ctx.save();
+    for (const p of list) {
+      if (!p.gleam) continue;
+      const level = shineLevel(p, now);
+      const after = now - p.at - p.grow;
+      // varredura rápida logo depois do pano (sem movimento: o reflexo fica parado no meio)
+      const sweep = !still && after >= 0 && after < 900 ? after / 900 : -1;
+      const ox = sweep >= 0 ? Math.round((sweep - 0.5) * p.rx * 2.4) : 0;
+      const x = Math.round(p.x) + ox;
+      const y = Math.round(p.y);
+      ctx.globalAlpha = Math.min(1, level * (sweep >= 0 ? 1 : 0.85));
+      ctx.fillStyle = '#ffffff';
+      for (let k = -2; k <= 2; k++) ctx.fillRect(x + k, y - k, 1, 1);
+      ctx.globalAlpha = Math.min(1, level * 0.5);
+      ctx.fillStyle = '#9fd8f2';
+      for (let k = -1; k <= 1; k++) ctx.fillRect(x + k + 1, y - k, 1, 1);
+      // estrelinha no canto (pisca devagar; sem movimento, fica acesa)
+      const tw = still ? 0.8 : 0.45 + 0.55 * Math.pow(Math.sin(now / 520 + (p.seed % 7)), 2);
+      const big = sweep >= 0 ? 1 : tw;
+      if (level * big > 0.08) star(ctx, Math.round(p.x) + 3, Math.round(p.y) - 3, Math.min(1, level * big));
+    }
+    ctx.restore();
+  }
+
   /** À noite, por cima da escuridão: o reflexo quente das luzes no piso limpo (sutil). */
   drawNight(ctx: CanvasRenderingContext2D, sim: Sim, now: number, view: ShineView, night: number): void {
     if (night < 0.05) return;
@@ -207,7 +239,7 @@ export class StaffRenderer {
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = '#ffe2a6';
     for (const p of list) {
-      if (p.carpet) continue;
+      if (p.carpet || p.gleam) continue;
       const a = shineLevel(p, now) * night;
       if (a < 0.02) continue;
       // faixa vertical (a luminária refletida) e um ponto mais forte no meio

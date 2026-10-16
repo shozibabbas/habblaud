@@ -13,7 +13,7 @@ const digest = (d: Uint8ClampedArray) => {
   return h;
 };
 /** Pixels das cores das ferramentas (pegador, cabo, franjas do mop, corpo do aspirador): só elas usam. */
-const TOOL_RGB = [0xe0623c, 0xc3c9d2, 0xece6d6, 0xd94f3a];
+const TOOL_RGB = [0xe0623c, 0xc3c9d2, 0xece6d6, 0xd94f3a, 0x58c4c4, 0xf4f6f8];
 const grips = (d: Uint8ClampedArray) => {
   let n = 0;
   for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0 && TOOL_RGB.includes((d[i] << 16) | (d[i + 1] << 8) | d[i + 2])) n++;
@@ -23,8 +23,8 @@ const grips = (d: Uint8ClampedArray) => {
 describe('poses da limpeza', () => {
   const cast = [cleanerUniform(appearanceFromSeed(3, { look: 'f' }), undefined), cleanerUniform(appearanceFromSeed(9, { look: 'm', profile: 'pk' }), 'pk'), cleanerUniform(appearanceFromSeed(5, { look: 'f', profile: 'pk' }), 'pk')];
 
-  it('mop, aspirador e carrinho: 4 quadros, folha padrão, quadros diferentes (vaivém)', () => {
-    for (const pose of ['mop', 'vacuum', 'push'] as Pose[]) {
+  it('mop, aspirador, carrinho, escova e pano: 4 quadros, folha padrão, quadros diferentes (vaivém)', () => {
+    for (const pose of ['mop', 'vacuum', 'push', 'scrub', 'wipe'] as Pose[]) {
       expect(POSE_FRAMES[pose]).toBe(4);
       expect(POSE_DURATION[pose]).toBeGreaterThan(100);
       for (const a of cast) {

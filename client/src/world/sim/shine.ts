@@ -17,6 +17,8 @@ export interface ShinePatch {
   seed: number;
   /** Carpete (aspirador): listras em vez de verniz molhado. */
   carpet: boolean;
+  /** Brilho de louça, espelho ou metal (vaso, pia, torneira): pequeno, desenhado por cima dos móveis. */
+  gleam?: boolean;
 }
 
 /** Quanto tempo o brilho leva para sumir depois da limpeza. */

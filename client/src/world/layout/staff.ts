@@ -9,6 +9,10 @@ import type { AreaBuilder } from './builder';
 export const STAFF_REST = 'staff:descanso';
 export const STAFF_SINK = 'staff:tanque';
 export const STAFF_CART = 'staff:carrinho';
+/** Recepção: a cadeira atrás do balcão, onde quem assume espera a troca, e o arquivo (quem está de folga fica ali). */
+export const STAFF_DESK = 'staff:recepcao';
+export const STAFF_DESK_SWAP = 'staff:recepcao:troca';
+export const STAFF_DESK_BACK = 'staff:recepcao:arquivo';
 
 type At = readonly [lx: number, ly: number];
 type AtDir = readonly [lx: number, ly: number, dir: Dir];
@@ -75,3 +79,26 @@ export const COMMONS_JANITOR_CORNER: JanitorCornerSpec = {
     [7, 10, 7, 9],
   ],
 };
+
+export interface ReceptionDeskSpec {
+  /** Cadeira atrás do balcão (virada para quem chega). */
+  chair: At;
+  /** Ao lado da cadeira: quem vai assumir espera ali até a outra pessoa levantar. */
+  swap: AtDir;
+  /** Diante do arquivo, atrás do balcão: quem está de folga organiza a papelada ali. */
+  back: AtDir;
+}
+
+/** Cadeira e pontos da equipe da recepção atrás do balcão. Chamado no FIM do layout da recepção. */
+export function receptionDesk(b: AreaBuilder, spec: ReceptionDeskSpec): void {
+  b.seat('staff', 'office_chair_front', spec.chair[0], spec.chair[1], 'down', 'black', { group: STAFF_DESK, order: 0.43 });
+  // um pouco para fora: quem espera não cobre quem está sentado
+  b.spot('staff', spec.swap[0], spec.swap[1], spec.swap[2], { group: STAFF_DESK_SWAP, dx: 5 });
+  b.spot('staff', spec.back[0], spec.back[1], spec.back[2], { group: STAFF_DESK_BACK });
+}
+
+/** Recepção do prédio único: balcão em (9..11, 5), arquivo em (8, 5). */
+export const CORE_RECEPTION_DESK: ReceptionDeskSpec = { chair: [10, 4], swap: [11, 4, 'left'], back: [8, 4, 'down'] };
+
+/** Recepção do Commons: balcão em (6..8, 4), arquivos em (5, 4) e (10, 4). */
+export const COMMONS_RECEPTION_DESK: ReceptionDeskSpec = { chair: [7, 3], swap: [8, 3, 'left'], back: [5, 3, 'down'] };

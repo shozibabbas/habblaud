@@ -2,7 +2,7 @@
 import type { WallStyle } from '../../art/api';
 import { COL_W, NORTH_Y, ROOM_H, SOUTH_Y, TILE } from '../constants';
 import { AreaBuilder, SEATED_SORT_BIAS } from './builder';
-import { CORE_JANITOR_CORNER, janitorCorner } from './staff';
+import { CORE_JANITOR_CORNER, CORE_RECEPTION_DESK, janitorCorner, receptionDesk } from './staff';
 import type { AreaLayout } from './types';
 
 export const RECEPTION_ID = 'core:recepcao';
@@ -66,6 +66,7 @@ export function layoutReception(): AreaLayout {
   b.walk(1, 2, 14, 10);
   b.spot('talk', 6, 9, 'right', { group: 'talk:recepcao', dx: -1 });
   b.spot('talk', 7, 9, 'left', { group: 'talk:recepcao', dx: 1 });
+  receptionDesk(b, CORE_RECEPTION_DESK);
 
   const a = b.build();
   a.shade = undefined;
