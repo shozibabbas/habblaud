@@ -362,8 +362,10 @@ describe('federation: presença de quem olha', () => {
   it('o escritório combinado informa a contagem a cada par conectado: na hora quando muda, senão a cada 10 s', async () => {
     const snap: OfficeSnapshot = { rev: 1, serverTime: 0, rooms: [], agents: [], accounts: [], meta: { demo: false, sources: [], startedAt: 0, version: 't' } };
     const peer = await fakePeer();
+    let streamUrl = '';
     peer.on((req, res) => {
-      if (req.url === '/api/stream') {
+      if (req.url?.startsWith('/api/stream')) {
+        streamUrl = req.url;
         res.writeHead(200, { 'Content-Type': 'text/event-stream' });
         res.write(`event: snapshot\ndata: ${JSON.stringify(snap)}\n\n`);
       } else sendJson(res, 200, { ok: true });
@@ -376,6 +378,8 @@ describe('federation: presença de quem olha', () => {
     // Antes de conectar: nada.
     fed.sendPresence();
     await until(() => fed.merge(snap, true).snapshot.meta.machines?.[1].online === true);
+    // só o escritório do par, sem os pares dele
+    expect(streamUrl).toBe('/api/stream?scope=local');
     fed.sendPresence();
     await until(() => posts().length === 1);
     expect(posts()[0]).toMatchObject({ method: 'POST', host: 'localhost', type: 'application/json' });

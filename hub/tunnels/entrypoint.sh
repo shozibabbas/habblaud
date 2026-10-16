@@ -2,10 +2,14 @@
 # One supervised autossh per line of $TUNNELS_CONF:
 #
 #   <localPort> <user>@<host>[:<sshPort>] [remotePort=4747]
+#   R <remotePort> <user>@<host>[:<sshPort>] <targetHost>:<targetPort>
 #
-# Each line becomes `-L 0.0.0.0:<localPort>:127.0.0.1:<remotePort>`: the office is reached on the remote machine's
+# A plain line becomes `-L 0.0.0.0:<localPort>:127.0.0.1:<remotePort>`: the office is reached on the remote machine's
 # own loopback, so Habblaud there still sees a local client. 0.0.0.0 is inside the container only; compose publishes
 # the ports on the host's 127.0.0.1.
+# An `R` line is a reverse tunnel: `-R 127.0.0.1:<remotePort>:<targetHost>:<targetPort>` makes an office on this side
+# (e.g. host.docker.internal:4747, the machine Docker runs on) reachable on the remote machine's loopback, so an
+# always-on server can follow it while this machine is up. The remote key needs `permitlisten="127.0.0.1:<port>"`.
 set -u
 set -f # no globbing when splitting config lines
 
@@ -45,11 +49,18 @@ valid_port() {
 }
 
 run_tunnel() {
-  name=$1 lport=$2 user=$3 host=$4 sshport=$5 rport=$6
+  name=$1 lport=$2 user=$3 host=$4 sshport=$5 rport=$6 mode=${7:-L}
+  if [ "$mode" = R ]; then
+    fwd="-R 127.0.0.1:$lport:$rport"
+    desc="$user@$host:$sshport 127.0.0.1:$lport -> $rport (reverse)"
+  else
+    fwd="-L 0.0.0.0:$lport:127.0.0.1:$rport"
+    desc="localhost:$lport -> $user@$host:$sshport -> 127.0.0.1:$rport"
+  fi
   delay=2
   while :; do
     started=$(date +%s)
-    log "[$name] connecting: localhost:$lport -> $user@$host:$sshport -> 127.0.0.1:$rport"
+    log "[$name] connecting: $desc"
     # AUTOSSH_GATETIME (default 30 s): if ssh fails that fast, autossh gives up and this loop backs off.
     # After a connection lived longer, autossh itself restarts ssh when it drops.
     AUTOSSH_LOGFILE=/dev/stderr AUTOSSH_LOGLEVEL=5 \
@@ -74,7 +85,7 @@ run_tunnel() {
       -o ForwardX11=no \
       -o PermitLocalCommand=no \
       -o LogLevel=ERROR \
-      -L "0.0.0.0:$lport:127.0.0.1:$rport" \
+      $fwd \
       "$host" 2>&1 | prefix "$name"
     lived=$(($(date +%s) - started))
     [ "$lived" -ge 60 ] && delay=2
@@ -97,14 +108,25 @@ while IFS= read -r raw || [ -n "$raw" ]; do
   # shellcheck disable=SC2086
   set -- $line
   [ $# -eq 0 ] && continue
-  if [ $# -lt 2 ] || [ $# -gt 3 ]; then
-    die "$CONF line $lineno: expected '<localPort> <user>@<host>[:<sshPort>] [remotePort]', got: $raw"
+  mode=L
+  if [ "$1" = R ]; then
+    [ $# -eq 4 ] || die "$CONF line $lineno: expected 'R <remotePort> <user>@<host>[:<sshPort>] <targetHost>:<targetPort>', got: $raw"
+    mode=R lport=$2 target=$3 rport=$4
+    valid_port "$lport" || die "$CONF line $lineno: bad remote port '$lport'."
+    thost=${rport%:*} tport=${rport##*:}
+    [ "$thost" != "$rport" ] || die "$CONF line $lineno: target '$rport' needs the form host:port."
+    printf '%s' "$thost" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9.-]*$' || die "$CONF line $lineno: bad target host '$thost'."
+    valid_port "$tport" || die "$CONF line $lineno: bad target port '$tport'."
+  else
+    if [ $# -lt 2 ] || [ $# -gt 3 ]; then
+      die "$CONF line $lineno: expected '<localPort> <user>@<host>[:<sshPort>] [remotePort]', got: $raw"
+    fi
+    lport=$1 target=$2 rport=${3:-4747}
+    valid_port "$lport" || die "$CONF line $lineno: bad local port '$lport'."
+    valid_port "$rport" || die "$CONF line $lineno: bad remote port '$rport'."
+    case $ports in *" $lport "*) die "$CONF line $lineno: local port $lport is used twice." ;; esac
+    ports="$ports$lport "
   fi
-  lport=$1 target=$2 rport=${3:-4747}
-  valid_port "$lport" || die "$CONF line $lineno: bad local port '$lport'."
-  valid_port "$rport" || die "$CONF line $lineno: bad remote port '$rport'."
-  case $ports in *" $lport "*) die "$CONF line $lineno: local port $lport is used twice." ;; esac
-  ports="$ports$lport "
 
   # user@host[:sshPort]; nothing option-looking or exotic reaches ssh.
   user=${target%%@*}
@@ -117,12 +139,12 @@ while IFS= read -r raw || [ -n "$raw" ]; do
   printf '%s' "$user" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9._-]*$' || die "$CONF line $lineno: bad user name '$user'."
   printf '%s' "$host" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9.-]*$' || die "$CONF line $lineno: bad host '$host'."
   valid_port "$sshport" || die "$CONF line $lineno: bad SSH port '$sshport'."
-  if [ "$lport" -lt 4801 ] || [ "$lport" -gt 4810 ]; then
+  if [ "$mode" = L ] && { [ "$lport" -lt 4801 ] || [ "$lport" -gt 4810 ]; }; then
     log "WARNING: line $lineno: local port $lport is outside 4801-4810, which compose.yml publishes."
   fi
 
   count=$((count + 1))
-  specs="$specs$lport $user $host $sshport $rport
+  specs="$specs$lport $user $host $sshport $rport $mode
 "
 done <"$CONF"
 
@@ -134,8 +156,8 @@ if [ "$count" -eq 0 ]; then
 fi
 
 # A here-document, not a pipe: the supervisors must be children of this shell so `wait` keeps it alive.
-while read -r lport user host sshport rport; do
-  [ -n "$lport" ] && run_tunnel "$lport>$host" "$lport" "$user" "$host" "$sshport" "$rport" &
+while read -r lport user host sshport rport mode; do
+  [ -n "$lport" ] && run_tunnel "$mode$lport>$host" "$lport" "$user" "$host" "$sshport" "$rport" "$mode" &
 done <<EOF_SPECS
 $specs
 EOF_SPECS

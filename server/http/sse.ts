@@ -13,6 +13,13 @@ const MAX_BUFFERED = 8 * 1024 * 1024;
 
 export class Hub {
   private clients = new Set<ServerResponse>();
+  /**
+   * Clientes que pediram só o escritório local (`?scope=local`): outro escritório combinado seguindo este. Recebem o
+   * snapshot do Office sem os pares deste — senão um par apareceria duas vezes (e dois hubs se seguiriam em laço).
+   */
+  private localScope = new WeakSet<ServerResponse>();
+  /** Último snapshot só do Office (sem a federação). */
+  private lastLocal: OfficeSnapshot | null = null;
   /** Clientes que abriram a página por um Host local (os únicos que podem responder pedidos de permissão). */
   private local = new WeakSet<ServerResponse>();
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -41,7 +48,7 @@ export class Hub {
   start(): void {
     this.unsubscribe = this.office.onChange(() => this.schedule());
     this.unsubscribeFederation = this.federation?.onChange(() => this.schedule()) ?? null;
-    this.pinger = setInterval(() => this.writeAll(': ping\n\n'), this.pingMs);
+    this.pinger = setInterval(() => this.writeAll(PING), this.pingMs);
     this.pinger.unref?.();
   }
 
@@ -79,7 +86,7 @@ export class Hub {
   }
 
   /** Conecta um cliente: snapshot completo + últimos 50 itens do feed, depois o fluxo ao vivo. */
-  attach(req: IncomingMessage, res: ServerResponse): void {
+  attach(req: IncomingMessage, res: ServerResponse, opts: { localScope?: boolean } = {}): void {
     req.socket.setTimeout(0);
     req.socket.setNoDelay(true);
     res.writeHead(200, {
@@ -88,11 +95,13 @@ export class Hub {
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
-    const snapshot = this.current();
+    const local = !!opts.localScope && !!this.federation;
+    const snapshot = local ? this.currentLocal() : this.current();
     res.write('retry: 2000\n\n');
     res.write(frame('snapshot', snapshot));
-    res.write(frame('feed', this.federation ? this.federation.recentFeed(this.office.recentFeed(50), 50) : this.office.recentFeed(50)));
+    res.write(frame('feed', this.federation && !local ? this.federation.recentFeed(this.office.recentFeed(50), 50) : this.office.recentFeed(50)));
     this.clients.add(res);
+    if (local) this.localScope.add(res);
     if (this.canAnswer(req) && !req.headers[FEDERATION_HEADER]) this.local.add(res);
     const drop = () => this.clients.delete(res);
     req.on('close', drop);
@@ -105,7 +114,15 @@ export class Hub {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.lastFlush = Date.now();
-    const r = this.combine(this.office.commit());
+    const raw = this.office.commit();
+    this.lastLocal = raw.snapshot;
+    const r = this.combine(raw);
+    if (this.federation) {
+      // quem segue só o local recebe o Office puro
+      if (raw.changed) this.writeAll(frame('snapshot', raw.snapshot), true);
+      if (raw.feed.length) this.writeAll(frame('feed', raw.feed), true);
+      for (const n of raw.notices) this.writeAll(frame('notice', n), true);
+    }
     if (r.changed) {
       this.writeAll(frame('snapshot', r.snapshot));
       for (const cb of this.snapshotCbs) {
@@ -134,6 +151,12 @@ export class Hub {
     return { ...this.flush(), serverTime: Date.now() };
   }
 
+  /** Snapshot só do escritório local (sem os pares), para outro escritório combinado (`?scope=local`). */
+  currentLocal(): OfficeSnapshot {
+    const merged = this.flush();
+    return { ...(this.lastLocal ?? merged), serverTime: Date.now() };
+  }
+
   private schedule(): void {
     if (this.timer) return;
     const wait = Math.max(0, this.lastFlush + this.throttleMs - Date.now());
@@ -144,8 +167,10 @@ export class Hub {
     this.timer.unref?.();
   }
 
-  private writeAll(chunk: string): void {
+  /** Escreve para os clientes do escopo pedido: `localScope` true = só os que seguem o local; false = os demais. */
+  private writeAll(chunk: string, localScope = false): void {
     for (const c of this.clients) {
+      if (this.localScope.has(c) !== localScope && chunk !== PING) continue;
       if (c.destroyed || c.writableEnded) {
         this.clients.delete(c);
         continue;
@@ -159,6 +184,8 @@ export class Hub {
     }
   }
 }
+
+const PING = ': ping\n\n';
 
 export function frame(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;

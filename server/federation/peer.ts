@@ -92,7 +92,9 @@ export class PeerClient {
 
   private connect(): void {
     if (this.stopped) return;
-    const url = new URL('/api/stream', this.config.url);
+    // só o escritório do par, sem os pares dele (um par que também é escritório combinado não se repete aqui, e dois
+    // escritórios combinados podem seguir um ao outro sem laço)
+    const url = new URL('/api/stream?scope=local', this.config.url);
     let req: ClientRequest;
     try {
       req = this.request(url, { method: 'GET', headers: peerHeaders({ Accept: 'text/event-stream' }) }, (res) => this.onResponse(req, res));

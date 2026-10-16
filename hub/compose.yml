@@ -37,6 +37,9 @@ services:
     container_name: habblaud-hub-tunnels
     restart: unless-stopped
     init: true
+    # reverse tunnels (`R` lines) reach the local office through host.docker.internal (also on Linux)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       # One port per remote office (see tunnels.conf). Loopback only: never publish these on another interface.
       - "127.0.0.1:4801-4810:4801-4810"

@@ -366,12 +366,12 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
     }
     if (path === '/api/stream') {
       if (method !== 'GET') methodNotAllowed(res, 'GET');
-      else hub.attach(req, res);
+      else hub.attach(req, res, { localScope: url.searchParams.get('scope') === 'local' });
       return true;
     }
     if (path === '/api/snapshot') {
       if (!isRead) methodNotAllowed(res, 'GET');
-      else sendJson(res, 200, hub.current());
+      else sendJson(res, 200, url.searchParams.get('scope') === 'local' ? hub.currentLocal() : hub.current());
       return true;
     }
     if (path === '/api/health') {
