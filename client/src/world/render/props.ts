@@ -364,62 +364,96 @@ export function propSprite(prop: ExteriorProp): PropSprite {
   return s;
 }
 
-const CAR_COLORS: [string, string, string][] = [
-  ['#d9534a', '#a83a33', '#f08a80'],
-  ['#3f7fd8', '#2c5ea6', '#7fb0f0'],
-  ['#f2f2ee', '#c4c6c8', '#ffffff'],
-  ['#f2b33d', '#c88a1f', '#ffd889'],
-  ['#2fb3a3', '#1f8579', '#79dccf'],
-  ['#4a5468', '#323a4a', '#76819a'],
+/** Supercarros: cor da carroceria, sombra, brilho e a cor das rodas. */
+const CAR_COLORS: [string, string, string, string][] = [
+  ['#d61f26', '#9c1418', '#ff7a7a', '#2a2d34'], // vermelho corsa
+  ['#7ed321', '#4e8a12', '#c8f58a', '#1d1f24'], // verde lima
+  ['#ff7a1a', '#c45608', '#ffb784', '#2a2d34'], // laranja papaia
+  ['#ffd21f', '#c9a00a', '#fff19a', '#1d1f24'], // amarelo
+  ['#1f5fd6', '#123d8f', '#80adff', '#c9ced6'], // azul
+  ['#f4f5f7', '#bfc4cb', '#ffffff', '#c9a227'], // branco com rodas douradas
+  ['#2a2d34', '#15171c', '#555b67', '#c9a227'], // preto fosco com rodas douradas
+  ['#7b3fe4', '#4f22a3', '#b993ff', '#1d1f24'], // roxo
 ];
 
-/** Carro visto de lado (3/4), virado para a direita; `flip` desenha para a esquerda. */
+/** Quantas cores de carro existem (o renderer sorteia entre elas). */
+export const CAR_VARIANTS = CAR_COLORS.length;
+
+/** Silhueta do supercarro (virado para a direita): por linha, o primeiro e o último x preenchidos. */
+const CAR_ROWS: readonly (readonly [number, number, number])[] = [
+  [5, 15, 23],
+  [6, 13, 26],
+  [7, 11, 29],
+  [8, 3, 32],
+  [9, 2, 35],
+  [10, 2, 37],
+  [11, 2, 38],
+  [12, 2, 38],
+  [13, 3, 37],
+  [14, 4, 36],
+];
+
+/** Supercarro visto de lado, virado para a direita; `flip` desenha para a esquerda. Âncora no chão, no meio. */
 export function carSprite(variant: number, flip: boolean): PropSprite {
-  const key = `car:${variant % CAR_COLORS.length}:${flip ? 1 : 0}`;
+  const v = ((variant % CAR_VARIANTS) + CAR_VARIANTS) % CAR_VARIANTS;
+  const key = `car:${v}:${flip ? 1 : 0}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const [body, dark, light] = CAR_COLORS[variant % CAR_COLORS.length];
-  const [c, ctx] = makeCanvas(36, 20);
+  const [body, dark, light, rim] = CAR_COLORS[v];
+  const [c, ctx] = makeCanvas(40, 19);
   if (flip) {
-    ctx.translate(36, 0);
+    ctx.translate(40, 0);
     ctx.scale(-1, 1);
   }
-  shadowEllipse(ctx, 18, 17, 16, 2, 0.3);
-  const o = '#2e3648';
-  // carroceria
-  ctx.fillStyle = o;
-  ctx.fillRect(2, 8, 32, 8);
-  ctx.fillRect(8, 3, 18, 6);
-  ctx.fillStyle = body;
-  ctx.fillRect(3, 9, 30, 6);
-  ctx.fillRect(9, 4, 16, 5);
-  ctx.fillStyle = light;
-  ctx.fillRect(3, 9, 30, 1);
-  ctx.fillRect(9, 4, 16, 1);
-  ctx.fillStyle = dark;
-  ctx.fillRect(3, 13, 30, 2);
-  // vidros
-  ctx.fillStyle = '#3a5f86';
-  ctx.fillRect(10, 5, 6, 3);
-  ctx.fillRect(18, 5, 6, 3);
-  ctx.fillStyle = '#9cc7ec';
-  ctx.fillRect(10, 5, 2, 1);
-  ctx.fillRect(18, 5, 2, 1);
-  // farol e lanterna
-  ctx.fillStyle = '#fff3c4';
-  ctx.fillRect(32, 10, 2, 2);
-  ctx.fillStyle = '#e04a3a';
-  ctx.fillRect(2, 10, 1, 2);
-  // rodas
-  for (const wx of [7, 25]) {
-    ctx.fillStyle = o;
-    ctx.fillRect(wx, 13, 5, 5);
-    ctx.fillStyle = '#6b7385';
-    ctx.fillRect(wx + 1, 14, 3, 3);
-    ctx.fillStyle = '#9aa3b5';
-    ctx.fillRect(wx + 2, 15, 1, 1);
+  const o = '#14161c';
+  const px = (color: string, x: number, y: number, w = 1, h = 1) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+  };
+  shadowEllipse(ctx, 20, 17, 19, 2, 0.35);
+  // asa traseira (por trás da carroceria)
+  px(o, 1, 3, 8, 2);
+  px(dark, 2, 3, 6, 1);
+  px(o, 3, 5, 1, 3);
+  px(o, 6, 5, 1, 3);
+  // contorno e carroceria, baixa e em cunha
+  for (const [y, x0, x1] of CAR_ROWS) px(o, x0, y, x1 - x0 + 1);
+  for (const [y, x0, x1] of CAR_ROWS) if (y > 5) px(body, x0 + 1, y, x1 - x0 - 1);
+  // brilho do teto e do vinco lateral; parte de baixo mais escura
+  px(light, 14, 6, 10);
+  px(light, 4, 9, 30);
+  px(dark, 4, 13, 32);
+  px(dark, 5, 14, 30);
+  // capota de vidro escuro (para-brisa inclinado, vidro lateral) com reflexo
+  px('#1b2636', 15, 6, 9);
+  px('#1b2636', 13, 7, 14);
+  px('#1b2636', 24, 6, 2);
+  px('#1b2636', 27, 7, 2);
+  px('#6f93b8', 16, 6, 3);
+  px('#6f93b8', 25, 7, 2);
+  px(body, 21, 6, 1, 2);
+  // tampa do motor com frestas e entrada de ar lateral
+  for (const x of [5, 7, 9]) px(dark, x, 8, 1);
+  px('#0d0f13', 14, 10, 7, 2);
+  px(dark, 14, 12, 7);
+  // luzes em fenda: farol na frente, lanterna atrás, e o difusor
+  px('#eaf6ff', 35, 10, 3);
+  px('#ffffff', 37, 10, 1);
+  px('#ff3b30', 2, 9, 2, 2);
+  px('#0d0f13', 3, 13, 4);
+  px('#0d0f13', 34, 13, 4);
+  // rodas grandes com aro colorido
+  for (const cx of [9, 31]) {
+    px(o, cx - 3, 11, 7, 7);
+    px(o, cx - 4, 12, 9, 5);
+    px('#22252d', cx - 2, 12, 5, 5);
+    px('#22252d', cx - 3, 13, 7, 3);
+    px(rim, cx - 2, 13, 5, 3);
+    px(rim, cx - 1, 12, 3, 5);
+    px('#0d0f13', cx, 14, 1, 1);
+    px('#ffffff', cx - 1, 13, 1, 1);
   }
-  const s = { canvas: c, ax: 18, ay: 17 };
+  const s = { canvas: c, ax: 20, ay: 17 };
   cache.set(key, s);
   return s;
 }

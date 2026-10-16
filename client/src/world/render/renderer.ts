@@ -25,7 +25,7 @@ import { Lighting } from './lighting';
 import { reducedMotion } from './github-fx';
 import { drawCallToPrayer, drawWuduWater, MosqueRenderer } from './mosque';
 import { Particles } from './particles';
-import { carSprite, propSprite, shadowSprite } from './props';
+import { CAR_VARIANTS, carSprite, propSprite, shadowSprite } from './props';
 import { drawPodSleepers, drawRallies, drawScoreboard, drawSmoke, paintCourt } from './recreation';
 import { countBadge, fallbackIcon } from './shell-sprites';
 import { decorateElevator, drawEidSparkle, drawSeasonalLights, drawSeasonalWindow, seasonalFurniture, seasonalTableTop } from './seasonal';
@@ -1204,7 +1204,7 @@ export class Renderer {
     if (now >= this.nextCarAt) {
       this.nextCarAt = now + 4000 + Math.random() * 9000;
       const lane = this.exterior.lanes[Math.floor(Math.random() * this.exterior.lanes.length)];
-      if (lane) this.cars.push({ x: lane.dir > 0 ? x0 : x1, y: lane.y, dir: lane.dir, speed: 38 + Math.random() * 30, variant: Math.floor(Math.random() * 6) });
+      if (lane) this.cars.push({ x: lane.dir > 0 ? x0 : x1, y: lane.y, dir: lane.dir, speed: 75 + Math.random() * 55, variant: Math.floor(Math.random() * CAR_VARIANTS) });
     }
     for (const c of this.cars) c.x += c.dir * c.speed * Math.min(dt, 0.1);
     if (this.cars.length) this.cars = this.cars.filter((c) => c.x >= x0 - 10 && c.x <= x1 + 10);

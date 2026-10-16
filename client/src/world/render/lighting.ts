@@ -614,11 +614,12 @@ export class Lighting {
     const tail = glowSprite('#ff4a3a', 16);
     for (const car of scene.cars) {
       if (car.x < view.x0 - 80 || car.x > view.x1 + 80 || car.y < view.y0 - 30 || car.y > view.y1 + 30) continue;
-      const front = car.x + car.dir * 16;
+      // supercarro: faróis em fenda baixos, na ponta do bico; lanternas na traseira (render/props.ts carSprite)
+      const front = car.x + car.dir * 18;
       ctx.globalAlpha = 0.55 * n;
-      ctx.drawImage(beam, Math.round(front + (car.dir > 0 ? 0 : -46)), Math.round(car.y - 15), 46, 16);
+      ctx.drawImage(beam, Math.round(front + (car.dir > 0 ? 0 : -50)), Math.round(car.y - 13), 50, 13);
       ctx.globalAlpha = 0.8 * n;
-      ctx.drawImage(tail, Math.round(car.x - car.dir * 16 - 4), Math.round(car.y - 11), 8, 8);
+      ctx.drawImage(tail, Math.round(car.x - car.dir * 17 - 4), Math.round(car.y - 12), 8, 8);
     }
   }
 
