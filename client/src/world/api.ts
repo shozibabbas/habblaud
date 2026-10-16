@@ -47,7 +47,27 @@ export function seasonalThemeFor(theme: OfficeTheme | undefined, date: Date, hij
 export type DaylightMode = 'auto' | 'day' | 'night';
 
 /** Sons do ambiente que o mundo sugere (quem toca, e se toca, é a UI). */
-export type SoundCueKind = 'keys' | 'elevator' | 'pingpong' | 'table' | 'arcade';
+export type SoundCueKind =
+  | 'keys'
+  | 'elevator'
+  | 'pingpong'
+  | 'table'
+  | 'arcade'
+  // jogos do campus: raquetada e quique do tênis, moedinhas das apostas
+  | 'tennis'
+  | 'bounce'
+  | 'coins'
+  // pausas: água do wudu, ronco nas cápsulas, isqueiro e baforada, xícaras do chá, TV (torcida), o chamado à oração
+  | 'water'
+  | 'snore'
+  | 'lighter'
+  | 'exhale'
+  | 'cup'
+  | 'tv'
+  | 'cheer'
+  | 'prayerCall'
+  // trânsito: supercarro passando
+  | 'car';
 
 export interface SoundCue {
   kind: SoundCueKind;

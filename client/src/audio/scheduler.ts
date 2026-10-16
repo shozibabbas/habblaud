@@ -3,11 +3,11 @@
 import type { SoundCueKind } from '../world/api';
 
 /** Categorias que o usuário liga/desliga nas configurações. */
-export type SoundCategory = 'alerts' | 'keys' | 'elevator' | 'social';
+export type SoundCategory = 'alerts' | 'keys' | 'elevator' | 'social' | 'breaks' | 'traffic';
 /** Sons: o sino de "precisa de você", o estalo de tarefa concluída e os do ambiente. */
 export type SoundKind = 'chime' | 'pop' | SoundCueKind;
 
-export const SOUND_CATEGORIES: readonly SoundCategory[] = ['alerts', 'keys', 'elevator', 'social'];
+export const SOUND_CATEGORIES: readonly SoundCategory[] = ['alerts', 'keys', 'elevator', 'social', 'breaks', 'traffic'];
 
 export const CATEGORY_OF: Readonly<Record<SoundKind, SoundCategory>> = {
   chime: 'alerts',
@@ -17,6 +17,18 @@ export const CATEGORY_OF: Readonly<Record<SoundKind, SoundCategory>> = {
   pingpong: 'social',
   table: 'social',
   arcade: 'social',
+  tennis: 'social',
+  bounce: 'social',
+  coins: 'social',
+  water: 'breaks',
+  snore: 'breaks',
+  lighter: 'breaks',
+  exhale: 'breaks',
+  cup: 'breaks',
+  tv: 'breaks',
+  cheer: 'breaks',
+  prayerCall: 'breaks',
+  car: 'traffic',
 };
 
 /** Intervalo mínimo (ms) entre dois sons do mesmo canal. */
@@ -28,6 +40,18 @@ export const MIN_GAP_MS: Readonly<Record<SoundKind, number>> = {
   pingpong: 200,
   table: 200,
   arcade: 450,
+  tennis: 250,
+  bounce: 250,
+  coins: 600,
+  water: 1_300,
+  snore: 2_200,
+  lighter: 1_500,
+  exhale: 1_200,
+  cup: 900,
+  tv: 2_500,
+  cheer: 6_000,
+  prayerCall: 4_000,
+  car: 1_800,
 };
 
 /** O sino e o estalo dividem o mesmo canal (um não atropela o outro). */
@@ -39,6 +63,18 @@ const CHANNEL: Readonly<Record<SoundKind, string>> = {
   pingpong: 'pingpong',
   table: 'pingpong',
   arcade: 'arcade',
+  tennis: 'tennis',
+  bounce: 'tennis',
+  coins: 'coins',
+  water: 'water',
+  snore: 'snore',
+  lighter: 'smoke',
+  exhale: 'smoke',
+  cup: 'cup',
+  tv: 'tv',
+  cheer: 'tv',
+  prayerCall: 'prayerCall',
+  car: 'car',
 };
 
 /** Teto global: no máximo isto de sons por segundo (o sino de alerta sempre passa). */
@@ -51,9 +87,13 @@ export interface SoundSettings {
   keys: boolean;
   elevator: boolean;
   social: boolean;
+  /** Pausas: wudu, cápsulas, área de fumantes, chá, TV e o chamado à oração. */
+  breaks: boolean;
+  /** Trânsito: os carros da rua. */
+  traffic: boolean;
 }
 
-export const DEFAULT_SOUND_SETTINGS: SoundSettings = { volume: 0.6, alerts: true, keys: true, elevator: true, social: true };
+export const DEFAULT_SOUND_SETTINGS: SoundSettings = { volume: 0.6, alerts: true, keys: true, elevator: true, social: true, breaks: true, traffic: true };
 
 /** Valida campo a campo (preferência corrompida cai no padrão). */
 export function sanitizeSoundSettings(raw: unknown): SoundSettings {
@@ -61,7 +101,15 @@ export function sanitizeSoundSettings(raw: unknown): SoundSettings {
   const d = DEFAULT_SOUND_SETTINGS;
   const bool = (v: unknown, f: boolean) => (typeof v === 'boolean' ? v : f);
   const vol = typeof o.volume === 'number' && Number.isFinite(o.volume) ? Math.min(1, Math.max(0, o.volume)) : d.volume;
-  return { volume: vol, alerts: bool(o.alerts, d.alerts), keys: bool(o.keys, d.keys), elevator: bool(o.elevator, d.elevator), social: bool(o.social, d.social) };
+  return {
+    volume: vol,
+    alerts: bool(o.alerts, d.alerts),
+    keys: bool(o.keys, d.keys),
+    elevator: bool(o.elevator, d.elevator),
+    social: bool(o.social, d.social),
+    breaks: bool(o.breaks, d.breaks),
+    traffic: bool(o.traffic, d.traffic),
+  };
 }
 
 /** Curva do volume mestre: o controle deslizante fica perceptualmente linear. */

@@ -39,7 +39,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
   const socialCbs = new Set<(e: SocialEvent) => void>();
   const soundCbs = new Set<(c: SoundCue) => void>();
   const roomMenuCbs = new Set<(roomId: string, at: { x: number; y: number }) => void>();
-  let cues = new SoundCues(sim, camera);
+  let cues = new SoundCues(sim, camera, Math.random, () => renderer.cars);
   let selection: Selection = null;
   let hover: string | null = null;
   let mouse: { x: number; y: number } | null = null;
@@ -341,7 +341,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     }
     overlay = new Overlay(renderer.ctx, sim, renderer, camera);
     debug = createDebug(sim, renderer, camera, markMoved);
-    cues = new SoundCues(sim, camera);
+    cues = new SoundCues(sim, camera, Math.random, () => renderer.cars);
     lastKey = '';
     setHover(null);
   };
@@ -395,7 +395,10 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     activities: () => (playback ? [] : availableActivities(sim)),
     sendAll: (activity) => {
       if (playback || !availableActivities(sim).some((a) => a.id === activity)) return null;
-      return sendAll(sim, activity, Date.now());
+      const r = sendAll(sim, activity, Date.now());
+      // chamado à oração: um sino suave (não imita o azan), tocado só se alguém foi
+      if (activity === 'prayer' && r?.sent.length) soundCbs.forEach((cb) => cb({ kind: 'prayerCall', gain: 1, pan: 0 }));
+      return r;
     },
     onRoomContextMenu: (cb) => {
       roomMenuCbs.add(cb);

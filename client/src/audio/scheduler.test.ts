@@ -90,4 +90,18 @@ describe('agendador de sons', () => {
     expect(sanitizeSoundSettings({ volume: Number.NaN }).volume).toBe(DEFAULT_SOUND_SETTINGS.volume);
     expect(sanitizeSoundSettings({ volume: 9 }).volume).toBe(1);
   });
+
+  it('atividades: pausas e trânsito têm categoria própria; jogos do campus ficam em rodas', () => {
+    expect(CATEGORY_OF.tennis).toBe('social');
+    expect(CATEGORY_OF.coins).toBe('social');
+    for (const k of ['water', 'snore', 'lighter', 'exhale', 'cup', 'tv', 'cheer', 'prayerCall'] as const) expect(CATEGORY_OF[k]).toBe('breaks');
+    expect(CATEGORY_OF.car).toBe('traffic');
+    const s = new SoundScheduler();
+    s.configure(true, { ...DEFAULT_SOUND_SETTINGS, breaks: false });
+    expect(s.decide('water', 0)).toBeNull();
+    expect(s.decide('car', 0)).not.toBeNull();
+    expect(s.decide('tennis', 0)).not.toBeNull();
+    // preferência antiga (sem as categorias novas): ligadas por padrão
+    expect(sanitizeSoundSettings({ volume: 0.5, social: false })).toMatchObject({ breaks: true, traffic: true, social: false });
+  });
 });

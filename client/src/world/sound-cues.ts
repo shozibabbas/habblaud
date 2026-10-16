@@ -1,10 +1,20 @@
 // Sons do ambiente sugeridos pelo mundo: teclado de quem trabalha à vista, "ding" quando a porta de
-// um elevador abre (alguém chega ou sai) e as rodas (raquetadas do pingue-pongue, fliperama). Só
-// observa a simulação e a câmera; quem decide se toca (preferência, volume, aba oculta) é a UI.
+// um elevador abre (alguém chega ou sai), as rodas (raquetadas e quiques do pingue-pongue e do tênis no ritmo da
+// bola desenhada, fliperama, moedinhas das apostas), as pausas (água do wudu, ronco nas cápsulas, isqueiro e
+// baforadas, xícaras na cozinha, a TV) e os carros da rua. Só observa a simulação e a câmera; quem decide se toca
+// (preferência, volume, aba oculta) é a UI.
 import type { SoundCue } from './api';
 import type { Camera } from './camera';
+import { RALLY_MS, shotAt } from './social/rally';
 import type { Character } from './sim/character';
 import type { Sim } from './sim/sim';
+
+/** Carro da rua visto pelos sons (render/renderer.ts). */
+export interface CarLike {
+  x: number;
+  y: number;
+  dir: number;
+}
 
 /** Reavalia quem está digitando a cada isto (ms). */
 const KEYS_TICK_MS = 160;
@@ -24,11 +34,20 @@ export class SoundCues {
   private nextKeysAt = 0;
   private nextArcadeAt = 0;
   private rally = new Map<number, number>();
+  private nextCupAt = 0;
+  private nextTvAt = 0;
+  private nextSnoreAt = 0;
+  private nextWaterAt = 0;
+  /** Quem estava com o cigarro e em que pose (isqueiro ao acender, baforada ao tirar da boca). */
+  private smokers = new Map<string, string>();
+  private coinsSeen = 0;
+  private carsSeen = new WeakSet<object>();
 
   constructor(
     private readonly sim: Sim,
     private readonly camera: Camera,
     private readonly rng: () => number = Math.random,
+    private readonly cars: () => readonly CarLike[] = () => [],
   ) {}
 
   update(now: number, emit: (cue: SoundCue) => void): void {
@@ -40,6 +59,9 @@ export class SoundCues {
     this.elevators(view, emit);
     this.keys(now, view, near, emit);
     this.social(now, view, near, emit);
+    this.breaks(now, view, near, emit);
+    this.coins(view, near, emit);
+    this.traffic(view, near, emit);
   }
 
   private pan(x: number, v: ViewRect): number {
@@ -80,17 +102,20 @@ export class SoundCues {
     emit({ kind: 'keys', gain: near * Math.min(1, 0.6 + 0.1 * n), pan: this.pan(sx / n, view), count: 2 + Math.floor(this.rng() * 5) });
   }
 
-  /** Pingue-pongue (raquetadas e quiques no ritmo da bolinha desenhada) e o fliperama. */
+  /**
+   * Rodas: pingue-pongue e tênis (raquetada a cada golpe e quique no meio, no ritmo do rali desenhado), fliperama e
+   * videogame (arpejos), cozinha (xícaras) e TV (narração, e a torcida de vez em quando no futebol).
+   */
   private social(now: number, view: ViewRect, near: number, emit: (cue: SoundCue) => void): void {
     const alive = new Set<number>();
     for (const g of this.sim.social.gatherings) {
       if (g.phase !== 'run') continue;
-      if (g.kind !== 'pingpong' && g.kind !== 'arcade') continue;
       let x = 0;
       let y = 0;
       let k = 0;
       for (const m of g.members) {
-        if (m.role !== 'player' || m.left) continue;
+        if (m.left) continue;
+        if ((g.kind === 'pingpong' || g.kind === 'tennis' || g.kind === 'arcade') && m.role !== 'player') continue;
         const ch = this.sim.chars.get(m.id);
         if (!ch) continue;
         x += ch.x;
@@ -101,19 +126,101 @@ export class SoundCues {
       x /= k;
       y /= k;
       if (!this.inView(x, y, view, 24)) continue;
-      if (g.kind === 'pingpong') {
+      const pan = this.pan(x, view);
+      if (g.kind === 'pingpong' || g.kind === 'tennis') {
         alive.add(g.id);
-        // a cada meia ida: raquetada (pontas) ou quique na mesa (meio), como no desenho
-        const seg = Math.floor(((now - g.startAt) % (PINGPONG_PERIOD * 2)) / (PINGPONG_PERIOD / 2));
+        const seg = this.rallySegment(g.rally, g.startAt, now);
         const prev = this.rally.get(g.id);
         this.rally.set(g.id, seg);
-        if (prev !== undefined && prev !== seg) emit({ kind: seg % 2 === 0 ? 'pingpong' : 'table', gain: near, pan: this.pan(x, view) });
-      } else if (now >= this.nextArcadeAt) {
+        if (seg < 0 || prev === undefined || prev === seg) continue;
+        const hit = seg % 2 === 0;
+        if (g.kind === 'tennis') emit({ kind: hit ? 'tennis' : 'bounce', gain: near, pan });
+        else emit({ kind: hit ? 'pingpong' : 'table', gain: near, pan });
+      } else if (g.kind === 'arcade' || g.kind === 'videogame') {
+        if (now < this.nextArcadeAt) continue;
         this.nextArcadeAt = now + 500 + this.rng() * 900;
-        emit({ kind: 'arcade', gain: near * 0.8, pan: this.pan(x, view) });
+        emit({ kind: 'arcade', gain: near * (g.kind === 'videogame' ? 0.6 : 0.8), pan });
+      } else if (g.kind === 'kitchen') {
+        if (now < this.nextCupAt) continue;
+        this.nextCupAt = now + 2_200 + this.rng() * 3_500;
+        emit({ kind: 'cup', gain: near * 0.9, pan });
+      } else if (g.kind === 'tv') {
+        if (now < this.nextTvAt) continue;
+        this.nextTvAt = now + 2_600 + this.rng() * 2_000;
+        const goal = g.program === 'futebol' && this.rng() < 0.12;
+        emit({ kind: goal ? 'cheer' : 'tv', gain: near * 0.8, pan });
       }
     }
     for (const id of this.rally.keys()) if (!alive.has(id)) this.rally.delete(id);
+  }
+
+  /**
+   * Meio-golpe atual do rali (par = raquetada, ímpar = quique), ou -1 entre pontos. Sem rali (prédio antigo), o
+   * ritmo fixo da bolinha desenhada.
+   */
+  private rallySegment(st: Parameters<typeof shotAt>[0] | undefined, startAt: number, now: number): number {
+    if (!st) return Math.floor(((now - startAt) % (PINGPONG_PERIOD * 2)) / (PINGPONG_PERIOD / 2));
+    const t0 = shotAt(st, 0);
+    if (now < st.at) return -1;
+    const shot = RALLY_MS[st.kind].shot;
+    if (now < t0) return 0;
+    return 2 * Math.floor((now - t0) / shot) + ((now - t0) % shot >= shot / 2 ? 1 : 0) + 2;
+  }
+
+  /** Pausas: água do wudu, ronco de quem dorme, isqueiro e baforadas na área de fumantes. */
+  private breaks(now: number, view: ViewRect, near: number, emit: (cue: SoundCue) => void): void {
+    let wudu = 0;
+    let wx = 0;
+    let sleep = 0;
+    let sx = 0;
+    const smoking = new Set<string>();
+    for (const ch of this.sim.chars.values()) {
+      if (ch.gone || ch.alpha < 0.5 || !this.inView(ch.x, ch.y, view)) continue;
+      if (ch.pose === 'wudu') {
+        wudu++;
+        wx += ch.x;
+      } else if (ch.pose === 'sleep') {
+        sleep++;
+        sx += ch.x;
+      }
+      if (ch.held === 'cigarette') {
+        smoking.add(ch.id);
+        const prev = this.smokers.get(ch.id);
+        if (prev === undefined) emit({ kind: 'lighter', gain: near * 0.9, pan: this.pan(ch.x, view) });
+        else if (prev === 'drink' && ch.pose !== 'drink') emit({ kind: 'exhale', gain: near * 0.8, pan: this.pan(ch.x, view) });
+        this.smokers.set(ch.id, ch.pose);
+      }
+    }
+    for (const id of this.smokers.keys()) if (!smoking.has(id)) this.smokers.delete(id);
+    if (wudu && now >= this.nextWaterAt) {
+      this.nextWaterAt = now + 1_100 + this.rng() * 500;
+      emit({ kind: 'water', gain: near * Math.min(1, 0.6 + 0.15 * wudu), pan: this.pan(wx / wudu, view) });
+    }
+    if (sleep && now >= this.nextSnoreAt) {
+      this.nextSnoreAt = now + (3_000 + this.rng() * 3_500) / Math.sqrt(Math.min(sleep, 4));
+      emit({ kind: 'snore', gain: near * 0.8, pan: this.pan(sx / sleep, view) });
+    }
+  }
+
+  /** Moedinhas quando uma aposta é paga (o efeito das moedas voando entre os dois). */
+  private coins(view: ViewRect, near: number, emit: (cue: SoundCue) => void): void {
+    for (const e of this.sim.effects) {
+      if (e.kind !== 'coins' || e.at <= this.coinsSeen) continue;
+      this.coinsSeen = e.at;
+      const ch = this.sim.chars.get(e.charId);
+      if (ch && this.inView(ch.x, ch.y, view, 24)) emit({ kind: 'coins', gain: near, pan: this.pan(ch.x, view) });
+    }
+  }
+
+  /** Supercarro entrando na tela: o ronco passa do lado de onde ele vem. */
+  private traffic(view: ViewRect, near: number, emit: (cue: SoundCue) => void): void {
+    for (const car of this.cars()) {
+      if (this.carsSeen.has(car)) continue;
+      if (car.y < view.y0 - 20 || car.y > view.y1 + 20) continue;
+      if (car.x < view.x0 - 60 || car.x > view.x1 + 60) continue;
+      this.carsSeen.add(car);
+      emit({ kind: 'car', gain: near, pan: car.dir > 0 ? -0.5 : 0.5 });
+    }
   }
 }
 

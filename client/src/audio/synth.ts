@@ -96,7 +96,152 @@ export function playVoice(ac: AudioContext, dest: AudioNode, kind: SoundKind, t:
       }
       return;
     }
+    case 'tennis':
+      // raquetada de tênis: "pok" encorpado (corda) com um estalo de ruído por cima
+      tone(ac, out, 'triangle', 420, t, 0.12 * g, 0.002, 0.09, 230);
+      burst(ac, out, o, t, { freq: 2400, q: 0.9, peak: 0.07 * g, decay: 0.03 });
+      return;
+    case 'bounce':
+      // quique da bolinha de tênis na quadra: grave e abafado
+      tone(ac, out, 'sine', 210, t, 0.08 * g, 0.002, 0.07, 140);
+      return;
+    case 'coins': {
+      // moedinhas: três "plins" metálicos em sequência
+      for (let i = 0; i < 3; i++) {
+        const f = 2350 + o.rng() * 500;
+        tone(ac, out, 'sine', f, t + i * 0.07, 0.05 * g, 0.002, 0.18);
+        tone(ac, out, 'sine', f * 1.51, t + i * 0.07, 0.02 * g, 0.002, 0.1);
+      }
+      return;
+    }
+    case 'water':
+      // torneira do wudu: fio d'água (ruído filtrado, com o volume oscilando de leve)
+      flow(ac, out, o, t, { freq: 1600, q: 0.7, peak: 0.05 * g, dur: 1.2, wobble: 7 });
+      return;
+    case 'snore':
+      // ronco baixinho na cápsula: uma inspiração grave e arrastada
+      flow(ac, out, o, t, { freq: 260, q: 1.6, peak: 0.07 * g, dur: 0.9, wobble: 22 });
+      tone(ac, out, 'sawtooth', 82, t + 0.1, 0.012 * g, 0.25, 0.55);
+      return;
+    case 'lighter':
+      // isqueiro: o "clic" da pedra e a chama acendendo
+      burst(ac, out, o, t, { freq: 3800, q: 2.2, peak: 0.09 * g, decay: 0.015 });
+      flow(ac, out, o, t + 0.05, { freq: 900, q: 0.6, peak: 0.025 * g, dur: 0.35, wobble: 0 });
+      return;
+    case 'exhale':
+      // baforada: sopro longo e suave
+      flow(ac, out, o, t, { freq: 700, q: 0.5, peak: 0.035 * g, dur: 1.0, wobble: 0 });
+      return;
+    case 'cup':
+      // xícara no pires: "tin" de porcelana
+      tone(ac, out, 'sine', 3150 + o.rng() * 400, t, 0.05 * g, 0.001, 0.22);
+      tone(ac, out, 'sine', 4700, t, 0.018 * g, 0.001, 0.12);
+      return;
+    case 'tv':
+      // TV: murmúrio de narração e torcida ao fundo
+      flow(ac, out, o, t, { freq: 1100, q: 0.4, peak: 0.022 * g, dur: 1.6, wobble: 3 });
+      tone(ac, out, 'square', 180 + o.rng() * 60, t + 0.2, 0.006 * g, 0.05, 0.25);
+      return;
+    case 'cheer':
+      // gol na TV: a torcida sobe e desce
+      flow(ac, out, o, t, { freq: 1300, q: 0.35, peak: 0.06 * g, dur: 2.2, wobble: 5 });
+      return;
+    case 'prayerCall':
+      // chamado à oração: três notas suaves de sino (sem imitar o azan), espaçadas
+      for (const [i, f] of [587.3, 740, 880].entries()) {
+        tone(ac, out, 'sine', f, t + i * 0.42, 0.09 * g, 0.02, 1.6);
+        tone(ac, out, 'sine', f * 2, t + i * 0.42, 0.015 * g, 0.02, 0.8);
+      }
+      return;
+    case 'car':
+      carPass(ac, out, o, t);
+      return;
   }
+}
+
+/** Estalo curto de ruído filtrado (raquetada, isqueiro). */
+function burst(ac: AudioContext, out: AudioNode, o: VoiceOpts, t: number, p: { freq: number; q: number; peak: number; decay: number }): void {
+  if (!o.noise) return;
+  const src = ac.createBufferSource();
+  src.buffer = o.noise;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = p.freq;
+  bp.Q.value = p.q;
+  const g = ac.createGain();
+  env(g, t, p.peak, 0.001, p.decay);
+  src.connect(bp).connect(g).connect(out);
+  src.start(t, 0, 0.05);
+}
+
+/**
+ * Som contínuo de ruído filtrado (água, sopro, torcida): o buffer curto fica em loop, sobe e desce suave em `dur`
+ * segundos; `wobble` (Hz) faz o volume oscilar (a água correndo, o ronco).
+ */
+function flow(ac: AudioContext, out: AudioNode, o: VoiceOpts, t: number, p: { freq: number; q: number; peak: number; dur: number; wobble: number }): void {
+  if (!o.noise) return;
+  const src = ac.createBufferSource();
+  src.buffer = o.noise;
+  src.loop = true;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = p.freq;
+  bp.Q.value = p.q;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, p.peak), t + p.dur * 0.3);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + p.dur);
+  let node: AudioNode = g;
+  if (p.wobble > 0) {
+    const trem = ac.createGain();
+    trem.gain.value = 0.7;
+    const lfo = ac.createOscillator();
+    const depth = ac.createGain();
+    lfo.frequency.value = p.wobble;
+    depth.gain.value = 0.3;
+    lfo.connect(depth).connect(trem.gain);
+    lfo.start(t);
+    lfo.stop(t + p.dur + 0.05);
+    g.connect(trem);
+    node = trem;
+  }
+  src.connect(bp).connect(g);
+  node.connect(out);
+  src.start(t, o.rng() * 0.05);
+  src.stop(t + p.dur + 0.05);
+}
+
+/** Supercarro passando: o ronco do motor sobe e cai (efeito Doppler) com o vento por cima. */
+function carPass(ac: AudioContext, out: AudioNode, o: VoiceOpts, t: number): void {
+  const dur = 1.6;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(500, t);
+  lp.frequency.linearRampToValueAtTime(1500, t + dur * 0.45);
+  lp.frequency.linearRampToValueAtTime(400, t + dur);
+  lp.connect(out);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, 0.06 * o.gain), t + dur * 0.45);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.connect(lp);
+  const base = 105 + o.rng() * 30;
+  for (const [mult, lvl] of [
+    [1, 1],
+    [2.01, 0.45],
+  ] as const) {
+    const osc = ac.createOscillator();
+    const og = ac.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(base * mult * 1.12, t);
+    osc.frequency.linearRampToValueAtTime(base * mult * 1.18, t + dur * 0.4);
+    osc.frequency.linearRampToValueAtTime(base * mult * 0.82, t + dur);
+    og.gain.value = lvl;
+    osc.connect(og).connect(g);
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+  }
+  flow(ac, out, o, t + 0.2, { freq: 1800, q: 0.4, peak: 0.02 * o.gain, dur: dur - 0.3, wobble: 0 });
 }
 
 /** Rajada de teclas: estalos de ruído filtrado com intervalos irregulares, como digitação de verdade. */

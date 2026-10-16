@@ -2683,4 +2683,10 @@ export const EN: Readonly<Record<string, string>> = {
   "Pausa para o cigarro": "Smoke break",
   "Passeio": "Stroll",
   "De volta às mesas": "Back to desks",
+  "Avisos: sino e estalo · Teclado: quem digita nas salas à vista · Elevador: chegadas e saídas · Rodas: pingue-pongue, tênis e fliperama · Pausas: wudu, cápsulas, fumantes, chá, TV e o chamado à oração · Trânsito: os carros da rua.": "Alerts: bell and pop · Keyboard: people typing in the rooms in view · Elevator: arrivals and departures · Games: table tennis, tennis and arcade · Breaks: wudu, pods, smokers, chai, TV and the call to prayer · Traffic: the cars on the road.",
+  "Os supercarros passando na rua.": "The supercars driving by on the road.",
+  "Pausas": "Breaks",
+  "Pingue-pongue, tênis, fliperama e as moedinhas das apostas.": "Table tennis, tennis, arcade and the coins from bets.",
+  "Trânsito": "Traffic",
+  "Água do wudu, ronco nas cápsulas, isqueiro, xícaras de chá, a TV e o chamado à oração.": "Wudu water, snoring in the pods, lighters, chai cups, the TV and the call to prayer.",
 };

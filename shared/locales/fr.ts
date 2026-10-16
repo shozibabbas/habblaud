@@ -2699,4 +2699,10 @@ export const FR: Readonly<Record<string, string>> = {
   "Pausa para o cigarro": "Pause cigarette",
   "Passeio": "Promenade",
   "De volta às mesas": "Retour aux bureaux",
+  "Avisos: sino e estalo · Teclado: quem digita nas salas à vista · Elevador: chegadas e saídas · Rodas: pingue-pongue, tênis e fliperama · Pausas: wudu, cápsulas, fumantes, chá, TV e o chamado à oração · Trânsito: os carros da rua.": "Alertes : cloche et clic · Clavier : ceux qui tapent dans les salles visibles · Ascenseur : arrivées et départs · Jeux : ping-pong, tennis et arcade · Pauses : wudu, capsules, fumeurs, thé, TV et l'appel à la prière · Circulation : les voitures de la rue.",
+  "Os supercarros passando na rua.": "Les supercars qui passent dans la rue.",
+  "Pausas": "Pauses",
+  "Pingue-pongue, tênis, fliperama e as moedinhas das apostas.": "Ping-pong, tennis, arcade et les pièces des paris.",
+  "Trânsito": "Circulation",
+  "Água do wudu, ronco nas cápsulas, isqueiro, xícaras de chá, a TV e o chamado à oração.": "L'eau du wudu, les ronflements dans les capsules, les briquets, les tasses de thé, la TV et l'appel à la prière.",
 };
