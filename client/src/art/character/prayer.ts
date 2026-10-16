@@ -132,8 +132,7 @@ function drawStanding(dc: Dc, pose: 'takbir' | 'qiyam' | 'sadl' | 'qunoot'): voi
   if (pose === 'takbir') {
     // palma aberta virada para a qibla: o polegar junto ao lóbulo da orelha
     a.near();
-    dc.b.set(6, 10, dc.p.skin.lt);
-    dc.b.set(6, 11, dc.p.skin.base);
+    palm(dc, 0);
     return;
   }
   a.near();
@@ -274,6 +273,19 @@ export function drawTurbah(b: PixelBuf, x: number, baseY: number): void {
   b.set(x + 2, baseY - 1, '#b3a797');
 }
 
+/**
+ * Palma aberta virada para a qibla junto à orelha (takbir em pé e sentado): dedos para cima, o polegar no lóbulo.
+ * Desenhada por cima da manga, para ler mesmo com a aba e o chador escuros.
+ */
+function palm(dc: Dc, dy: number): void {
+  const sk = dc.p.skin;
+  for (let y = 8; y <= 12; y++) {
+    dc.b.set(5, y + dy, y === 8 ? sk.base : sk.lt);
+    dc.b.set(6, y + dy, y < 10 ? sk.base : sk.dk);
+  }
+  dc.b.set(7, 12 + dy, sk.base);
+}
+
 /** Jalsa/tashahhud (cabeça de perfil) e salam (cabeça virada: 'up' = à direita/norte, 'down' = à esquerda/sul). */
 function drawKneeling(dc: Dc, view: HeadView, held: CharacterFrameRequest['held'] = 'none', talk = -1, takbir = false): void {
   const drop = 5;
@@ -292,11 +304,7 @@ function drawKneeling(dc: Dc, view: HeadView, held: CharacterFrameRequest['held'
   P.drawTorso(d);
   head(d, view);
   a.near();
-  if (takbir) {
-    // palma aberta virada para a qibla, o polegar junto ao lóbulo da orelha (como no takbir em pé)
-    dc.b.set(6, 10 + drop, dc.p.skin.lt);
-    dc.b.set(6, 11 + drop, dc.p.skin.base);
-  }
+  if (takbir) palm(dc, drop);
   // o terço na mão que descansa na coxa (a de trás, no dars)
   if (held === 'tasbih') P.drawTasbih(dc.b, talk < 0 ? 7 : 9, 23 + drop);
 }
