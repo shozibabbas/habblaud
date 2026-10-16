@@ -629,6 +629,10 @@ describe('piso molhado só em piso duro', () => {
         started ||= st.area === area;
         sim.staff.kit(kit, clock.now);
         for (const k of kit) if (k.kind === 'sign') expect(isCarpet(k.x, k.y - 2), `placa em carpete (${area})`).toBe(false);
+        // na mesquita, o carrinho estacionado (rodas de ponta a ponta) nunca fica no carpete da oração
+        if (area.startsWith('mosque') && st.arrived && !st.cart.withMe) {
+          for (const dx of [-10, 0, 10]) expect(isCarpet(st.cart.x + dx, st.cart.y - 2), `carrinho no carpete (${area})`).toBe(false);
+        }
         if (area.startsWith('mosque') && c.step?.t === 'act' && c.step.pose === 'vacuum') mosqueVacuum++;
         return started && st.area === null;
       });

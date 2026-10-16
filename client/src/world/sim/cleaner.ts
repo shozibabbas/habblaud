@@ -398,7 +398,10 @@ function openness(grid: StaffCrew['sim']['building']['grid'], x: number, y: numb
   return n;
 }
 
-/** Onde estacionar o carrinho: o tile limpável mais perto de quem chega, com espaço à frente para o carrinho. */
+/**
+ * Onde estacionar o carrinho: o tile limpável mais perto de quem chega, com espaço à frente para o carrinho. Na mesquita,
+ * nem quem empurra nem o carrinho (de uma roda à outra) ficam no carpete da oração.
+ */
 function parkingTile(crew: StaffCrew, tiles: readonly { x: number; y: number }[], from: { x: number; y: number }, a: CleanArea): { x: number; y: number; dir: Dir } | null {
   const grid = crew.sim.building.grid;
   const r = a.layout.rect;
@@ -412,6 +415,7 @@ function parkingTile(crew: StaffCrew, tiles: readonly { x: number; y: number }[]
     const fx = t.x + (dir === 'right' ? 1 : dir === 'left' ? -1 : 0);
     const fy = t.y + (dir === 'down' ? 1 : dir === 'up' ? -1 : 0);
     if (grid.get(fx, fy) !== FREE || openness(grid, fx, fy) < 8) continue;
+    if (a.hardOnly && cartOnPrayerCarpet(crew, t.x * TILE + FOOT_DX, t.y * TILE + FOOT_DY, dir)) continue;
     const d = Math.abs(t.x - from.x) + Math.abs(t.y - from.y);
     if (d < bestD) {
       bestD = d;
@@ -441,6 +445,17 @@ function signSpot(crew: StaffCrew, park: { x: number; y: number; dir: Dir }, a: 
   cands.sort((p, q) => Math.abs(p[0] - cx) + Math.abs(p[1] - cy) - (Math.abs(q[0] - cx) + Math.abs(q[1] - cy)));
   const t = cands[0];
   return t ? { x: t[0] * TILE + TILE / 2, y: t[1] * TILE + 13 } : null;
+}
+
+/** O ponto (px de mundo) está no carpete do salão de uma das alas da mesquita. */
+function onPrayerCarpet(crew: StaffCrew, px: number, py: number): boolean {
+  return crew.sim.building.areas.some((a) => (a.id === MEN_ID || a.id === WOMEN_ID) && inRect(a.rect, Math.floor(px / TILE), Math.floor(py / TILE)) && carpetPx(a, px, py));
+}
+
+/** Quem está em (x, y) olhando para `dir`, ou o carrinho à frente (de uma roda à outra), fica no carpete da oração. */
+function cartOnPrayerCarpet(crew: StaffCrew, x: number, y: number, dir: Dir): boolean {
+  const p = cartAt(x, y, dir);
+  return onPrayerCarpet(crew, x, y) || [-11, 0, 11].some((dx) => onPrayerCarpet(crew, p.x + dx, p.y - 2));
 }
 
 function homeCart(crew: StaffCrew, m: Cleaner): void {
@@ -972,9 +987,10 @@ export const CLEANER: StaffRoleDef<CleanerState> = {
     s.bucket = null;
     if (s.cart.withMe) {
       const p = cartAt(ch.x, ch.y, ch.dir);
-      Object.assign(s.cart, { withMe: false, home: false, x: p.x, y: p.y, tx: ch.tx, ty: ch.ty, dir: ch.dir });
+      // no carpete da oração, não: alguém o leva de volta ao canto da limpeza
+      if (cartOnPrayerCarpet(crew, ch.x, ch.y, ch.dir)) homeCart(crew, m);
+      else Object.assign(s.cart, { withMe: false, home: false, x: p.x, y: p.y, tx: ch.tx, ty: ch.ty, dir: ch.dir });
     }
-    void crew;
     return true;
   },
 
