@@ -26,7 +26,7 @@ export const POSE_FRAMES: Readonly<Record<Pose, number>> = {
   read: 2, play: 2, wait: 2, cheer: 2, laugh: 2, game: 2, rps: 2, groom: 2, sulk: 2,
   takbir: 1, qiyam: 1, ruku: 1, sujood: 1, jalsa: 1, salam: 2, wudu: 2, phone: 3, phone_walk: 4, type_stand: 4,
   mop: 4, vacuum: 4, push: 4, scrub: 4, wipe: 4,
-  sadl: 1, qunoot: 1, dars: 2,
+  sadl: 1, qunoot: 1, dars: 2, takbir_seated: 1,
 };
 
 export const POSE_DURATION: Readonly<Record<Pose, number>> = {
@@ -35,7 +35,7 @@ export const POSE_DURATION: Readonly<Record<Pose, number>> = {
   takbir: 1000, qiyam: 1000, ruku: 1000, sujood: 1000, jalsa: 1000, salam: 1300, wudu: 700, phone: 420, phone_walk: 170,
   type_stand: 120,
   mop: 230, vacuum: 260, push: 150, scrub: 170, wipe: 210,
-  sadl: 1000, qunoot: 1000, dars: 520,
+  sadl: 1000, qunoot: 1000, dars: 520, takbir_seated: 1000,
 };
 
 const SEATED_ONLY: ReadonlySet<Pose> = new Set<Pose>(['sit', 'type', 'sleep', 'wait']);

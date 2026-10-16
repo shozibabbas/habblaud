@@ -71,7 +71,7 @@ export function stepPray(ch: Character, s: PrayStep, elapsed: number, now = elap
     const whole = () => sessionSequence(ch.rng, j.prayers.map((p) => RAKAHS[p]), j.style);
     if (!s.hurried && calledAway(ch) && !f.lead) {
       // chamado no meio: termina depressa a partir da postura em que está
-      solo(hurrySequence([{ pose: (ch.pose as Posture) ?? standing(j.style), ms: 600 }], 0));
+      solo(hurrySequence([{ pose: (ch.pose as Posture) ?? standing(j.style), ms: 600 }], 0, j.style));
       s.hurried = true;
     } else if (j.startAt === null && now - j.calledAt > START_WAIT_MS * 1.5) {
       // a congregação não começou (ninguém para puxar): reza sozinho
@@ -157,40 +157,145 @@ export function pickPrayerSpot(spots: readonly SpotDef[], isFree: (id: string) =
   return best;
 }
 
+// =================================================================== fila da ablução
+
 /**
- * Tile livre perto dos banquinhos da ablução para esperar a vez (chamado para a oração: mais gente que torneiras).
- * `taken` guarda os tiles já escolhidos nesta leva, para cada um esperar no seu.
+ * Fila da ablução de cada ala: quem chega com todas as torneiras ocupadas entra no fim da fila e espera em pé num lugar
+ * só seu, numa fileira arrumada ao lado das torneiras. A primeira torneira que vagar — qualquer uma, a mais perto — vai
+ * para o primeiro da fila. Ninguém espera atrás de uma torneira ocupada com outra livre, e duas pessoas nunca vão para
+ * a mesma torneira (a reserva é feita na hora em que ela é dada).
  */
-function queueTile(sim: Sim, ch: Character, stool: SpotDef, taken: Set<number>): { x: number; y: number } | null {
-  const grid = sim.building.grid;
-  const busy = sim.busyTiles(ch.id);
-  const stools = new Set(sim.spots.ofKind('wudu').map((s) => grid.key(s.tx, s.ty)));
-  const r = sim.building.areas.find((a) => a.id === stool.areaId)?.rect;
-  let best: { x: number; y: number } | null = null;
+interface WuduQueue {
+  /** Ids na ordem de chegada. */
+  order: string[];
+  /** O passo de espera de cada um: quem não o tem mais na fila de passos saiu da fila (foi chamado, desistiu). */
+  waits: Map<string, Step>;
+  /** Lugar de espera de cada um (índice na lista de lugares da ala). */
+  slots: Map<string, number>;
+}
+
+const wuduQueues = new WeakMap<Sim, Map<MosqueSection, WuduQueue>>();
+
+function wuduQueue(sim: Sim, section: MosqueSection): WuduQueue {
+  let m = wuduQueues.get(sim);
+  if (!m) wuduQueues.set(sim, (m = new Map()));
+  let q = m.get(section);
+  if (!q) m.set(section, (q = { order: [], waits: new Map(), slots: new Map() }));
+  return q;
+}
+
+/** Quem ainda está na fila agora (os outros saíram: foram chamados, a fila deles foi descartada). */
+function activeQueue(sim: Sim, q: WuduQueue): string[] {
+  q.order = q.order.filter((id) => {
+    const c = sim.chars.get(id);
+    const w = q.waits.get(id);
+    const ok = !!c && !c.gone && !!w && (c.step === w || c.queue.includes(w));
+    if (!ok) {
+      q.waits.delete(id);
+      q.slots.delete(id);
+    }
+    return ok;
+  });
+  return q.order;
+}
+
+/** Quem está na fila da ablução de uma ala, na ordem (para os testes e a depuração). */
+export function wuduQueueOrder(sim: Sim, section: MosqueSection): string[] {
+  return [...activeQueue(sim, wuduQueue(sim, section))];
+}
+
+/** A torneira livre mais perto de (tx, ty), ou undefined. */
+function nearestFreeTap(sim: Sim, ch: Character, stools: readonly SpotDef[], tx: number, ty: number): SpotDef | undefined {
+  let best: SpotDef | undefined;
   let bestD = Infinity;
-  for (let dy = -4; dy <= 4; dy++) {
-    for (let dx = -4; dx <= 4; dx++) {
-      const x = stool.tx + dx;
-      const y = stool.ty + dy;
-      const k = grid.key(x, y);
-      if (grid.get(x, y) !== 1 || busy.has(k) || taken.has(k) || stools.has(k)) continue;
-      if (r && (x < r.x || y < r.y || x >= r.x + r.w || y >= r.y + r.h)) continue;
-      const d = Math.abs(dx) + Math.abs(dy) * 1.2;
-      if (d >= 2 && d < bestD) {
-        bestD = d;
-        best = { x, y };
-      }
+  for (const s of stools) {
+    if (!sim.spots.isFree(s.id, ch.id)) continue;
+    const d = Math.abs(s.tx - tx) + Math.abs(s.ty - ty);
+    if (d < bestD) {
+      bestD = d;
+      best = s;
     }
   }
-  if (best) taken.add(grid.key(best.x, best.y));
   return best;
 }
 
+/** Lugares de espera da fila: colunas ao lado das torneiras (2, 3 e 4 tiles a leste), de cima para baixo. */
+function queueSlots(sim: Sim, stools: readonly SpotDef[]): { x: number; y: number }[] {
+  const grid = sim.building.grid;
+  // fora dos tiles de outros spots (banquinhos, sapateiras, topis/hijabs)
+  const used = new Set([...sim.spots.all()].filter((p) => p.kind !== 'prayer').map((p) => grid.key(p.tx, p.ty)));
+  const rows = [...new Set(stools.map((s) => s.ty))].sort((a, b) => a - b);
+  const x0 = Math.max(...stools.map((s) => s.tx));
+  const out: { x: number; y: number }[] = [];
+  for (const dx of [2, 3, 4]) for (const y of rows) if (grid.get(x0 + dx, y) === 1 && !used.has(grid.key(x0 + dx, y))) out.push({ x: x0 + dx, y });
+  return out;
+}
+
+/** A vez de alguém da fila: o primeiro da fila recebe a torneira livre mais perto (já reservada). */
+function grantTap(sim: Sim, ch: Character, section: MosqueSection, stools: readonly SpotDef[]): SpotDef | null {
+  const q = wuduQueue(sim, section);
+  if (activeQueue(sim, q)[0] !== ch.id) return null;
+  const tap = nearestFreeTap(sim, ch, stools, ch.tx, ch.ty);
+  if (!tap || !sim.reserveTemp(ch, tap)) return null;
+  q.order.shift();
+  q.waits.delete(ch.id);
+  q.slots.delete(ch.id);
+  return tap;
+}
+
 /**
- * Monta a ida à mesquita (retorna false se a mesquita não existe ou a ala está lotada). Com `queue` (chamado para a
- * oração), sem torneira livre a pessoa espera a vez perto da ablução em vez de desistir.
+ * Passos da ablução na chegada (depois da sapateira): com torneira livre e ninguém na fila, a mais perto; senão, o fim
+ * da fila, num lugar de espera só seu, até a vez chegar (e então a torneira que vagou).
+ */
+function wuduOnArrival(sim: Sim, ch: Character, section: MosqueSection, rng: () => number): Step[] {
+  const stools = sim.spots.ofKind('wudu').filter((s) => s.areaId === sectionArea(section));
+  if (!stools.length) return [];
+  const q = wuduQueue(sim, section);
+  const wudu = (tap: SpotDef): Step[] => [
+    { t: 'go', tx: tap.tx, ty: tap.ty },
+    { t: 'enter', spot: tap.id },
+    { t: 'act', pose: 'wudu', ms: jitter(rng, 8000), seated: true },
+    { t: 'exit' },
+    { t: 'do', fn: () => sim.spots.release(tap.id, ch.id) },
+  ];
+  if (!activeQueue(sim, q).length) {
+    const tap = nearestFreeTap(sim, ch, stools, ch.tx, ch.ty);
+    if (tap && sim.reserveTemp(ch, tap)) return wudu(tap);
+  }
+  // fila: entra no fim agora e espera no primeiro lugar de espera livre
+  q.order.push(ch.id);
+  const slots = queueSlots(sim, stools);
+  const taken = new Set(q.slots.values());
+  const k = slots.findIndex((_, i) => !taken.has(i));
+  const steps: Step[] = [];
+  if (k >= 0) {
+    q.slots.set(ch.id, k);
+    steps.push({ t: 'go', tx: slots[k].x, ty: slots[k].y, dir: 'left' });
+  }
+  const wait: Step = {
+    t: 'until',
+    cond: () => {
+      // os passos da torneira entram logo depois deste (a fila de passos continua com o topi/hijab e o lugar no saf)
+      const tap = grantTap(sim, ch, section, stools);
+      if (tap) ch.queue.unshift(...wudu(tap));
+      return !!tap;
+    },
+    minMs: 300,
+    maxMs: 240_000,
+    pose: 'stand',
+    dir: 'left',
+  };
+  q.waits.set(ch.id, wait);
+  steps.push(wait);
+  return steps;
+}
+
+/**
+ * Monta a ida à mesquita (retorna false se a mesquita não existe ou a ala está lotada). A torneira da ablução é escolhida
+ * na chegada (a livre mais perto, ou a fila da ala). `opts.queue` ficou só por compatibilidade.
  */
 export function planPrayerVisit(sim: Sim, ch: Character, now: number, opts: { queue?: Set<number> } = {}): boolean {
+  void opts;
   if (!sim.building.campus?.mosque) return false;
   const section = sectionOf(ch.appearance.look);
   const area = sectionArea(section);
@@ -200,24 +305,10 @@ export function planPrayerVisit(sim: Sim, ch: Character, now: number, opts: { qu
   const j = joinable(cur, now) ? cur : undefined;
   const style = sim.mosque.style;
   const place = pickPrayerSpot(sim.spots.ofKind('prayer').filter((s) => s.areaId === area), free, !!j);
-  const stools = sim.spots.ofKind('wudu').filter((s) => s.areaId === area);
-  let stool = stools.find((s) => free(s.id) && ch.rng() < 0.7) ?? stools.find((s) => free(s.id));
-  // chamado para a oração: torneiras ocupadas, espera a vez numa delas
-  let wait: { x: number; y: number } | null = null;
-  if (!stool && opts.queue && stools.length) {
-    stool = stools[Math.floor(ch.rng() * stools.length) % stools.length];
-    wait = queueTile(sim, ch, stool, opts.queue);
-  }
   const shoes = quickSpot(sim, ch, 'shoes', section);
   const head = quickSpot(sim, ch, 'headwear', section);
-  if (!place || !stool || !shoes || !head) return false;
+  if (!place || !shoes || !head) return false;
   if (!sim.reserveTemp(ch, place)) return false;
-  const queued = !free(stool.id);
-  if (!queued && !sim.reserveTemp(ch, stool)) {
-    sim.releaseTemp(ch);
-    return false;
-  }
-  const tap = stool;
   const visit: PrayerVisit = { section, shoesOff: false, covered: false };
   if (j) j.members.add(ch.id);
   const turbah = style === 'shia';
@@ -232,19 +323,9 @@ export function planPrayerVisit(sim: Sim, ch: Character, now: number, opts: { qu
     { t: 'act', pose: 'use', ms: jitter(rng, 1500), dir: shoes.dir },
     { t: 'do', fn: () => takeOffShoes(ch, visit) },
   );
-  if (queued) {
-    // na fila da ablução: espera em pé perto das torneiras até a sua vagar
-    if (wait) steps.push({ t: 'go', tx: wait.x, ty: wait.y, dir: 'left' });
-    // a condição já reserva a torneira (dois na fila nunca sentam na mesma)
-    steps.push({ t: 'until', cond: () => sim.spots.ownerOf(tap.id) === ch.id || sim.reserveTemp(ch, tap), minMs: 400, maxMs: 120_000, pose: 'stand' });
-  }
   steps.push(
-    // ablução
-    { t: 'go', tx: tap.tx, ty: tap.ty },
-    { t: 'enter', spot: tap.id },
-    { t: 'act', pose: 'wudu', ms: jitter(rng, 8000), seated: true },
-    { t: 'exit' },
-    { t: 'do', fn: () => sim.spots.release(tap.id, ch.id) },
+    // ablução: na chegada, a torneira livre mais perto, ou a fila (sim/prayer.ts wuduOnArrival)
+    { t: 'do', fn: () => ch.queue.unshift(...wuduOnArrival(sim, ch, section, rng)) },
     // topi (homens) ou hijab do cabideiro (mulheres); no estilo shia, também uma turbah da caixinha ao lado
     { t: 'go', tx: head.tx, ty: head.ty, fx: head.x, fy: head.y, dir: head.dir },
     { t: 'act', pose: 'use', ms: jitter(rng, (section === 'f' ? 1800 : 1100) + (turbah ? 900 : 0)), dir: head.dir },

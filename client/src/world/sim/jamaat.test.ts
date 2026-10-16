@@ -10,9 +10,9 @@ import type { Appearance, ArtModule, RoomTheme } from '../../art/api';
 import { DEFAULT_WORLD_OPTIONS } from '../api';
 import { CLERIC_IMAM, clericGroup, MEN_ID, WOMEN_ID } from '../layout/mosque';
 import { CLERIC_NAMES } from './cleric';
-import { currentPrayer, followPose, jamaatOf, startJamaat, turbahsOf, type Follow, type Jamaat } from './jamaat';
+import { currentPrayer, followPose, imamTurbahs, jamaatOf, startJamaat, turbahsOf, type Follow, type Jamaat } from './jamaat';
 import { GRACE_MS, PrayerClock } from './prayer-clock';
-import { makeupSequence, missedRakahs, prayersFor, prayerSequence, RAKAHS, sequenceMs, sessionSequence, skipCall } from './salat';
+import { endingMs, endingPhases, hurrySequence, makeupSequence, missedRakahs, prayersFor, prayerSequence, RAKAHS, sequenceMs, sessionSequence, skipCall } from './salat';
 import { sendAll } from './send-all';
 import { Sim } from './sim';
 import { staffRoles } from './staff';
@@ -45,10 +45,32 @@ describe('sequências: sunni × shia', () => {
       const seq = prayerSequence(rng(), n, style);
       expect(seq.filter((p) => p.pose === 'ruku')).toHaveLength(n);
       expect(seq.filter((p) => p.pose === 'sujood')).toHaveLength(2 * n);
-      const tashahhud = seq.filter((p, i) => p.pose === 'jalsa' && seq[i + 1]?.pose !== 'sujood');
+      const tashahhud = seq.filter((p, i) => p.pose === 'jalsa' && !p.end && seq[i + 1]?.pose !== 'sujood');
       expect(tashahhud).toHaveLength(n > 2 ? 2 : 1);
-      expect(seq.at(-1)!.pose).toBe('salam');
+      expect(seq.at(-1)!.end).toBe(true);
     }
+  });
+
+  it('o fim: sunni = salam virando a cabeça; shia = salam sentado olhando a qibla e três takbirs sentado (mãos às orelhas e às coxas)', () => {
+    const sunni = prayerSequence(rng(), 2, 'sunni');
+    expect(sunni.filter((p) => p.end).map((p) => p.pose)).toEqual(['salam']);
+    expect(sunni.some((p) => p.pose === 'takbir_seated')).toBe(false);
+    const shia = prayerSequence(rng(), 2, 'shia');
+    const end = shia.filter((p) => p.end).map((p) => p.pose);
+    expect(end).toEqual(['jalsa', 'takbir_seated', 'jalsa', 'takbir_seated', 'jalsa', 'takbir_seated', 'jalsa']);
+    // sem virar a cabeça: nenhuma pose 'salam' (a que vira a cabeça) no estilo shia
+    expect(shia.some((p) => p.pose === 'salam')).toBe(false);
+    // o fim vem depois do tashahhud final
+    const first = shia.findIndex((p) => p.end);
+    expect(shia[first - 1].pose).toBe('jalsa');
+    expect(endingPhases('shia').reduce((a, p) => a + p.ms, 0)).toBe(endingMs(shia));
+    // atrasado e chamado no meio: também terminam do jeito do estilo
+    expect(makeupSequence(rng(), 1, 'shia').filter((p) => p.pose === 'takbir_seated')).toHaveLength(3);
+    expect(hurrySequence(shia, 2000).filter((p) => p.pose === 'takbir_seated')).toHaveLength(3);
+    expect(hurrySequence(sunni, 2000).at(-1)!.pose).toBe('salam');
+    // no meio dos takbirs: termina os que faltam, sem recomeçar
+    const t = shia.slice(0, shia.findIndex((p) => p.pose === 'takbir_seated') + 1).reduce((a, p) => a + p.ms, 0) + 100;
+    expect(hurrySequence(shia, t).filter((p) => p.pose === 'takbir_seated')).toHaveLength(2);
   });
 
   it('orações juntas (shia, combine): Dhuhr+Asr e Maghrib+Isha, dois takbirs e dois salams; Asr e Isha não chamam', () => {
@@ -60,7 +82,9 @@ describe('sequências: sunni × shia', () => {
     expect(skipCall('asr', 'shia', false)).toBe(false);
     const seq = sessionSequence(rng(), [4, 4], 'shia');
     expect(seq.filter((p) => p.pose === 'takbir')).toHaveLength(2);
-    expect(seq.filter((p) => p.pose === 'salam')).toHaveLength(2);
+    // cada oração termina com os seus três takbirs sentado
+    expect(seq.filter((p) => p.pose === 'takbir_seated')).toHaveLength(6);
+    expect(sessionSequence(rng(), [4, 4], 'sunni').filter((p) => p.pose === 'salam')).toHaveLength(2);
     expect(seq.filter((p) => p.pose === 'ruku')).toHaveLength(8);
   });
 
@@ -254,9 +278,10 @@ describe('religiosos e congregação', () => {
     for (const id of jf.members) expect(sim.chars.get(id)!.appearance.look).toBe('f');
     expect(turbahs).toBeGreaterThanOrEqual(8);
     expect(majlis).toBe(true);
-    // todos levantam, devolvem a turbah e saem
+    // todos levantam, devolvem a turbah e saem: ficam só as turbahs fixas dos dois lugares do imam
     run(sim, clock, 8);
-    expect([...turbahsOf(sim)]).toHaveLength(0);
+    expect(turbahsOf(sim)).toEqual(imamTurbahs(sim));
+    expect(imamTurbahs(sim)).toHaveLength(2);
     void WOMEN_ID;
   });
 
@@ -269,11 +294,14 @@ describe('religiosos e congregação', () => {
     run(sim, clock, 300, () => {
       for (const c of sim.chars.values()) if (c.step?.t === 'pray') poses.add(c.pose);
       turbahs = Math.max(turbahs, [...turbahsOf(sim)].length);
-      return !jamaatOf(sim, 'm') && poses.size > 4;
+      return !jamaatOf(sim, 'm') && poses.has('salam');
     });
     expect(poses.has('qiyam')).toBe(true);
     expect(poses.has('sadl')).toBe(false);
     expect(poses.has('qunoot')).toBe(false);
+    // o fim sunni: o salam virando a cabeça, sem os takbirs sentado
+    expect(poses.has('salam')).toBe(true);
+    expect(poses.has('takbir_seated')).toBe(false);
     expect(turbahs).toBe(0);
   });
 

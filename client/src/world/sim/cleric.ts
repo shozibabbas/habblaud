@@ -181,7 +181,12 @@ function planRoutine(crew: StaffCrew, m: Cleric): boolean {
     if (!imam) return false;
     s.doing = 'nafl';
     goTo(steps, ch, imam, 'left');
-    steps.push({ t: 'pray', seq: prayerSequence(rng, 2, sim.mosque.style) });
+    // estilo shia: a turbah do lugar do imam (sempre ali, ver jamaat.imamTurbahs) sob a testa
+    steps.push(
+      { t: 'do', fn: () => sim.mosque.style === 'shia' && setTurbah(sim, ch, turbahSpot(imam.x, imam.y)) },
+      { t: 'pray', seq: prayerSequence(rng, 2, sim.mosque.style) },
+      { t: 'do', fn: () => setTurbah(sim, ch, null) },
+    );
   }
   ch.queue.push(...steps);
   return true;

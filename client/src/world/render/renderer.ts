@@ -25,7 +25,7 @@ import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
 import { reducedMotion } from './github-fx';
 import { drawCallToPrayer, drawTurbahs, drawWuduWater, MosqueRenderer } from './mosque';
-import { turbahsOf } from '../sim/jamaat';
+import { turbahsOf, turbahUnder } from '../sim/jamaat';
 import { Particles } from './particles';
 import { CAR_VARIANTS, carSprite, propSprite, shadowSprite } from './props';
 import { drawPodSleepers, drawRallies, drawScoreboard, drawSmoke, paintCourt } from './recreation';
@@ -928,7 +928,8 @@ export class Renderer {
     req.appearance = wornAppearance(ch);
     req.dir = ch.dir;
     req.pose = ch.pose;
-    req.held = ch.held;
+    // estilo shia: no sujood a testa repousa sobre a turbah (a arte a desenha sob a testa, no mesmo lugar da do carpete)
+    req.held = ch.pose === 'sujood' && turbahUnder(this.sim, ch) ? 'turbah' : ch.held;
     req.seated = ch.seated;
     try {
       sprite = this.charSprite(req, ch.animT);

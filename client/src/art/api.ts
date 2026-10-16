@@ -78,6 +78,7 @@ export type Pose =
   // --- mesquita, estilo shia e os religiosos (aditivo; character/prayer.ts)
   | 'sadl' // qiyam com as mãos ao lado do corpo (estilo shia) (1)
   | 'qunoot' // em pé, as duas mãos erguidas diante do rosto com as palmas para cima (2ª rak'ah, antes do ruku) (1)
+  | 'takbir_seated' // ajoelhado, as mãos ao lado das orelhas com as palmas para a qibla: os três takbirs do fim (shia) (1)
   | 'dars' // ajoelhado falando para quem escuta: uma mão gesticulando e a boca mexendo (majlis/dars) (2)
 
 export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book' | 'box' | 'paddle' | 'popcorn'
@@ -96,7 +97,8 @@ export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book
   | 'mop'
   | 'vacuum'
   // --- mesquita (aditivo; character/cleric.ts)
-  | 'tasbih'; // terço de contas pendurado na mão (também nas posturas ajoelhadas da oração)
+  | 'tasbih' // terço de contas pendurado na mão (também nas posturas ajoelhadas da oração)
+  | 'turbah'; // (só no sujood) a turbah/sajdagah no chão sob a testa, estilo shia: a testa encosta nela
 
 export type HairStyle =
   | 'short' | 'buzz' | 'spiky' | 'side_part' | 'curly' | 'afro' | 'bob' | 'long' | 'ponytail' | 'bun' | 'pigtails'

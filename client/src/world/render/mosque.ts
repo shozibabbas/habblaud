@@ -363,17 +363,21 @@ export function drawWuduWater(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.fillRect(x + 1 + sp, y + 10, 1, 1);
 }
 
-/** Turbahs (tabletes redondos de barro) no carpete, diante de quem reza no estilo shia: onde a testa encosta. */
+/**
+ * Turbahs (sajdagahs: tabletes de barro) no carpete, diante de quem reza no estilo shia: o mesmo desenho e o mesmo
+ * lugar da que a arte põe sob a testa no sujood (art/character/prayer.ts drawTurbah). (x, y) = canto esquerdo da base.
+ */
 export function drawTurbahs(ctx: CanvasRenderingContext2D, at: Iterable<{ x: number; y: number }>): void {
   for (const t of at) {
-    ctx.fillStyle = 'rgba(28,32,52,0.25)';
-    ctx.fillRect(t.x - 2, t.y + 1, 6, 1);
-    ctx.fillStyle = '#8f8374';
-    ctx.fillRect(t.x - 3, t.y - 1, 6, 2);
-    ctx.fillRect(t.x - 2, t.y - 2, 4, 1);
+    ctx.fillStyle = 'rgba(28,32,52,0.28)';
+    ctx.fillRect(t.x + 1, t.y + 1, 8, 1);
+    ctx.fillStyle = '#c2b6a5';
+    ctx.fillRect(t.x + 1, t.y - 2, 6, 1);
+    ctx.fillStyle = '#9a8e7e';
+    ctx.fillRect(t.x, t.y - 1, 8, 1);
     ctx.fillStyle = '#b3a797';
-    ctx.fillRect(t.x - 2, t.y - 2, 3, 1);
-    ctx.fillStyle = '#6f6557';
-    ctx.fillRect(t.x - 2, t.y, 4, 1);
+    ctx.fillRect(t.x + 2, t.y - 1, 1, 1);
+    ctx.fillStyle = '#71675a';
+    ctx.fillRect(t.x + 1, t.y, 6, 1);
   }
 }

@@ -7,7 +7,7 @@ import { PRAYER_AX, PRAYER_W } from './character/prayer';
 import { CHAR_AX, CHAR_H, renderCharacter } from './character/render';
 import type { PixelBuf } from './core/pixbuf';
 
-const POSTURES: readonly Pose[] = ['takbir', 'qiyam', 'sadl', 'qunoot', 'ruku', 'sujood', 'jalsa', 'salam', 'wudu', 'dars'];
+const POSTURES: readonly Pose[] = ['takbir', 'qiyam', 'sadl', 'qunoot', 'ruku', 'sujood', 'jalsa', 'salam', 'wudu', 'dars', 'takbir_seated'];
 const draw = (a: Appearance, pose: Pose, frame = 0, dir: 'left' | 'right' = 'left') => renderCharacter({ appearance: a, dir, pose, frame, seated: pose === 'wudu' });
 const box = (b: PixelBuf) => b.bounds()!;
 
@@ -119,7 +119,7 @@ describe('posturas da oração', () => {
     expect(beads(renderCharacter({ appearance: aalim, dir: 'left', pose: 'jalsa', frame: 0, held: 'tasbih' }).buf)).toBe(true);
     expect(beads(renderCharacter({ appearance: aalim, dir: 'down', pose: 'sit', frame: 0, held: 'tasbih', seated: true }).buf)).toBe(true);
     const aalima = { ...women[0], topStyle: 'abaya', top: '#1e1c22', accessory: 'hijab', accessoryColor: '#25232b', hair: '#d03030' } as Appearance;
-    for (const pose of ['stand', 'walk', 'sadl', 'sujood', 'dars'] as Pose[]) {
+    for (const pose of ['stand', 'walk', 'sadl', 'sujood', 'dars', 'takbir_seated'] as Pose[]) {
       const b = renderCharacter({ appearance: aalima, dir: 'left', pose, frame: 0 }).buf;
       expect(has(b, '#1e1c22'), pose).toBe(true);
       expect(has(b, '#d03030'), pose).toBe(false);

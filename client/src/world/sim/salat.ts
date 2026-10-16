@@ -1,19 +1,44 @@
 // Sequências de posturas da oração (puro): quantas rak'ahs cada oração tem, o jeito de rezar (sunni: mãos cruzadas no
 // qiyam; shia: mãos ao lado do corpo e o qunoot na 2ª rak'ah), o tashahhud do meio nas orações de 3 e 4 rak'ahs, duas
 // orações juntas (estilo shia: Dhuhr+Asr, Maghrib+Isha) e as rak'ahs que quem chegou atrasado completa sozinho.
-// Tempos encurtados, no ritmo calmo de quem reza; o salam (direita e depois esquerda) fecha cada oração.
+// Tempos encurtados, no ritmo calmo de quem reza. O fim de cada oração depende do jeito de rezar:
+//   sunni  depois do tashahhud, o salam virando a cabeça à direita e depois à esquerda;
+//   shia   o salam dito sentado, olhando para a qibla (sem virar a cabeça), e três takbirs sentado: as mãos sobem ao
+//          lado das orelhas (palmas para a qibla) e descem às coxas, três vezes; depois levanta.
 import type { PrayerStyle } from '../../../../shared/mosque';
 import type { PrayerName } from '../../../../shared/prayer-times';
 import type { Pose } from '../../art/api';
 
 /** Postura da oração (as poses da arte). */
-export type Posture = Extract<Pose, 'takbir' | 'qiyam' | 'sadl' | 'qunoot' | 'ruku' | 'sujood' | 'jalsa' | 'salam'>;
+export type Posture = Extract<Pose, 'takbir' | 'qiyam' | 'sadl' | 'qunoot' | 'ruku' | 'sujood' | 'jalsa' | 'salam' | 'takbir_seated'>;
 
 export interface PrayerPhase {
   pose: Posture;
   ms: number;
   /** Rak'ah (0, 1, ... contando as duas orações juntas) a que a postura pertence; ausente no takbir e no salam. */
   rakah?: number;
+  /** Faz parte do fim da oração (o salam e, no estilo shia, os três takbirs sentado). */
+  end?: boolean;
+}
+
+/** O fim da oração depois do tashahhud: o salam virando a cabeça (sunni) ou o salam sentado e os três takbirs (shia). */
+export function endingPhases(style: PrayerStyle): PrayerPhase[] {
+  if (style !== 'shia') return [{ pose: 'salam', ms: 2600, end: true }];
+  const out: PrayerPhase[] = [{ pose: 'jalsa', ms: 1400, end: true }];
+  for (let k = 0; k < 3; k++) out.push({ pose: 'takbir_seated', ms: 700, end: true }, { pose: 'jalsa', ms: k < 2 ? 500 : 900, end: true });
+  return out;
+}
+
+/** Duração do fim (as fases `end` do final) de uma sequência. */
+export function endingMs(seq: readonly PrayerPhase[]): number {
+  let t = 0;
+  for (let i = seq.length - 1; i >= 0 && seq[i].end; i--) t += seq[i].ms;
+  return t;
+}
+
+/** O jeito de rezar de uma sequência (pelas posturas: em pé de mãos ao lado, qunoot, takbir sentado = shia). */
+export function styleOf(seq: readonly PrayerPhase[]): PrayerStyle {
+  return seq.some((p) => p.pose === 'sadl' || p.pose === 'qunoot' || p.pose === 'takbir_seated') ? 'shia' : 'sunni';
 }
 
 /** Rak'ahs das obrigatórias: Fajr 2, Dhuhr 4, Asr 4, Maghrib 3, Isha 4. */
@@ -66,7 +91,7 @@ function rakahPhases(rng: () => number, rakahs: number, style: PrayerStyle, firs
 
 /** Uma oração completa: takbir, `rakahs` rak'ahs (2 no nafl) com o tashahhud e o salam. */
 export function prayerSequence(rng: () => number, rakahs = 2, style: PrayerStyle = 'sunni'): PrayerPhase[] {
-  return [{ pose: 'takbir', ms: jitter(rng, 1100) }, ...rakahPhases(rng, rakahs, style, 0), { pose: 'salam', ms: 2600 }];
+  return [{ pose: 'takbir', ms: jitter(rng, 1100) }, ...rakahPhases(rng, rakahs, style, 0), ...endingPhases(style)];
 }
 
 /** Uma ou duas orações seguidas (juntas): cada uma com o seu takbir e o seu salam; as rak'ahs contam direto. */
@@ -76,7 +101,7 @@ export function sessionSequence(rng: () => number, rakahs: readonly number[], st
   rakahs.forEach((n, i) => {
     // entre as duas: um instante sentado e de pé de novo para o takbir da segunda
     if (i > 0) out.push({ pose: 'jalsa', ms: jitter(rng, 1800) });
-    out.push({ pose: 'takbir', ms: jitter(rng, 1100) }, ...rakahPhases(rng, n, style, first), { pose: 'salam', ms: 2600 });
+    out.push({ pose: 'takbir', ms: jitter(rng, 1100) }, ...rakahPhases(rng, n, style, first), ...endingPhases(style));
     first += n;
   });
   return out;
@@ -85,7 +110,7 @@ export function sessionSequence(rng: () => number, rakahs: readonly number[], st
 /** O que quem chegou atrasado completa sozinho depois do salam do imam: as rak'ahs perdidas, o tashahhud e o salam. */
 export function makeupSequence(rng: () => number, missed: number, style: PrayerStyle): PrayerPhase[] {
   if (missed <= 0) return [];
-  return [...rakahPhases(rng, missed, style, 0, false), { pose: 'salam', ms: 2600 }];
+  return [...rakahPhases(rng, missed, style, 0, false), ...endingPhases(style)];
 }
 
 export function sequenceMs(seq: readonly PrayerPhase[]): number {
@@ -125,18 +150,20 @@ const isUp = (p: Posture) => p === 'takbir' || p === 'qiyam' || p === 'sadl' || 
  * máximo 0,6 s; quem está em pé ou curvado desce em sujood; depois o tashahhud curto e o salam. Retorna a
  * sequência que começa AGORA (tempos relativos ao instante `t` da sequência antiga).
  */
-export function hurrySequence(seq: readonly PrayerPhase[], t: number): PrayerPhase[] {
+export function hurrySequence(seq: readonly PrayerPhase[], t: number, style: PrayerStyle = styleOf(seq)): PrayerPhase[] {
   const at = phaseAt(seq, t);
   if (!at) return [];
   const cur = at.phase.pose;
   const out: PrayerPhase[] = [{ pose: cur, ms: Math.min(at.left, 600) }];
-  if (cur === 'salam') {
-    out[0].ms = Math.min(at.left, 1300);
+  if (at.phase.end) {
+    // já no fim: termina o que falta dele (o salam, ou os takbirs) sem pular nada
+    out[0] = { ...at.phase, ms: Math.min(at.left, 1300) };
+    for (let i = at.i + 1; i < seq.length && seq[i].end; i++) out.push({ ...seq[i] });
     return out;
   }
   if (isUp(cur)) out.push({ pose: 'sujood', ms: 1000 });
   if (cur !== 'jalsa') out.push({ pose: 'jalsa', ms: 1200 });
   else out[0].ms = Math.min(at.left, 1200);
-  out.push({ pose: 'salam', ms: 2600 });
+  out.push(...endingPhases(style));
   return out;
 }

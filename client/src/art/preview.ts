@@ -34,7 +34,7 @@ const POSE_PT: Record<Pose, string> = {
   wait: 'esperando', cheer: 'comemorando', laugh: 'gargalhando', game: 'videogame', rps: 'jokenpô', groom: 'no espelho', sulk: 'chateado',
   takbir: 'takbir', qiyam: 'qiyam', ruku: 'ruku', sujood: 'sujood', jalsa: 'jalsa', salam: 'salam', wudu: 'ablução',
   phone: 'ao celular', phone_walk: 'andando ao celular', type_stand: 'digitando em pé', mop: 'passando mop', vacuum: 'aspirando', push: 'empurrando carrinho', scrub: 'esfregando o vaso', wipe: 'passando pano',
-  sadl: 'qiyam (mãos ao lado)', qunoot: 'qunoot', dars: 'dars (majlis)',
+  sadl: 'qiyam (mãos ao lado)', qunoot: 'qunoot', dars: 'dars (majlis)', takbir_seated: 'takbir sentado',
 };
 /** Poses que sempre são sentadas (as demais podem ser em pé ou sentadas). */
 const SEATED_POSES: readonly Pose[] = ['sit', 'type', 'sleep', 'wait'];
@@ -42,7 +42,7 @@ const HELD: readonly HeldItem[] = ['coffee', 'water', 'papers', 'laptop', 'book'
 const HELD_PT: Record<HeldItem, string> = {
   none: 'nada', coffee: 'café', water: 'água', papers: 'papéis', laptop: 'notebook', book: 'livro', box: 'caixa', paddle: 'raquete', popcorn: 'pipoca',
   controller: 'controle', phone: 'celular', lipstick: 'batom', comb: 'pente', rock: 'pedra', paper: 'papel', scissors: 'tesoura',
-  racket: 'raquete de tênis', cigarette: 'cigarro', mop: 'mop', vacuum: 'aspirador', tasbih: 'tasbih',
+  racket: 'raquete de tênis', cigarette: 'cigarro', mop: 'mop', vacuum: 'aspirador', tasbih: 'tasbih', turbah: 'turbah',
 };
 const SCREENS: readonly ScreenMode[] = ['off', 'standby', 'idle', 'code', 'terminal', 'browser', 'search', 'chat', 'docs', 'tasks', 'alert', 'progress', 'show', 'game'];
 const SCREEN_PT: Record<ScreenMode, string> = {

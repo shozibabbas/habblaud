@@ -12,9 +12,9 @@ import type { BufSprite } from '../core/sprite';
 import type { HeadView } from './hair';
 import { CHAR_AX, CHAR_AY, CHAR_H, CHAR_PARTS as P, type Arm, type Dc, type Rig } from './render';
 
-export type PrayerPose = Extract<Pose, 'takbir' | 'qiyam' | 'ruku' | 'sujood' | 'jalsa' | 'salam' | 'wudu' | 'sadl' | 'qunoot' | 'dars'>;
+export type PrayerPose = Extract<Pose, 'takbir' | 'qiyam' | 'ruku' | 'sujood' | 'jalsa' | 'salam' | 'wudu' | 'sadl' | 'qunoot' | 'dars' | 'takbir_seated'>;
 
-const PRAYER_POSES: ReadonlySet<string> = new Set<PrayerPose>(['takbir', 'qiyam', 'ruku', 'sujood', 'jalsa', 'salam', 'wudu', 'sadl', 'qunoot', 'dars']);
+const PRAYER_POSES: ReadonlySet<string> = new Set<PrayerPose>(['takbir', 'qiyam', 'ruku', 'sujood', 'jalsa', 'salam', 'wudu', 'sadl', 'qunoot', 'dars', 'takbir_seated']);
 
 export function isPrayerPose(pose: Pose): pose is PrayerPose {
   return PRAYER_POSES.has(pose);
@@ -52,11 +52,14 @@ export function renderPrayer(req: CharacterFrameRequest): BufSprite {
     case 'dars':
       drawKneeling(dc, 'side', req.held, f);
       break;
+    case 'takbir_seated':
+      drawKneeling(dc, 'side', req.held, -1, true);
+      break;
     case 'ruku':
       drawRuku(dc);
       break;
     case 'sujood':
-      drawSujood(dc);
+      drawSujood(dc, req.held === 'turbah');
       break;
     case 'jalsa':
     case 'salam':
@@ -129,8 +132,7 @@ function drawStanding(dc: Dc, pose: 'takbir' | 'qiyam' | 'sadl' | 'qunoot'): voi
   if (pose === 'takbir') {
     // palma aberta virada para a qibla: o polegar junto ao lóbulo da orelha
     a.near();
-    dc.b.set(6, 10, dc.p.skin.lt);
-    dc.b.set(6, 11, dc.p.skin.base);
+    palm(dc, 0);
     return;
   }
   a.near();
@@ -237,9 +239,11 @@ function kneelLegsSitting(dc: Dc): void {
 }
 
 /** Sujood: ajoelhado, tronco à frente na horizontal, testa e nariz no chão, mãos espalmadas ao lado da cabeça. */
-function drawSujood(dc: Dc): void {
+function drawSujood(dc: Dc, turbah = false): void {
   const hx = 12;
-  const hy = HIP_Y + 1;
+  // com a turbah, a cabeça fica 2 px mais alta: a testa repousa sobre ela
+  const hy = HIP_Y + 1 - (turbah ? 2 : 0);
+  if (turbah) drawTurbah(dc.b, TURBAH_X, CHAR_AY);
   const fem = dc.a.look === 'f';
   const z = withRig(dc, { ub: 0, lean: 0 });
   const sl = Math.min(P.sleeveLength(dc.a), 3);
@@ -250,18 +254,57 @@ function drawSujood(dc: Dc): void {
   P.drawArm(z, fem ? P.arm([5, hy], [2, 28], [-3, 29]) : P.arm([5, hy - 1], [2, 25], [-2, 29]), dc.p.top, sl, 0, true);
 }
 
+/**
+ * Turbah (sajdagah) sob a testa no sujood, em coordenadas padrão: (x, y) = canto esquerdo da linha de baixo. O mundo
+ * desenha a do carpete no mesmo lugar (render/mosque.ts, TURBAH_DX), então as duas coincidem.
+ */
+export const TURBAH_X = -6;
+/**
+ * Deslocamento (px) do canto esquerdo da turbah em relação aos pés de quem reza virado para oeste: TURBAH_X - CHAR_AX.
+ * Literal de propósito (render.ts importa este módulo; nada dele pode ser lido no carregamento). A base fica nos pés.
+ */
+export const TURBAH_DX = -18;
+
+export function drawTurbah(b: PixelBuf, x: number, baseY: number): void {
+  // tablete redondo de barro (8 x 3), visto de lado: topo claro, borda escura embaixo
+  b.hline(x + 1, x + 6, baseY - 2, '#c2b6a5');
+  b.rect(x, baseY - 1, 8, 1, '#9a8e7e');
+  b.hline(x + 1, x + 6, baseY, '#71675a');
+  b.set(x + 2, baseY - 1, '#b3a797');
+}
+
+/**
+ * Palma aberta virada para a qibla junto à orelha (takbir em pé e sentado): dedos para cima, o polegar no lóbulo.
+ * Desenhada por cima da manga, para ler mesmo com a aba e o chador escuros.
+ */
+function palm(dc: Dc, dy: number): void {
+  const sk = dc.p.skin;
+  for (let y = 8; y <= 12; y++) {
+    dc.b.set(5, y + dy, y === 8 ? sk.base : sk.lt);
+    dc.b.set(6, y + dy, y < 10 ? sk.base : sk.dk);
+  }
+  dc.b.set(7, 12 + dy, sk.base);
+}
+
 /** Jalsa/tashahhud (cabeça de perfil) e salam (cabeça virada: 'up' = à direita/norte, 'down' = à esquerda/sul). */
-function drawKneeling(dc: Dc, view: HeadView, held: CharacterFrameRequest['held'] = 'none', talk = -1): void {
+function drawKneeling(dc: Dc, view: HeadView, held: CharacterFrameRequest['held'] = 'none', talk = -1, takbir = false): void {
   const drop = 5;
   const d = withRig(dc, { ub: drop, mouth: talk === 0 ? 'open' : 'none', eyes: talk >= 0 ? 'open' : dc.r.eyes });
-  // dars: a mão de perto gesticula (na altura do peito e um pouco mais alta)
-  const near = talk < 0 ? P.arm([10, 18], [10, 21], [7, 22]) : talk === 0 ? P.arm([10, 18], [8, 20], [5, 19]) : P.arm([10, 18], [8, 19], [5, 16]);
-  const a = arms(d, P.arm([12, 18], [12, 21], [8, 22]), near);
+  // dars: a mão de perto gesticula (na altura do peito e um pouco mais alta); takbir: as duas mãos junto às orelhas
+  const near = takbir
+    ? P.arm([10, 18], [7, 17], [7, 11])
+    : talk < 0
+      ? P.arm([10, 18], [10, 21], [7, 22])
+      : talk === 0
+        ? P.arm([10, 18], [8, 20], [5, 19])
+        : P.arm([10, 18], [8, 19], [5, 16]);
+  const a = arms(d, takbir ? P.arm([12, 18], [14, 16], [13, 11]) : P.arm([12, 18], [12, 21], [8, 22]), near);
   a.far();
   kneelLegsSitting(d);
   P.drawTorso(d);
   head(d, view);
   a.near();
+  if (takbir) palm(dc, drop);
   // o terço na mão que descansa na coxa (a de trás, no dars)
   if (held === 'tasbih') P.drawTasbih(dc.b, talk < 0 ? 7 : 9, 23 + drop);
 }
