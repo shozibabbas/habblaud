@@ -1,7 +1,8 @@
 // Sons do ambiente sugeridos pelo mundo: teclado de quem trabalha à vista, "ding" quando a porta de
 // um elevador abre (alguém chega ou sai), as rodas (raquetadas e quiques do pingue-pongue e do tênis no ritmo da
 // bola desenhada, fliperama, moedinhas das apostas), as pausas (água do wudu, ronco nas cápsulas, isqueiro e
-// baforadas, xícaras na cozinha, a TV) e os carros da rua. Só observa a simulação e a câmera; quem decide se toca
+// baforadas, xícaras na cozinha, a TV), a diretoria (o celular do dono tocando, o motor da mesa de pé, a xícara de
+// chai) e os carros da rua. Só observa a simulação e a câmera; quem decide se toca
 // (preferência, volume, aba oculta) é a UI.
 import type { SoundCue } from './api';
 import type { Camera } from './camera';
@@ -41,6 +42,7 @@ export class SoundCues {
   /** Quem estava com o cigarro e em que pose (isqueiro ao acender, baforada ao tirar da boca). */
   private smokers = new Map<string, string>();
   private coinsSeen = 0;
+  private staffSeen = 0;
   private carsSeen = new WeakSet<object>();
 
   constructor(
@@ -61,6 +63,7 @@ export class SoundCues {
     this.social(now, view, near, emit);
     this.breaks(now, view, near, emit);
     this.coins(view, near, emit);
+    this.staffCues(view, near, emit);
     this.traffic(view, near, emit);
   }
 
@@ -211,6 +214,16 @@ export class SoundCues {
       this.coinsSeen = e.at;
       const ch = this.sim.chars.get(e.charId);
       if (ch && this.inView(ch.x, ch.y, view, 24)) emit({ kind: 'coins', gain: near, pan: this.pan(ch.x, view) });
+    }
+  }
+
+  /** Sons pedidos pela equipe (sim/staff.ts `cue`): só os de quem está à vista. */
+  private staffCues(view: ViewRect, near: number, emit: (cue: SoundCue) => void): void {
+    for (const c of this.sim.staff.cues) {
+      if (c.seq <= this.staffSeen) continue;
+      this.staffSeen = c.seq;
+      if (!this.inView(c.x, c.y, view, 24)) continue;
+      emit({ kind: c.kind, gain: near * (c.kind === 'deskHum' ? 0.8 : 1), pan: this.pan(c.x, view) });
     }
   }
 

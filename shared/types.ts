@@ -424,6 +424,8 @@ export interface OwnerInfo {
   look: 'f' | 'm';
   parts?: AppearanceParts;
   secretary?: { name: string; look: 'f' | 'm'; parts?: AppearanceParts };
+  /** Fuma (vai junto na pausa para o cigarro do menu Atividades). Ausente = não. */
+  smokes?: boolean;
 }
 
 /**

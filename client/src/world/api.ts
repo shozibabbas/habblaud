@@ -68,6 +68,9 @@ export type SoundCueKind =
   | 'tv'
   | 'cheer'
   | 'prayerCall'
+  // diretoria (sim/ceo.ts): o toque baixinho do celular antes de uma ligação e o motor da mesa de pé subindo/descendo
+  | 'ring'
+  | 'deskHum'
   // trânsito: supercarro passando
   | 'car';
 

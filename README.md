@@ -744,8 +744,20 @@ HABBLAUD_OWNER='{"name":"Ana","title":"CEO","look":"f","parts":{"topStyle":"jack
   guests and a credenza.
 - **The reception**, right inside the entrance — the secretary's desk (monitor, desk phone, document trays and a small printer), two visitor
   chairs; the owner's office is behind it, through the glass door.
-- At night the windows stay lit and the desk lamp glows. Only the owner and the secretary use the suite; the agents
-  never go there. Without an owner, or in a single-computer office, nothing changes.
+- At night the windows stay lit and the desk lamp glows. Without an owner, or in a single-computer office, nothing
+  changes.
+
+The owner and the secretary are in the office themselves, as staff (like the cleaners and the receptionist: never counted
+as agents; click one for a small card such as "Ana · CEO / On a video call"). The owner works at the desk, sitting or
+standing (the desk rises with a soft motor hum and the chair rolls aside), takes calls on the mobile (seated, or pacing
+by the window) and video calls with the headset on, makes chai at the bar, invites one to three idle agents to short
+meetings at the oval table, does rounds of the campus (stopping at agents' desks for a word, checking on the reception
+and the cleaners), plays table tennis or tennis, watches the TV in the lounge, prays at the mosque, and joins everything
+the **Activities** menu sends people to (the smoking break only with `"smokes": true` in the owner JSON). At night the
+owner works late at the desk under the lamp: no rounds, games or meetings started on their own. The secretary works at
+the reception desk (typing, the desk phone, filing), greets visitors, receives the meeting guests and announces them at
+the owner's door, brings the owner chai now and then, takes breaks only while the owner is out, and joins the call to
+prayer and the Activities menu like everyone else.
 
 ## Accounts and usage (5-hour and weekly)
 

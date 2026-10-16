@@ -2,6 +2,7 @@
 // limpeza, mandar limpar agora e envelhecer o brilho do piso (para ver o brilho novo ao lado de um quase apagado).
 import { TILE } from '../art/api';
 import type { Camera } from './camera';
+import { forceCeo, suiteOf, type CeoActivity } from './sim/ceo';
 import { cleanNow, cleaningAreas, lastCleanedOf, schedule, type CleanerState } from './sim/cleaner';
 import type { Sim } from './sim/sim';
 
@@ -18,6 +19,10 @@ export interface StaffDebug {
   ageShine(seconds: number): number;
   /** Câmera acompanhando alguém da equipe (nome ou id). */
   lookAt(who: string, zoom?: number): void;
+  /** O dono faz isto agora ('stand', 'phone', 'pace', 'video', 'meeting', 'chai', 'rounds', 'game', 'pray'...). */
+  ceo(what: CeoActivity): boolean;
+  /** A reunião do dono em andamento: fase, convidados (nomes) e quem já chegou à antessala. */
+  meeting(): { phase: string; guests: string[]; arrived: string[] } | null;
 }
 
 export function createStaffDebug(sim: Sim, camera: Camera, onCameraMoved: () => void, now: () => number): StaffDebug {
@@ -54,6 +59,12 @@ export function createStaffDebug(sim: Sim, camera: Camera, onCameraMoved: () => 
     ageShine: (seconds) => {
       for (const p of crew.shine.items) p.at -= seconds * 1000;
       return crew.shine.items.length;
+    },
+    ceo: (what) => forceCeo(crew, what),
+    meeting: () => {
+      const m = suiteOf(crew).meeting;
+      const name = (id: string) => sim.chars.get(id)?.info.name ?? id;
+      return m ? { phase: m.phase, guests: m.guests.map(name), arrived: [...m.arrived].map(name) } : null;
     },
     lookAt: (who, zoom = 3) => {
       const m = find(who);

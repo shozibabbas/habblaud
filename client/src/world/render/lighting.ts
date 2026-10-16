@@ -189,6 +189,7 @@ export class Lighting {
    */
   update(now: number, mode: DaylightMode, override: number | null, date: Date): number {
     const hour = effectiveHour(mode, override, date);
+    this.sim.hour = hour;
     const changed = mode !== this.mode || override !== this.override;
     if (now - this.reducedAt > 5_000) {
       this.reducedAt = now;

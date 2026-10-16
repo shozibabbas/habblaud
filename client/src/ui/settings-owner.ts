@@ -1,7 +1,7 @@
 // Grupo "Dono do escritório" das configurações: o nome, o cargo e o look do dono e da secretária. Com um dono, o campus
 // do escritório combinado ganha a diretoria (client/src/world/layout/ceo.ts). Grava no servidor (PUT /api/owner,
 // server/owner.ts: <dataDir>/owner.json); nome vazio (ou "Remover") tira o dono. As peças da aparência (`parts`) não
-// são editadas aqui: vêm do HABBLAUD_OWNER ou da API e são mantidas ao salvar.
+// são editadas aqui: vêm do HABBLAUD_OWNER ou da API e são mantidas ao salvar (assim como `smokes`).
 import type { OwnerInfo } from '../../../shared/types';
 import { access } from '../net/access';
 import type { UiContext } from './context';
@@ -26,6 +26,7 @@ export function ownerBody(form: { name: string; title: string; look: Look; secNa
     ...(form.title.trim() ? { title: form.title.trim() } : {}),
     look: form.look,
     ...(current?.parts ? { parts: current.parts } : {}),
+    ...(current?.smokes ? { smokes: true } : {}),
     ...(secName ? { secretary: { name: secName, look: form.secLook, ...(current?.secretary?.parts ? { parts: current.secretary.parts } : {}) } } : {}),
   };
 }

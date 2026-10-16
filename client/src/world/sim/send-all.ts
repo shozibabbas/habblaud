@@ -8,12 +8,13 @@
 //   pingpong todas as mesas (duplas onde dá); quem sobra assiste.       tennis    a quadra (campus).
 //   nap     as cápsulas (campus); quem sobra cochila na mesa.           smoke     só fumantes (campus).
 //   walk    um passeio pelos caminhos.                                desk      todos de volta à mesa agora.
+// A equipe que participa (o dono e a secretária: StaffRoleDef.joinActivity) vai junto, fora das contas (`crew`).
 import type { GatherKind } from '../social/gathering';
 import type { TileRect } from '../layout/types';
 import { planPrayerVisit } from './prayer';
 import { isSmoker, planNap, planSmoke } from './recreation';
 import type { Character } from './character';
-import { isStaff } from './staff';
+import { isStaff, isStaffId } from './staff';
 import type { Sim } from './sim';
 import type { Step } from './steps';
 import { tr } from '../../../../shared/i18n';
@@ -56,6 +57,8 @@ export interface SendAllResult {
   extra: number;
   /** Total de quem não foi (busy + full + nonSmokers). */
   skipped: number;
+  /** Da equipe, quem foi junto (o dono, a secretária, a limpeza na oração): nunca entra nas contas acima. */
+  crew: string[];
 }
 
 /** Atividades possíveis neste escritório (o prédio único não tem mesquita, quadra, cápsulas nem fumantes). */
@@ -95,7 +98,7 @@ export function availability(ch: Character): 'free' | 'busy' | 'praying' {
 }
 
 function result(activity: SendActivity): SendAllResult {
-  return { activity, sent: [], busy: 0, full: 0, nonSmokers: 0, extra: 0, skipped: 0 };
+  return { activity, sent: [], busy: 0, full: 0, nonSmokers: 0, extra: 0, skipped: 0, crew: [] };
 }
 
 /** Manda todos os livres para `activity`. Retorna quem foi e quem ficou (e por quê). */
@@ -118,6 +121,8 @@ export function sendAll(sim: Sim, activity: SendActivity, now: number): SendAllR
   }
   // tira cada um do que fazia (passeio, roda, cápsula): o plano novo sai de onde a pessoa está
   for (const ch of go) sim.clearPlan(ch);
+  // o dono e a secretária vão junto, na frente da fila (o dono puxa a partida); a oração tem o caminho próprio abaixo
+  if (activity !== 'prayer') go = [...sim.staff.forActivity(activity, now), ...go];
   switch (activity) {
     case 'prayer':
       sim.callToPrayerAt = now;
@@ -126,7 +131,7 @@ export function sendAll(sim: Sim, activity: SendActivity, now: number): SendAllR
         const queue = new Set<number>();
         for (const ch of go) place(r, ch, planPrayerVisit(sim, ch, now, { queue }));
         // a equipe também está no prédio: vai junto, depois dos agentes (fora das contas do resultado)
-        sim.staff.callToPrayer(now, (ch) => planPrayerVisit(sim, ch, now, { queue }));
+        r.crew.push(...sim.staff.callToPrayer(now, (ch) => planPrayerVisit(sim, ch, now, { queue })));
       }
       break;
     case 'chai':
@@ -142,7 +147,7 @@ export function sendAll(sim: Sim, activity: SendActivity, now: number): SendAllR
     case 'nap':
       for (const ch of go) {
         if (planNap(sim, ch, now, true)) r.sent.push(ch.id);
-        else {
+        else if (!isStaff(ch)) {
           deskNap(sim, ch);
           r.sent.push(ch.id);
           r.extra++;
@@ -156,13 +161,16 @@ export function sendAll(sim: Sim, activity: SendActivity, now: number): SendAllR
       for (const ch of go) place(r, ch, planStroll(sim, ch));
       break;
   }
+  // a equipe sai das contas
+  r.crew.push(...r.sent.filter(isStaffId));
+  r.sent = r.sent.filter((id) => !isStaffId(id));
   r.skipped = r.busy + r.full + r.nonSmokers;
   return r;
 }
 
 function place(r: SendAllResult, ch: Character, ok: boolean): void {
   if (ok) r.sent.push(ch.id);
-  else r.full++;
+  else if (!isStaff(ch)) r.full++;
 }
 
 /**
@@ -199,7 +207,7 @@ function groups(sim: Sim, r: SendAllResult, kind: GatherKind, people: Character[
   for (const ch of left) {
     if (sim.social.joinOpen(kind, ch, now)) r.sent.push(ch.id);
     else if (kind === 'kitchen' && planCoffee(sim, ch)) r.sent.push(ch.id);
-    else r.full++;
+    else if (!isStaff(ch)) r.full++;
   }
 }
 
@@ -218,8 +226,8 @@ function games(sim: Sim, r: SendAllResult, kind: 'pingpong' | 'tennis', people: 
   for (const ch of left) {
     if (sim.social.joinOpen(kind, ch, now)) {
       r.sent.push(ch.id);
-      r.extra++;
-    } else r.full++;
+      if (!isStaff(ch)) r.extra++;
+    } else if (!isStaff(ch)) r.full++;
   }
 }
 
@@ -227,7 +235,8 @@ function games(sim: Sim, r: SendAllResult, kind: 'pingpong' | 'tennis', people: 
 function smokeBreak(sim: Sim, r: SendAllResult, smokers: Character[], now: number): void {
   const left = [...smokers];
   while (left.length >= 2 && sim.social.startWith('smoke', left[0], [left[1]], now)) for (const ch of left.splice(0, 2)) r.sent.push(ch.id);
-  for (const ch of left) place(r, ch, planSmoke(sim, ch));
+  // a equipe só chega aqui se fuma (o dono com `smokes`)
+  for (const ch of left) place(r, ch, planSmoke(sim, ch, isStaff(ch)));
 }
 
 /** Café sozinho (sobrou um na pausa para o chai): cafeteira, um gole e de volta. */
@@ -295,6 +304,8 @@ function planStroll(sim: Sim, ch: Character): boolean {
  * depressa (senta, salam — ver prayer.hurrySequence) em vez de largar a oração no meio; quem está na cabine sai logo.
  */
 function recallToDesks(sim: Sim, r: SendAllResult, now: number): SendAllResult {
+  // o dono e a secretária também voltam (cada um para a sua mesa: sim/ceo.ts, sim/secretary.ts)
+  r.crew = sim.staff.forActivity('desk', now).map((ch) => ch.id);
   for (const ch of sim.chars.values()) {
     if (isStaff(ch)) continue;
     if (ch.gone || ch.leaving || ch.arriving || (ch.mode !== 'idle' && ch.mode !== 'shell')) {

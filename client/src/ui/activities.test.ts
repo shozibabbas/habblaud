@@ -5,7 +5,7 @@ import { SEND_ACTIVITIES } from '../world/sim/send-all';
 import { activitiesBlocked, activityToast } from './activities';
 
 const info = (id: string) => SEND_ACTIVITIES.find((a) => a.id === id)!;
-const res = (p: Partial<SendAllResult> & Pick<SendAllResult, 'activity'>): SendAllResult => ({ sent: [], busy: 0, full: 0, nonSmokers: 0, extra: 0, skipped: 0, ...p });
+const res = (p: Partial<SendAllResult> & Pick<SendAllResult, 'activity'>): SendAllResult => ({ sent: [], busy: 0, full: 0, nonSmokers: 0, extra: 0, skipped: 0, crew: [], ...p });
 
 describe('aviso das atividades', () => {
   it('chamado para a oração: quantos vão e quantos ocupados ficaram', () => {

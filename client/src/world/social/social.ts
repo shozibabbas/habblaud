@@ -295,7 +295,8 @@ export class Social {
       g.members.push(m);
     });
     // aposta entre os dois jogadores
-    if (info.match) {
+    // (com o dono, não se aposta: a equipe não tem carteira)
+    if (info.match && !everyone.slice(0, 2).some(isStaff)) {
       const [a, b] = everyone;
       g.bet = betFor(kind, hp, personaFor(b.info.seed), this.wallets.coins(a.id), this.wallets.coins(b.id), bondBetween(a.info.seed, b.info.seed), g.rng);
     }
@@ -1113,7 +1114,8 @@ export class Social {
         : paid
           ? tr('ganhou 🪙{0} de {1} {2}{3}', [paid, ln, what, score])
           : tr('venceu {0} {1}{2}', [ln, what, score]);
-    this.event(g, icon, winners[0].id, text, now);
+    // o feed só fala de agentes (vitória do dono: sem nota no feed)
+    if (!isStaff(winners[0])) this.event(g, icon, winners[0].id, text, now);
   }
 
   private beatChat(g: Gathering, now: number): void {

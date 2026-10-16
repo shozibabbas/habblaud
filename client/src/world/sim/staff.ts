@@ -8,7 +8,10 @@
 // aparência sorteada pela semente + o uniforme da função, e um comportamento próprio: o planejador do Sim, com a fila
 // vazia, chama `think` da função (ver StaffRoleDef). Funções: registerStaffRole (a limpeza e a recepção já vêm registradas).
 //
-// Para criar uma função nova (ex.: 'ceo', 'secretary'): um arquivo sim/<função>.ts exportando um StaffRoleDef
+// Funções: limpeza (sim/cleaner.ts), recepção (sim/receptionist.ts), o dono e a secretária dele (sim/ceo.ts,
+// sim/secretary.ts; só no campus com `meta.owner`).
+//
+// Para criar uma função nova: um arquivo sim/<função>.ts exportando um StaffRoleDef
 // (rótulo, quantas pessoas, uniforme, estado inicial, `think` e `settle`; opcionais: `identity` para nome e peças fixos,
 // `doing` para o cartão, `kit`, `joinPrayer`, `dispose`), registrado com registerStaffRole (ou uma linha em ROLES).
 // Ver sim/cleaner.ts.
@@ -16,14 +19,17 @@ import type { AppearanceParts } from '../../../../shared/appearance';
 import { hash32 } from '../../../../shared/hash';
 import { inNameSet, pickName, type NameSet, type PersonName } from '../../../../shared/names';
 import type { AgentInfo, AppearanceProfile } from '../../../../shared/types';
-import type { Appearance, ArtModule } from '../../art/api';
+import type { Appearance, ArtModule, ScreenMode } from '../../art/api';
 import type { CleaningProp } from '../../art/furniture/cleaning';
 import { FOOT_DX, FOOT_DY, TILE } from '../constants';
 import { STAFF_REST } from '../layout/staff';
 import type { SpotDef } from '../layout/types';
 import { Character } from './character';
+import { CEO } from './ceo';
 import { CLEANER } from './cleaner';
 import { RECEPTIONIST } from './receptionist';
+import { SECRETARY } from './secretary';
+import type { SendActivity } from './send-all';
 import { ShineList } from './shine';
 import type { Sim } from './sim';
 import type { Step } from './steps';
@@ -41,6 +47,16 @@ export function isStaff(ch: { id: string }): boolean {
 
 export function staffId(role: string, index: number): string {
   return `${STAFF_PREFIX}${role}:${index}`;
+}
+
+/** Som pedido pela equipe (o toque do celular, o motor da mesa, a xícara): world/sound-cues.ts toca os novos. */
+export interface StaffCue {
+  kind: 'ring' | 'deskHum' | 'cup';
+  x: number;
+  y: number;
+  at: number;
+  /** Crescente: quem toca guarda o último que viu. */
+  seq: number;
 }
 
 /** Peça do kit desenhada pelo mundo (carrinho, balde, placa), com os pés em (x, y). */
@@ -74,8 +90,8 @@ export interface StaffIdentity {
 /** Uma função da equipe. Tudo é chamado pela simulação; nada aqui desenha. */
 export interface StaffRoleDef<S = unknown> {
   readonly role: string;
-  /** Rótulo da função no cartão ("Equipe de limpeza"). */
-  label(): string;
+  /** Rótulo da função no cartão ("Equipe de limpeza"; o cargo do dono vem da configuração). */
+  label(crew?: StaffCrew): string;
   /** Quantas pessoas desta função o escritório tem agora (0 = nenhuma). */
   count(crew: StaffCrew): number;
   /**
@@ -93,6 +109,13 @@ export interface StaffRoleDef<S = unknown> {
   settle(m: StaffMember<S>, crew: StaffCrew, now: number): void;
   /** O que está fazendo agora (2ª linha do cartão), ou null. */
   doing?(m: StaffMember<S>, crew: StaffCrew): string | null;
+  /** Tela da mesa em que a pessoa está (diretoria: render/ceo.ts), ou null para a regra padrão. */
+  screen?(m: StaffMember<S>, crew: StaffCrew): ScreenMode | null;
+  /**
+   * Menu Atividades (send-all.ts): prepara a pessoa e diz se vai junto (fora das contas). A oração usa `joinPrayer`.
+   * Ausente = fica (a limpeza e a recepção trabalham).
+   */
+  joinActivity?(m: StaffMember<S>, crew: StaffCrew, activity: SendActivity, now: number): boolean;
   /** Peças do kit que o mundo desenha (carrinho, balde, placa). */
   kit?(m: StaffMember<S>, out: KitItem[], now: number): void;
   /**
@@ -107,7 +130,7 @@ export interface StaffRoleDef<S = unknown> {
 }
 
 /** Registro das funções da equipe, na ordem de chegada (a limpeza e a recepção já vêm registradas). */
-const ROLES: StaffRoleDef<unknown>[] = [CLEANER as StaffRoleDef<unknown>, RECEPTIONIST as StaffRoleDef<unknown>];
+const ROLES: StaffRoleDef<unknown>[] = [CLEANER as StaffRoleDef<unknown>, RECEPTIONIST as StaffRoleDef<unknown>, CEO as StaffRoleDef<unknown>, SECRETARY as StaffRoleDef<unknown>];
 
 /** Registra (ou substitui, pelo nome) uma função. Retorna como desfazer. */
 export function registerStaffRole<S>(def: StaffRoleDef<S>): () => void {
@@ -158,14 +181,14 @@ export function staffNames(ids: readonly string[], agentNames: Iterable<string>,
 }
 
 /** AgentInfo de faz de conta para o Character (nada disso sai do mundo). */
-function staffInfo(id: string, def: StaffRoleDef<unknown>, name: PersonName, seed: number, profile: AppearanceProfile | undefined, now: number, parts?: AppearanceParts): AgentInfo {
+function staffInfo(id: string, def: StaffRoleDef<unknown>, crew: StaffCrew, name: PersonName, seed: number, profile: AppearanceProfile | undefined, now: number, parts?: AppearanceParts): AgentInfo {
   return {
     id,
     kind: 'main',
     roomId: '',
     name: name.name,
     look: name.look,
-    role: def.label(),
+    role: def.label(crew),
     sessionId: id,
     account: '',
     status: 'idle',
@@ -185,6 +208,9 @@ export class StaffCrew {
   readonly members = new Map<string, StaffMember<unknown>>();
   /** Brilho do piso limpo (sim/shine.ts). */
   readonly shine = new ShineList();
+  /** Sons pedidos pela equipe (os últimos; world/sound-cues.ts toca os que ainda não viu). */
+  readonly cues: StaffCue[] = [];
+  private cueSeq = 0;
   nameSet: NameSet = 'br';
   private agents: readonly AgentInfo[] = [];
   private nextHousekeeping = 0;
@@ -262,7 +288,7 @@ export class StaffCrew {
 
   private hire(def: StaffRoleDef<unknown>, index: number, name: PersonName, profile: AppearanceProfile | undefined, now: number, first: boolean, parts?: AppearanceParts): void {
     const id = staffId(def.role, index);
-    const info = staffInfo(id, def, name, hash32(id), profile, now, parts);
+    const info = staffInfo(id, def, this, name, hash32(id), profile, now, parts);
     const ch = new Character(info, this.dress(def, info));
     const m: StaffMember<unknown> = { id, role: def.role, index, ch, state: undefined, leaving: false };
     m.state = def.init(m, this, now);
@@ -390,6 +416,39 @@ export class StaffCrew {
     return sent;
   }
 
+  /**
+   * Menu Atividades: quem da equipe vai junto (o dono, a secretária), já tirado do que fazia. Fora das contas da UI;
+   * send-all.ts põe essas pessoas na frente da fila (o dono puxa a partida).
+   */
+  forActivity(activity: SendActivity, now: number): Character[] {
+    const out: Character[] = [];
+    for (const m of this.members.values()) {
+      const ch = m.ch;
+      if (m.leaving || ch.gone || ch.inside || ch.arriving || ch.prayer || ch.step?.t === 'pray') continue;
+      const t = ch.step?.t;
+      if (t === 'stall' || t === 'elevIn' || t === 'elevOut' || t === 'switch') continue;
+      const def = roleOf(m.role);
+      if (!def?.joinActivity || !def.joinActivity(m, this, activity, now)) continue;
+      this.sim.clearPlan(ch);
+      if (ch.atSpot) ch.queue.push({ t: 'exit' });
+      out.push(ch);
+    }
+    return out;
+  }
+
+  /** Tela da mesa de alguém da equipe (null = a regra padrão). */
+  screen(id: string): ScreenMode | null {
+    const m = this.members.get(id);
+    if (!m) return null;
+    return roleOf(m.role)?.screen?.(m, this) ?? null;
+  }
+
+  /** Pede um som no lugar da pessoa (os últimos 12 ficam guardados). */
+  cue(kind: StaffCue['kind'], ch: Character): void {
+    this.cues.push({ kind, x: ch.x, y: ch.y, at: this.now, seq: ++this.cueSeq });
+    if (this.cues.length > 12) this.cues.shift();
+  }
+
   /** Peças do kit de todos, para o desenho (reaproveita `out`). */
   kit(out: KitItem[], now: number): KitItem[] {
     out.length = 0;
@@ -402,7 +461,7 @@ export class StaffCrew {
     const m = this.members.get(id);
     if (!m) return null;
     const def = roleOf(m.role);
-    return { name: m.ch.info.name, role: def?.label() ?? m.ch.info.role, doing: def?.doing?.(m, this) ?? null, color: m.ch.appearance.top };
+    return { name: m.ch.info.name, role: def?.label(this) ?? m.ch.info.role, doing: def?.doing?.(m, this) ?? null, color: m.ch.appearance.top };
   }
 
   // ------------------------------------------------------------------ base (canto da limpeza)

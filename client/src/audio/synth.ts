@@ -153,6 +153,17 @@ export function playVoice(ac: AudioContext, dest: AudioNode, kind: SoundKind, t:
         tone(ac, out, 'sine', f * 2, t + i * 0.42, 0.015 * g, 0.02, 0.8);
       }
       return;
+    case 'ring':
+      // celular tocando baixinho: dois trinados curtos (duas notas alternando rápido)
+      for (let r = 0; r < 2; r++) {
+        for (let i = 0; i < 6; i++) tone(ac, out, 'sine', i % 2 ? 1568 : 1319, t + r * 0.55 + i * 0.05, 0.035 * g, 0.004, 0.045);
+      }
+      return;
+    case 'deskHum':
+      // motor da mesa de pé: zumbido grave e contínuo, subindo de leve
+      flow(ac, out, o, t, { freq: 180, q: 3.5, peak: 0.03 * g, dur: 1.4, wobble: 0 });
+      tone(ac, out, 'sawtooth', 96, t, 0.008 * g, 0.12, 1.3, 104);
+      return;
     case 'car':
       carPass(ac, out, o, t);
       return;

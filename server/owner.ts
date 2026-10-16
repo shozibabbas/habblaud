@@ -6,6 +6,8 @@
 //   HABBLAUD_OWNER='{"name":"Ana","title":"CEO","look":"f","parts":{"topStyle":"jacket"},
 //                    "secretary":{"name":"Rafael","look":"m"}}'
 //
+// `smokes: true` (opcional) leva o dono junto na pausa para o cigarro do menu Atividades (client/src/world/sim/ceo.ts).
+//
 // Qualquer campo fora do formato invalida o todo: melhor nenhuma diretoria do que uma meio configurada.
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -20,7 +22,7 @@ export interface OwnerParse {
   invalid?: string;
 }
 
-const KEYS = new Set(['name', 'title', 'look', 'parts', 'secretary']);
+const KEYS = new Set(['name', 'title', 'look', 'parts', 'secretary', 'smokes']);
 const SECRETARY_KEYS = new Set(['name', 'look', 'parts']);
 
 type Person = { name: string; look: 'f' | 'm'; parts?: AppearanceParts };
@@ -67,6 +69,7 @@ export function parseOwnerValue(json: unknown): OwnerParse {
     if (!t) return { invalid: 'title' };
     title = t;
   }
+  if (json.smokes !== undefined && typeof json.smokes !== 'boolean') return { invalid: 'smokes' };
   let secretary: Person | undefined;
   if (json.secretary !== undefined) {
     if (!isObject(json.secretary)) return { invalid: 'secretary' };
@@ -74,7 +77,7 @@ export function parseOwnerValue(json: unknown): OwnerParse {
     if (typeof s === 'string') return { invalid: s };
     secretary = s;
   }
-  return { owner: { name: owner.name, ...(title ? { title } : {}), look: owner.look, ...(owner.parts ? { parts: owner.parts } : {}), ...(secretary ? { secretary } : {}) } };
+  return { owner: { name: owner.name, ...(title ? { title } : {}), look: owner.look, ...(owner.parts ? { parts: owner.parts } : {}), ...(secretary ? { secretary } : {}), ...(json.smokes ? { smokes: true } : {}) } };
 }
 
 /**

@@ -46,6 +46,9 @@ export function ceoScreen(sim: Sim, f: FurnVis, area: AreaVis): ScreenMode {
     const owner = sim.spots.ownerOf(s.id);
     const ch = owner ? sim.chars.get(owner) : undefined;
     if (!ch || ch.leaving || ch.atSpot !== s.id) continue;
+    // o dono e a secretária: a tela segue o que fazem (a videochamada, os e-mails...), sim/ceo.ts
+    const own = sim.staff.screen(ch.id);
+    if (own) return own;
     if (ch.mode === 'wait') return 'alert';
     return ch.mode === 'work' ? screenModeFor(ch.info.activity?.kind) : 'docs';
   }

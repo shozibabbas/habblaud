@@ -28,6 +28,8 @@ export const CATEGORY_OF: Readonly<Record<SoundKind, SoundCategory>> = {
   tv: 'breaks',
   cheer: 'breaks',
   prayerCall: 'breaks',
+  ring: 'breaks',
+  deskHum: 'breaks',
   car: 'traffic',
 };
 
@@ -51,6 +53,8 @@ export const MIN_GAP_MS: Readonly<Record<SoundKind, number>> = {
   tv: 2_500,
   cheer: 6_000,
   prayerCall: 4_000,
+  ring: 3_000,
+  deskHum: 1_500,
   car: 1_800,
 };
 
@@ -74,6 +78,8 @@ const CHANNEL: Readonly<Record<SoundKind, string>> = {
   tv: 'tv',
   cheer: 'tv',
   prayerCall: 'prayerCall',
+  ring: 'ring',
+  deskHum: 'deskHum',
   car: 'car',
 };
 
