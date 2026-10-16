@@ -2718,4 +2718,31 @@ export const ES: Readonly<Record<string, string>> = {
   "Pingue-pongue, tênis, fliperama e as moedinhas das apostas.": "Ping-pong, tenis, arcade y las monedas de las apuestas.",
   "Trânsito": "Tráfico",
   "Água do wudu, ronco nas cápsulas, isqueiro, xícaras de chá, a TV e o chamado à oração.": "Agua del wudu, ronquidos en las cápsulas, mecheros, tazas de té, la TV y la llamada a la oración.",
+
+  // client/src/world/sim/cleaner.ts (equipe de limpeza)
+  "Corredor": "Pasillo",
+  "Saguão de {0}": "Vestíbulo de {0}",
+  "Área comum": "Zona común",
+  "Equipe de limpeza": "Personal de limpieza",
+  "Rezando": "Rezando",
+  "Indo limpar: {0}": "Va a limpiar: {0}",
+  "Passando o mop: {0}": "Fregando: {0}",
+  "Aspirando: {0}": "Aspirando: {0}",
+  "Limpando: {0}": "Limpiando: {0}",
+  "Guardando o carrinho": "Guardando el carrito",
+  "Descansando": "Descansando",
+  "Faxineiros que passam pelo escritório limpando o piso de tempos em tempos. Não são agentes.": "Personal que pasa por la oficina fregando el suelo de vez en cuando. No son agentes.",
+
+  // client/src/world/sim/cleaner.ts (banheiros) e receptionist.ts
+  "Limpando as cabines: {0}": "Limpiando los inodoros: {0}",
+  "Limpando pias e espelhos: {0}": "Limpiando lavabos y espejos: {0}",
+  "Limpando as torneiras: {0}": "Limpiando los grifos: {0}",
+  "Repondo papel e sabonete: {0}": "Reponiendo papel y jabón: {0}",
+  "Recepcionista": "Recepcionista",
+  "No balcão da recepção": "En el mostrador de recepción",
+  "Atendendo o telefone": "Al teléfono",
+  "Cumprimentando quem chega": "Saludando a quien llega",
+  "Assumindo o balcão": "Tomando el mostrador",
+  "Em pausa": "En pausa",
+  "Organizando a papelada": "Ordenando el papeleo",
 };

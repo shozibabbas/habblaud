@@ -16,6 +16,7 @@ import { isLongIdle } from '../sim/behavior';
 import { recreationDoing } from '../sim/recreation';
 import { facing, type Character } from '../sim/character';
 import type { Sim } from '../sim/sim';
+import { isStaff } from '../sim/staff';
 import type { Step } from '../sim/steps';
 import {
   active,
@@ -126,7 +127,8 @@ export class Social {
    * própria mesa, sem nada planejado. Quem cochila de tão ocioso pode ser acordado por um convite.
    */
   canJoin(c: Character, now: number): boolean {
-    if (c.gone || c.leaving || c.arriving || c.inside || c.gathering) return false;
+    // a equipe (limpeza...) trabalha: não entra em rodas
+    if (c.gone || c.leaving || c.arriving || c.inside || c.gathering || isStaff(c)) return false;
     if (c.mode !== 'idle' && c.mode !== 'shell') return false;
     if (c.step || c.queue.length) return false;
     if (!c.homeSpot || c.atSpot !== c.homeSpot) return false;
@@ -183,7 +185,7 @@ export class Social {
 
   /** Força uma roda (depuração). Usa `ids` (se vierem) como participantes. */
   force(kind: GatherKind, now: number, ids?: string[]): string[] | null {
-    const pool = ids?.length ? ids.map((id) => this.sim.chars.get(id)).filter((c): c is Character => !!c) : [...this.sim.chars.values()];
+    const pool = (ids?.length ? ids.map((id) => this.sim.chars.get(id)).filter((c): c is Character => !!c) : [...this.sim.chars.values()]).filter((c) => !isStaff(c));
     for (const c of pool) {
       if (c.gathering) this.sim.clearPlan(c);
       // depuração: levanta quem estiver passeando e põe na mesa na hora
@@ -1337,7 +1339,7 @@ export class Social {
     const w = this.wallets.get(id);
     const bonds: AgentSocial['bonds'] = [];
     for (const o of this.sim.chars.values()) {
-      if (o === ch || o.leaving || o.gone) continue;
+      if (o === ch || o.leaving || o.gone || isStaff(o)) continue;
       const kind = bondBetween(ch.info.seed, o.info.seed);
       if (kind) bonds.push({ id: o.id, name: o.info.name, kind, record: w?.vs[o.id] ? [w.vs[o.id][0], w.vs[o.id][1]] : null });
     }
@@ -1402,7 +1404,7 @@ export class Social {
   /** Nome de um colega para a fofoca: de preferência alguém de fora da roda. */
   private otherName(g: Gathering, c: Character, rng: () => number): string | undefined {
     const inside = new Set(g.members.map((m) => m.id));
-    const all = [...this.sim.chars.values()].filter((o) => o !== c && !o.leaving);
+    const all = [...this.sim.chars.values()].filter((o) => o !== c && !o.leaving && !isStaff(o));
     const out = all.filter((o) => !inside.has(o.id));
     return this.randomOf(out.length ? out : all, rng)?.info.name;
   }

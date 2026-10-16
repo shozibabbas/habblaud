@@ -87,7 +87,8 @@ function run(sim: Sim, clock: { now: number }, seconds: number, until?: () => bo
 }
 
 function newSim(): Sim {
-  return new Sim(art, () => ({ ...DEFAULT_WORLD_OPTIONS, liveliness: 'calm' }));
+  // só agentes aqui: a equipe (limpeza) tem os próprios testes (staff.test.ts)
+  return new Sim(art, () => ({ ...DEFAULT_WORLD_OPTIONS, liveliness: 'calm', staff: false }));
 }
 
 describe('simulação do escritório', () => {

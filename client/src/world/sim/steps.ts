@@ -5,7 +5,7 @@ import type { PrayStep } from './prayer';
 
 export type Step =
   /** Anda (ou corre) até o tile (tx, ty); depois, opcionalmente, até a posição fina (fx, fy) e vira para `dir`. */
-  | { t: 'go'; tx: number; ty: number; run?: boolean; fx?: number; fy?: number; dir?: Dir; held?: HeldItem; path?: number[]; i?: number; fine?: boolean }
+  | { t: 'go'; tx: number; ty: number; run?: boolean; fx?: number; fy?: number; dir?: Dir; held?: HeldItem; path?: number[]; i?: number; fine?: boolean; walkPose?: Pose }
   /** Encaixa no spot (assento ou ponto de uso). Exige estar no tile de aproximação. */
   | { t: 'enter'; spot: string }
   /** Sai do spot atual de volta ao tile de aproximação (levantar). */

@@ -4,6 +4,7 @@ import { FURNITURE, type FurnitureKind } from '../api';
 import { trim, type BufFurniture } from '../core/sprite';
 import * as E from './ceo';
 import * as C from './common';
+import * as K from './cleaning';
 import * as Q from './mosque';
 import * as O from './office';
 import * as R from './recreation';
@@ -184,6 +185,10 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
       return E.doorPlate();
     case 'award_wall':
       return E.awardWall();
+    case 'janitor_shelf':
+      return K.janitorShelf();
+    case 'mop_sink':
+      return K.mopSink();
   }
 }
 

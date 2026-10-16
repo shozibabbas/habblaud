@@ -68,7 +68,13 @@ export type Pose =
   // --- ligações e mesa alta (aditivo)
   | 'phone' // falando ao celular: aparelho na orelha, a outra mão gesticulando e a boca mexendo (3). Em pé ou sentado (opts.seated); held é ignorado
   | 'phone_walk' // andando de um lado para o outro ao celular: passos de 'walk' com o aparelho na orelha (4). Sempre em pé
-  | 'type_stand'; // em pé diante da mesa alta, digitando — normalmente dir 'up', de costas, braços alternando como em 'type' (4). Sempre em pé
+  | 'type_stand' // em pé diante da mesa alta, digitando — normalmente dir 'up', de costas, braços alternando como em 'type' (4). Sempre em pé
+  // --- equipe de limpeza (aditivo; character/cleaning.ts): sempre em pé
+  | 'mop' // passando o mop: as duas mãos no cabo, a ponta indo e voltando no chão à frente (4)
+  | 'vacuum' // o mesmo vaivém com o aspirador vertical (carpete) (4)
+  | 'push' // andando e empurrando o carrinho de limpeza (o carrinho é desenhado pelo mundo) (4)
+  | 'scrub' // escova de vaso subindo e descendo (normalmente dir 'up', na porta da cabine) (4)
+  | 'wipe'; // pano na mão indo e voltando (pia, espelho, torneira) (4)
 
 export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book' | 'box' | 'paddle' | 'popcorn'
   // --- vida social (aditivo)
@@ -81,7 +87,10 @@ export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book
   | 'comb' // pente (pose 'groom')
   // --- recreação do campus (aditivo)
   | 'racket' // raquete de tênis (pose 'play': a mesma rotina da raquete de ping-pong, cabo mais longo e aro com cordas)
-  | 'cigarette'; // cigarro aceso entre os dedos (pose 'drink' leva à boca; 'stand'/'sit' segura ao lado). A fumaça é do mundo
+  | 'cigarette' // cigarro aceso entre os dedos (pose 'drink' leva à boca; 'stand'/'sit' segura ao lado). A fumaça é do mundo
+  // --- equipe de limpeza (aditivo): carregados em pé ao lado do corpo ('stand'/'walk'/'run')
+  | 'mop'
+  | 'vacuum';
 
 export type HairStyle =
   | 'short' | 'buzz' | 'spiky' | 'side_part' | 'curly' | 'afro' | 'bob' | 'long' | 'ponytail' | 'bun' | 'pigtails'
@@ -238,7 +247,7 @@ export type FurnitureKind =
   | 'quran_shelf' // 2x1 estante baixa com Alcorões encadernados (verde/vinho, filete dourado).
   | 'arch_window' // (parede) 2 tiles. Janela em arco com treliça; à noite o mundo acende o vidro.
   | 'prayer_times' // (parede) 2 tiles. Quadro com os horários das orações (seis mostradores, sem texto).
-  // --- diretoria (aditivo; campus; art/furniture/ceo.ts). Nogueira escura, couro, alumínio prateado e preto.
+  // --- diretoria (aditivo; campus art/furniture/ceo.ts). Nogueira escura, couro, alumínio prateado e preto.
   | 'exec_desk' // 4x1 mesa de altura regulável (pés telescópicos de aço grafite, tampo de nogueira): Studio Display no meio (rects.screen), caixas de som dos dois lados, MacBook aberto num suporte (rects.screen2), Magic Keyboard, Magic Mouse, headset no suporte e luminária de mesa (rects.glow). state 0 = altura de sentar, 1 = altura de ficar em pé (tampo e tudo em cima ~7px mais alto, colunas mais longas)
   | 'exec_chair' // 1x1 assento: cadeira executiva ergonômica de tela com apoio de cabeça, virada para cima (front = encosto alto). state 0 = junto à mesa, 1 = rolada para o lado (mesa em pé)
   | 'meeting_chair' // 1x1 assento: cadeira de reunião de couro caramelo com base cromada. variants como cafe_chair ('up' tem front)
@@ -248,6 +257,9 @@ export type FurnitureKind =
   | 'secretary_desk' // 3x1 mesa da secretária: monitor (rects.screen), telefone de mesa, bandejas de documentos e impressora pequena
   | 'door_plate' // 1x1 placa de latão com "CEO" presa na coluna de vidro ao lado da porta (divide o tile com a coluna: dy +1)
   | 'award_wall' // (parede) 2 tiles. Prateleira de prêmios: diplomas emoldurados, troféu e placa de cristal
+  // --- canto da limpeza (aditivo; furniture/cleaning.ts)
+  | 'janitor_shelf' // 1x1 estante alta de metal com produtos de limpeza, rolos de papel e panos dobrados.
+  | 'mop_sink'; // 1x1 tanque baixo de serviço com torneira e um mop escorrendo ao lado.
 
 export interface FurnitureDef {
   mount: 'floor' | 'wall';
@@ -349,6 +361,8 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   secretary_desk: { mount: 'floor', footprint: { w: 3, h: 1 }, blocks: true },
   door_plate: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   award_wall: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
+  janitor_shelf: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  mop_sink: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
 };
 
 export type FloorKind =

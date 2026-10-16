@@ -2718,4 +2718,31 @@ export const EN: Readonly<Record<string, string>> = {
   "Pingue-pongue, tênis, fliperama e as moedinhas das apostas.": "Table tennis, tennis, arcade and the coins from bets.",
   "Trânsito": "Traffic",
   "Água do wudu, ronco nas cápsulas, isqueiro, xícaras de chá, a TV e o chamado à oração.": "Wudu water, snoring in the pods, lighters, chai cups, the TV and the call to prayer.",
+
+  // client/src/world/sim/cleaner.ts (equipe de limpeza)
+  "Corredor": "Corridor",
+  "Saguão de {0}": "{0} lobby",
+  "Área comum": "Common area",
+  "Equipe de limpeza": "Cleaning staff",
+  "Rezando": "Praying",
+  "Indo limpar: {0}": "On the way to clean: {0}",
+  "Passando o mop: {0}": "Mopping: {0}",
+  "Aspirando: {0}": "Vacuuming: {0}",
+  "Limpando: {0}": "Cleaning: {0}",
+  "Guardando o carrinho": "Putting the cart away",
+  "Descansando": "Taking a break",
+  "Faxineiros que passam pelo escritório limpando o piso de tempos em tempos. Não são agentes.": "Cleaners who come through the office mopping the floor every now and then. They're not agents.",
+
+  // client/src/world/sim/cleaner.ts (banheiros) e receptionist.ts
+  "Limpando as cabines: {0}": "Scrubbing the toilets: {0}",
+  "Limpando pias e espelhos: {0}": "Wiping sinks and mirrors: {0}",
+  "Limpando as torneiras: {0}": "Wiping the taps: {0}",
+  "Repondo papel e sabonete: {0}": "Restocking tissue and soap: {0}",
+  "Recepcionista": "Receptionist",
+  "No balcão da recepção": "At the reception desk",
+  "Atendendo o telefone": "On the phone",
+  "Cumprimentando quem chega": "Greeting someone",
+  "Assumindo o balcão": "Taking over the desk",
+  "Em pausa": "On a break",
+  "Organizando a papelada": "Sorting paperwork",
 };

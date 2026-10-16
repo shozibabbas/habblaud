@@ -38,6 +38,7 @@ import { RoomState } from './room-state';
 import { countShells, latestShellDone, shellLabel, shellStage, shellWaitSince, spinDir, spinPhase, yawnPhase } from './shell';
 import { SpotRegistry } from './spots';
 import { planPrayerExit, planPrayerVisit, resetPrayer, stepPray, wantsToPray } from './prayer';
+import { isStaff, StaffCrew } from './staff';
 import type { Step } from './steps';
 import { tr } from '../../../../shared/i18n';
 
@@ -128,6 +129,8 @@ export class Sim {
   readonly effects: WorldEffect[] = [];
   /** Festa e alarme das salas (eventos do GitHub; sim/github.ts). */
   readonly roomFx = new RoomFxState();
+  /** Equipe do escritório (limpeza...): personagens que não são agentes (sim/staff.ts). */
+  readonly staff: StaffCrew;
   private lastSnapshot: OfficeSnapshot | null = null;
   /**
    * Campus (escritório combinado com 2+ máquinas em meta.machines): as máquinas, na ordem do snapshot. null =
@@ -149,6 +152,7 @@ export class Sim {
     storage: StorageLike | null = browserStorage(),
   ) {
     this.social = new Social(this, storage);
+    this.staff = new StaffCrew(this, art, () => this.options().staff !== false);
     this.building = assembleBuilding(columnsFor([]), [], 0);
     this.finder = new PathFinder(this.building.grid);
     this.spots.setSpots(this.building.spots);
@@ -226,7 +230,7 @@ export class Sim {
       }
     }
     for (const ch of this.chars.values()) {
-      if (!seen.has(ch.id) && !ch.leaving && ch.missingSince === null) ch.missingSince = now;
+      if (!seen.has(ch.id) && !ch.leaving && ch.missingSince === null && !isStaff(ch)) ch.missingSince = now;
     }
     // modos (depois de todos existirem, para subagentes acharem o pai)
     for (const ch of fresh) {
@@ -240,6 +244,7 @@ export class Sim {
       for (const ch of order) this.placeInitial(ch, now, seated);
     }
     this.refreshRoomInfo();
+    this.staff.sync(snap.agents, now, first);
   }
 
   /** Reaplica o último snapshot (depuração). */
@@ -761,6 +766,7 @@ export class Sim {
         this.chars.delete(id);
       }
     }
+    this.staff.update(now);
     if (now >= this.nextHousekeeping) {
       this.nextHousekeeping = now + 1000;
       this.housekeeping(now);
@@ -1141,7 +1147,7 @@ export class Sim {
       ch.setPose('stand', s.held ?? 'none');
       return true;
     }
-    if (moved) ch.setPose(s.run ? 'run' : 'walk', s.held ?? 'none');
+    if (moved) ch.setPose(s.run ? 'run' : (s.walkPose ?? 'walk'), s.held ?? 'none');
     return false;
   }
 
@@ -1372,6 +1378,7 @@ export class Sim {
     if (ch.gone) return false;
     // saindo da mesquita no meio da visita: devolve o topi/hijab e calça os sapatos antes de qualquer coisa
     if (ch.prayer && planPrayerExit(this, ch)) return true;
+    if (isStaff(ch)) return this.staff.think(ch, now);
     if (ch.mode === 'leave') return this.planLeave(ch, now);
     if (ch.mode === 'deliver') return this.planDeliver(ch, now);
     const room = this.rooms.get(ch.roomId);
@@ -1948,7 +1955,8 @@ export class Sim {
       ch.arriving = false;
       ch.hiddenUntil = 0;
       ch.stepT = 0;
-      if (ch.mode === 'work' || ch.mode === 'wait' || ch.mode === 'idle' || ch.mode === 'shell') {
+      if (isStaff(ch)) this.staff.settle(ch, now);
+      else if (ch.mode === 'work' || ch.mode === 'wait' || ch.mode === 'idle' || ch.mode === 'shell') {
         ch.reactUntil = 0;
         this.assignHome(ch);
         const home = this.spots.get(ch.homeSpot);

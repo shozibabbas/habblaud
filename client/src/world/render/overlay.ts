@@ -13,8 +13,10 @@ import type { RoomState } from '../sim/room-state';
 import type { Character } from '../sim/character';
 import { shellAgeKey, shellBubbleAlpha, shellBubbleText, STORM_LIFT, unitHash } from '../sim/shell';
 import type { Sim } from '../sim/sim';
+import { isStaff, isStaffId } from '../sim/staff';
 import { buildAnim } from './anim';
 import { drawFxBanner } from './github-fx';
+import { drawStaffCard } from './staff';
 import type { HeadInfo, Renderer } from './renderer';
 import { tr } from '../../../../shared/i18n';
 
@@ -375,6 +377,11 @@ export class Overlay {
     }
     this.drawChats(now);
     this.drawFloaters(now);
+    // equipe (limpeza...) clicada ou sob o cursor: cartãozinho com o nome, a função e o que está fazendo
+    const staffId = isStaffId(sel.agent) ? sel.agent : isStaffId(sel.hover) ? sel.hover : null;
+    const card = staffId ? this.sim.staff.card(staffId) : null;
+    const head = staffId ? this.renderer.heads.get(staffId) : undefined;
+    if (card && head?.visible) drawStaffCard(ctx, this.sx(head.x), this.sy(head.y) - 6, card, UI_FONT, camera.viewW);
     ctx.textBaseline = 'alphabetic';
   }
 
@@ -484,7 +491,7 @@ export class Overlay {
   private drawBuildingPlate(b: CampusBuilding, cx: number, cy: number): void {
     const { ctx } = this;
     let agents = 0;
-    for (const c of this.sim.chars.values()) if (!c.leaving && this.sim.charBld(c) === b.id) agents++;
+    for (const c of this.sim.chars.values()) if (!c.leaving && !isStaff(c) && this.sim.charBld(c) === b.id) agents++;
     const name = this.fit(PLATE_FONT, b.name, 200);
     const tag = b.online ? (agents > 0 ? String(agents) : '') : OFFLINE_TEXT;
     const tw = this.measure(PLATE_FONT, name);

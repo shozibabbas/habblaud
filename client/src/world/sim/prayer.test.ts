@@ -75,7 +75,7 @@ function run(sim: Sim, clock: { now: number }, seconds: number, each?: () => boo
   }
 }
 
-const newSim = () => new Sim(art, () => ({ ...DEFAULT_WORLD_OPTIONS, liveliness: 'calm' }), null);
+const newSim = () => new Sim(art, () => ({ ...DEFAULT_WORLD_OPTIONS, liveliness: 'calm', staff: false }), null);
 
 describe('oração: sequência', () => {
   it('2 rak\'ahs: takbir, qiyam, ruku, 2 sujood por rak\'ah, tashahhud e salam no fim', () => {

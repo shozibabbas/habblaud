@@ -8,6 +8,7 @@ import type { BufSprite } from '../core/sprite';
 import { LONG_TOPS, suitShirt } from './appearance';
 import { HAIR, HEAD_BASE, TEXTURED, type HeadView, type Tpl } from './hair';
 import { isPrayerPose, renderPrayer } from './prayer';
+import { isCleaningRequest, renderCleaning } from './cleaning';
 
 export const CHAR_W = 24;
 export const CHAR_H = 34;
@@ -23,6 +24,7 @@ export const POSE_FRAMES: Readonly<Record<Pose, number>> = {
   stand: 2, walk: 4, run: 4, sit: 2, type: 4, sleep: 2, drink: 2, use: 2, raise_hand: 2, talk: 2, stretch: 2,
   read: 2, play: 2, wait: 2, cheer: 2, laugh: 2, game: 2, rps: 2, groom: 2, sulk: 2,
   takbir: 1, qiyam: 1, ruku: 1, sujood: 1, jalsa: 1, salam: 2, wudu: 2, phone: 3, phone_walk: 4, type_stand: 4,
+  mop: 4, vacuum: 4, push: 4, scrub: 4, wipe: 4,
 };
 
 export const POSE_DURATION: Readonly<Record<Pose, number>> = {
@@ -30,6 +32,7 @@ export const POSE_DURATION: Readonly<Record<Pose, number>> = {
   stretch: 800, read: 1100, play: 200, wait: 480, cheer: 260, laugh: 190, game: 150, rps: 300, groom: 420, sulk: 1300,
   takbir: 1000, qiyam: 1000, ruku: 1000, sujood: 1000, jalsa: 1000, salam: 1300, wudu: 700, phone: 420, phone_walk: 170,
   type_stand: 120,
+  mop: 230, vacuum: 260, push: 150, scrub: 170, wipe: 210,
 };
 
 const SEATED_ONLY: ReadonlySet<Pose> = new Set<Pose>(['sit', 'type', 'sleep', 'wait']);
@@ -2094,6 +2097,7 @@ function itemPos(dc: Dc): Pt | null {
 
 export function renderCharacter(req: CharacterFrameRequest): BufSprite {
   if (isPrayerPose(req.pose)) return renderPrayer(req);
+  if (isCleaningRequest(req)) return renderCleaning(req);
   if (req.dir === 'right') {
     const left = renderCharacter({ ...req, dir: 'left' });
     return { buf: left.buf.flipped(), ax: CHAR_W - left.ax, ay: left.ay };

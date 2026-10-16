@@ -118,7 +118,9 @@ export type SpotKind =
   | 'ceo_guest' // lugar no sofá de visitas da sala (dois, um grupo)
   | 'ceo_door' // na antessala, diante da porta de vidro da sala (bater, anunciar alguém, receber)
   | 'secretary' // cadeira da secretária (mesa com monitor)
-  | 'visitor'; // cadeira de espera da antessala (duas, um grupo)
+  | 'visitor' // cadeira de espera da antessala (duas, um grupo)
+  // --- equipe de limpeza (aditivo; layout/staff.ts): só ela usa
+  | 'staff'; // canto da limpeza: banqueta de descanso, tanque de serviço ou vaga do carrinho (pelo `group`)
 
 /**
  * Ponto de interesse. O personagem anda até o tile de aproximação (tx, ty), caminhável,

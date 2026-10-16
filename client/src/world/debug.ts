@@ -12,6 +12,8 @@ import { planPrayerVisit, prays } from './sim/prayer';
 import { oldestShell } from './sim/shell';
 import type { Sim } from './sim/sim';
 import type { GatherKind } from './social/gathering';
+import { isStaff } from './sim/staff';
+import { createStaffDebug, type StaffDebug } from './staff-debug';
 
 /** Um shell para os cenários de depuração: campos de ShellJob opcionais + idade relativa. */
 export interface ShellJobInput extends Partial<ShellJob> {
@@ -102,6 +104,8 @@ export interface WorldDebug {
    * do GitHub; `agentId` = o responsável (estrela na festa, balão "!" no alarme).
    */
   roomEffect(idOrName: string, kind: 'party' | 'alarm' | null, opts?: { text?: string; agentId?: string }): void;
+  /** Equipe do escritório (limpeza): lista, escala, mandar limpar agora, envelhecer o brilho do piso. */
+  readonly staff: StaffDebug;
   readonly sim: Sim;
   readonly camera: Camera;
 }
@@ -357,7 +361,7 @@ export function createDebug(sim: Sim, renderer: Renderer, camera: Camera, onCame
       const t = now();
       const went: string[] = [];
       for (const c of sim.chars.values()) {
-        if (ids ? !ids.includes(c.id) : !prays(c.info.seed)) continue;
+        if (ids ? !ids.includes(c.id) : !prays(c.info.seed) || isStaff(c)) continue;
         if (c.mode !== 'idle' || c.prayer || c.leaving) continue;
         sim.clearPlan(c);
         if (planPrayerVisit(sim, c, t)) went.push(c.id);
@@ -468,6 +472,7 @@ export function createDebug(sim: Sim, renderer: Renderer, camera: Camera, onCame
       sim.roomFx.active.set(room.id, { roomId: room.id, kind, text, agentId, key: t, start: t, end, cheered: new Set(), sticky: true });
     },
 
+    staff: createStaffDebug(sim, camera, onCameraMoved, now),
     sim,
     camera,
   };
