@@ -14,13 +14,15 @@ import { hash32 } from '../../../../shared/hash';
 import { tr } from '../../../../shared/i18n';
 import type { AppearanceProfile } from '../../../../shared/types';
 import type { Appearance, Dir, HeldItem } from '../../art/api';
-import { TILE } from '../constants';
+import { FOOT_DX, FOOT_DY, TILE } from '../constants';
 import { inRect } from '../layout/geometry';
 import { MEN_ID, WOMEN_ID } from '../layout/mosque';
 import { STAFF_CART, STAFF_REST, STAFF_SINK } from '../layout/staff';
 import type { AreaLayout } from '../layout/types';
 import { FREE } from '../path/grid';
+import { jamaatOf } from './jamaat';
 import { planPrayerVisit, prays, wantsToPray } from './prayer';
+import { putOn, shoesOff, takeOff } from './wear';
 import type { KitItem, StaffCrew, StaffMember, StaffRoleDef } from './staff';
 import type { Step } from './steps';
 
@@ -73,7 +75,7 @@ export interface CleanArea {
   layout: AreaLayout;
   /** Ala da mesquita: só quem tem este look entra para limpar. */
   look?: 'm' | 'f';
-  /** Só o piso duro (mesquita: o carpete da oração não). */
+  /** Mesquita: mop só na ablução, nas sapateiras e nas entradas; o carpete do salão, só aspirador e com ele vazio. */
   hardOnly: boolean;
 }
 
@@ -179,7 +181,7 @@ type Doing = 'rest' | 'going' | 'mop' | 'vacuum' | 'back' | 'scrub' | 'wipe' | '
 
 /** Uma tarefa dentro da área: trecho de piso, cabine, pia (e o espelho), torneira da ablução, reposição. */
 type Task =
-  | { k: 'mop'; x: number; y: number }
+  | { k: 'mop'; x: number; y: number; dir: Dir; carpet: boolean; hall?: boolean; tries?: number }
   | { k: 'stall' | 'sink' | 'tap'; spot: string; tries: number }
   | { k: 'restock' };
 
@@ -220,6 +222,9 @@ export interface CleanerState {
   arrived: boolean;
 }
 
+/** Camada de roupa enquanto aspira o carpete da mesquita (pés descalços). */
+const WEAR_SHOES_CLEAN = 'limpeza:sapatos';
+
 /** Descanso entre as rondas (ms). */
 export const REST_MS: readonly [number, number] = [100_000, 190_000];
 /** Primeira ronda depois de abrir a página: a 1ª pessoa logo, as outras escalonadas. */
@@ -254,13 +259,43 @@ function patchCenter(x: number, y: number, dir: Dir): { x: number; y: number } {
 
 /** Carpete ou tapete sob o tile (aspirador em vez de mop). */
 export function carpetAt(a: AreaLayout, tx: number, ty: number): boolean {
-  const px = tx * TILE + TILE / 2;
-  const py = ty * TILE + TILE / 2;
+  return carpetPx(a, tx * TILE + TILE / 2, ty * TILE + TILE / 2);
+}
+
+/** Carpete ou tapete sob o ponto (px de mundo) desta área. Tapete por cima de piso duro conta como carpete. */
+export function carpetPx(a: AreaLayout, px: number, py: number): boolean {
   for (const r of a.rugs) if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) return true;
   let carpet = false;
   // o último piso pintado vence (ex.: o mármore da ablução por cima do carpete da mesquita)
   for (const f of a.floors) if (px >= f.x && px < f.x + f.w && py >= f.y && py < f.y + f.h) carpet = f.kind === 'carpet';
   return carpet;
+}
+
+/** Piso sob um ponto em qualquer área (o trecho pode encostar na área vizinha): carpete/tapete ou não. */
+export function carpetIn(areas: readonly AreaLayout[], px: number, py: number): boolean {
+  for (const a of areas) {
+    const r = a.rect;
+    if (px < r.x * TILE || py < r.y * TILE || px >= (r.x + r.w) * TILE || py >= (r.y + r.h) * TILE) continue;
+    if (carpetPx(a, px, py)) return true;
+  }
+  return false;
+}
+
+/** Tamanho do trecho limpo (px): o do mop (verniz molhado) e o do aspirador (listras). */
+export const MOP_PATCH = { rx: 22, ry: 11 } as const;
+export const VACUUM_PATCH = { rx: 14, ry: 8 } as const;
+/** Distância mínima (px) entre o molhado/brilho do mop e qualquer carpete ou tapete. */
+export const CARPET_MARGIN = TILE;
+
+/**
+ * O trecho (centro e raios em px) cabe onde deve: mop = tudo, com a margem em volta, fora de carpete e tapete;
+ * aspirador = tudo dentro do carpete. Amostra a caixa do trecho a cada 2 px.
+ */
+export function patchFits(isCarpet: (px: number, py: number) => boolean, cx: number, cy: number, carpet: boolean): boolean {
+  const { rx, ry } = carpet ? VACUUM_PATCH : MOP_PATCH;
+  const m = carpet ? 0 : CARPET_MARGIN;
+  for (let y = cy - ry - m; y <= cy + ry + m; y += 2) for (let x = cx - rx - m; x <= cx + rx + m; x += 2) if (isCarpet(x, y) !== carpet) return false;
+  return true;
 }
 
 /**
@@ -301,9 +336,37 @@ function canClean(crew: StaffCrew, m: Cleaner, a: CleanArea): boolean {
   const sim = crew.sim;
   if (a.layout.rec === 'rest' && sim.podBusy.size > 0) return false;
   if (a.look) {
+    if (jamaatOf(sim, a.look)) return false;
     for (const c of sim.chars.values()) if ((c.step?.t === 'pray' || c.prayer) && inRect(a.layout.rect, c.tx, c.ty)) return false;
   }
   return true;
+}
+
+/** Mesquita: onde se passa o mop (a ablução, as sapateiras e as entradas), em tiles. */
+function mosqueWetZone(crew: StaffCrew, a: CleanArea): (x: number, y: number) => boolean {
+  const near: { x: number; y: number }[] = [];
+  for (const sp of crew.sim.spots.all()) if (sp.areaId === a.id && (sp.kind === 'wudu' || sp.kind === 'shoes')) near.push({ x: sp.tx, y: sp.ty });
+  const d = a.layout.door;
+  if (d) for (let y = d.y; y < d.y + d.h; y++) for (let x = d.x; x < d.x + d.w; x++) near.push({ x, y });
+  return (x, y) => near.some((p) => Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) <= 3);
+}
+
+/**
+ * O aspirador espera o salão esvaziar: congregação ou majlis na ala, alguém rezando, ou qualquer pessoa (que não seja da
+ * equipe) no carpete. O religioso da ala, lendo ou com o tasbih no seu canto, não segura a limpeza: o trecho só fica
+ * longe dele (3 tiles).
+ */
+function hallBusy(crew: StaffCrew, m: Cleaner, a: CleanArea, t: { x: number; y: number }): boolean {
+  const sim = crew.sim;
+  if (a.look && jamaatOf(sim, a.look)) return true;
+  for (const c of sim.chars.values()) {
+    if (c === m.ch || c.gone || c.inside || !inRect(a.layout.rect, c.tx, c.ty)) continue;
+    if (c.prayer || c.step?.t === 'pray') return true;
+    if (!carpetAt(a.layout, c.tx, c.ty)) continue;
+    if (!crew.member(c.id)) return true;
+    if (Math.max(Math.abs(c.tx - t.x), Math.abs(c.ty - t.y)) <= 3) return true;
+  }
+  return false;
 }
 
 /** Tiles onde dá para limpar: livres (sem móvel nem assento), sem spot de uso e sem ninguém parado ou indo parar. */
@@ -320,7 +383,6 @@ function cleanTiles(crew: StaffCrew, m: Cleaner, a: CleanArea): { x: number; y: 
       if (grid.get(x, y) !== FREE) continue;
       const k = grid.key(x, y);
       if (busy.has(k) || spotTiles.has(k)) continue;
-      if (a.hardOnly && carpetAt(a.layout, x, y)) continue;
       // piso aberto: o mop, o balde e o brilho precisam de espaço (nada de cantinho entre vasos)
       if (openness(grid, x, y) < 7) continue;
       out.push({ x, y });
@@ -375,7 +437,7 @@ function signSpot(crew: StaffCrew, park: { x: number; y: number; dir: Dir }, a: 
     [fx - 1, fy],
     [fx, fy + 1],
     [fx, fy - 1],
-  ].filter(([x, y]) => (x !== park.x || y !== park.y) && grid.get(x, y) === FREE && openness(grid, x, y) >= 6);
+  ].filter(([x, y]) => (x !== park.x || y !== park.y) && grid.get(x, y) === FREE && openness(grid, x, y) >= 6 && !carpetAt(a.layout, x, y));
   cands.sort((p, q) => Math.abs(p[0] - cx) + Math.abs(p[1] - cy) - (Math.abs(q[0] - cx) + Math.abs(q[1] - cy)));
   const t = cands[0];
   return t ? { x: t[0] * TILE + TILE / 2, y: t[1] * TILE + 13 } : null;
@@ -439,9 +501,48 @@ function areaTasks(crew: StaffCrew, m: Cleaner, a: CleanArea, tiles: readonly { 
     for (const i of new Set([0, Math.floor(taps.length / 2), taps.length - 1])) if (taps[i]) tasks.push({ k: 'tap', spot: taps[i].id, tries: 0 });
     if (tasks.some((t) => t.k === 'stall' || t.k === 'sink')) tasks.push({ k: 'restock' });
   }
-  const k = isWashroom(a) ? Math.min(3, Math.max(2, Math.round(tiles.length / 30))) : Math.max(2, Math.min(5, Math.round(tiles.length / 28)));
-  for (const p of spreadPatches(tiles, k, rng)) tasks.push({ k: 'mop', x: p.x, y: p.y });
+  for (const p of floorPatches(crew, a, tiles, rng)) tasks.push(p);
   return tasks;
+}
+
+/**
+ * Trechos de piso da área: para cada tile, as direções em que o trecho cabe — mop só com o molhado e o brilho inteiros em
+ * piso duro, a 1 tile de qualquer carpete ou tapete; aspirador só dentro do carpete. Na mesquita: mop só na ablução,
+ * nas sapateiras e nas entradas, e o aspirador no carpete do salão (que espera o salão esvaziar).
+ */
+function floorPatches(crew: StaffCrew, a: CleanArea, tiles: readonly { x: number; y: number }[], rng: () => number): Task[] {
+  const sim = crew.sim;
+  const all = [...sim.building.areas, ...sim.building.rooms];
+  const isCarpet = (px: number, py: number) => carpetIn(all, px, py);
+  const wet = a.look ? mosqueWetZone(crew, a) : () => true;
+  const fits = new Map<{ x: number; y: number }, { dirs: Dir[]; carpet: boolean }>();
+  for (const t of tiles) {
+    const fx = t.x * TILE + FOOT_DX;
+    const fy = t.y * TILE + FOOT_DY;
+    for (const carpet of [false, true]) {
+      if (!carpet && !wet(t.x, t.y)) continue;
+      const dirs = (['left', 'right', 'down'] as const).filter((d) => {
+        const c = patchCenter(fx, fy, d);
+        return patchFits(isCarpet, c.x, c.y, carpet);
+      });
+      if (dirs.length) {
+        fits.set(t, { dirs, carpet });
+        break;
+      }
+    }
+  }
+  const ok = tiles.filter((t) => fits.has(t));
+  const k = isWashroom(a) ? Math.min(a.look ? 4 : 3, Math.max(2, Math.round(ok.length / 30))) : Math.max(2, Math.min(5, Math.round(ok.length / 28)));
+  const out: Task[] = [];
+  // mesquita: os dois tipos (mop na ablução, aspirador no salão), espalhados cada um no seu
+  const groups = a.look ? [ok.filter((t) => !fits.get(t)!.carpet), ok.filter((t) => fits.get(t)!.carpet)] : [ok];
+  for (const g of groups) {
+    for (const p of spreadPatches(g, a.look ? Math.ceil(k / 2) + 1 : k, rng)) {
+      const f = fits.get(p)!;
+      out.push({ k: 'mop', x: p.x, y: p.y, dir: f.dirs[Math.floor(rng() * f.dirs.length) % f.dirs.length], carpet: f.carpet, hall: !!a.look && f.carpet, tries: 0 });
+    }
+  }
+  return out;
 }
 
 /** Placa de piso molhado na porta do banheiro (do lado de dentro, sem tapar a passagem); sem porta, ao lado do carrinho. */
@@ -455,7 +556,7 @@ function doorSign(crew: StaffCrew, a: CleanArea): { x: number; y: number } | nul
   let bestD = Infinity;
   for (let y = d.y - 2; y <= d.y + d.h + 1; y++) {
     for (let x = d.x - 2; x <= d.x + d.w + 1; x++) {
-      if (!inRect(a.layout.rect, x, y) || grid.get(x, y) !== FREE) continue;
+      if (!inRect(a.layout.rect, x, y) || grid.get(x, y) !== FREE || carpetAt(a.layout, x, y)) continue;
       // fora da faixa da porta (quem entra não tropeça na placa)
       if (x >= d.x && x < d.x + d.w) continue;
       const dist = Math.abs(x - cx) + Math.abs(y - cy) * 1.5;
@@ -523,7 +624,7 @@ function planNext(crew: StaffCrew, m: Cleaner, a: CleanArea): boolean {
   if (!s.arrived) {
     steps.push({ t: 'do', fn: () => (s.doing = 'going') });
     fetchCart(m, steps);
-    const hard = isWashroom(a) || s.todo!.some((t) => t.k === 'mop' && !carpetAt(a.layout, t.x, t.y));
+    const hard = s.todo!.some((t) => t.k === 'mop' && !t.carpet);
     steps.push(
       { t: 'go', tx: park.x, ty: park.y, dir: park.dir, walkPose: 'push' },
       {
@@ -549,21 +650,33 @@ function planNext(crew: StaffCrew, m: Cleaner, a: CleanArea): boolean {
         todo.shift();
         continue;
       }
-      const carpet = carpetAt(a.layout, t.x, t.y);
+      // salão da mesquita: só com ele vazio (ninguém no carpete, sem congregação nem majlis)
+      if (t.hall && hallBusy(crew, m, a, t)) {
+        todo.shift();
+        if (++t.tries! < 6) todo.push(t);
+        continue;
+      }
+      const carpet = t.carpet;
       const tool: HeldItem = carpet ? 'vacuum' : 'mop';
       const rng = ch.rng;
-      const dir: Dir = (['left', 'right', 'down', 'down'] as const)[Math.floor(rng() * 4) % 4];
+      const dir = t.dir;
       const ms = Math.round(carpet ? between(rng, 5000, 7000) : between(rng, 6500, 9500));
       const pose = carpet ? 'vacuum' : 'mop';
+      const fx = t.x * TILE + FOOT_DX;
+      const fy = t.y * TILE + FOOT_DY;
+      // no carpete da mesquita, sem sapatos (ficam na entrada do salão)
+      if (t.hall) steps.push({ t: 'do', fn: () => putOn(ch, WEAR_SHOES_CLEAN, shoesOff(ch.appearance)) });
       steps.push(
-        { t: 'go', tx: t.x, ty: t.y, held: tool },
+        { t: 'go', tx: t.x, ty: t.y, fx, fy, held: tool },
         {
           t: 'do',
           fn: () => {
             s.doing = pose;
             ch.dir = dir;
-            const c = patchCenter(ch.x, ch.y, dir);
-            crew.shine.add({ x: c.x, y: c.y, rx: 22, ry: 11, at: crew.now, grow: ms, seed: hash32(`${m.id}:${crew.now}`), carpet });
+            // o trecho é o planejado (o que coube no piso), não onde a pessoa parou
+            const c = patchCenter(fx, fy, dir);
+            const size = carpet ? VACUUM_PATCH : MOP_PATCH;
+            crew.shine.add({ x: c.x, y: c.y, rx: size.rx, ry: size.ry, at: crew.now, grow: ms, seed: hash32(`${m.id}:${crew.now}`), carpet });
             // o balde fica no chão do outro lado (de quem passa o mop)
             if (!carpet) s.bucket = dir === 'left' ? { x: ch.x + 11, y: ch.y + 1 } : dir === 'right' ? { x: ch.x - 11, y: ch.y + 1 } : { x: ch.x + 12, y: ch.y - 1 };
           },
@@ -571,6 +684,7 @@ function planNext(crew: StaffCrew, m: Cleaner, a: CleanArea): boolean {
         { t: 'act', pose, ms, dir },
         { t: 'do', fn: () => (s.bucket = null) },
       );
+      if (t.hall) steps.push({ t: 'do', fn: () => takeOff(ch, WEAR_SHOES_CLEAN) });
       done();
       ch.queue.push(...steps);
       return true;
@@ -747,6 +861,8 @@ export const CLEANER: StaffRoleDef<CleanerState> = {
     const sched = schedule(crew);
     crew.claim(m, STAFF_REST);
     s.bucket = null;
+    // interrompida no meio do carpete da mesquita: calça os sapatos de novo
+    takeOff(ch, WEAR_SHOES_CLEAN);
     // carrinho largado num lugar que deixou de existir (a sala foi desmontada): alguém o levou de volta
     const c = s.cart;
     if (c.home || (!c.withMe && !crew.sim.building.grid.walkable(c.tx, c.ty))) homeCart(crew, m);

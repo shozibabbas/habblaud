@@ -178,7 +178,8 @@ export class StaffRenderer {
         ctx.globalAlpha = wet;
         ctx.drawImage(sheenSprite(p.rx, p.ry, 'wet', 0), x, y);
       }
-      ctx.globalAlpha = level;
+      // carpete: só um traço sutil do aspirador
+      ctx.globalAlpha = p.carpet ? level * 0.55 : level;
       ctx.drawImage(sheenSprite(p.rx, p.ry, p.carpet ? 'carpet' : 'gloss', p.seed % 3), x, y);
     }
     if (!still) {

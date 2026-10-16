@@ -57,5 +57,6 @@ export function prayerHeadwear(look: 'm' | 'f', color: string): WearLook {
 
 /** Sem sapatos (ficaram na sapateira): pés descalços/meias no tom da pele. */
 export function shoesOff(a: Appearance): WearLook {
-  return { shoes: barefoot(a.skin) };
+  // aparência incompleta (arte de teste, perfil antigo): fica como está
+  return a.skin ? { shoes: barefoot(a.skin) } : {};
 }

@@ -9,7 +9,7 @@ import { appearanceFromSeed } from '../../art/character/appearance';
 import { renderCleaningProp } from '../../art/furniture/cleaning';
 import { DEFAULT_WORLD_OPTIONS, type WorldOptions } from '../api';
 import { STAFF_REST } from '../layout/staff';
-import { AREA_MS, cartAt, cleanerUniform, cleaningAreas, isWashroom, lastCleanedOf, nextArea, oldestArea, schedule, spreadPatches, UNIFORM, WASHROOM_MS, type CleanerState } from './cleaner';
+import { AREA_MS, CARPET_MARGIN, MOP_PATCH, patchFits, VACUUM_PATCH, cartAt, cleanerUniform, cleaningAreas, isWashroom, lastCleanedOf, nextArea, oldestArea, schedule, spreadPatches, UNIFORM, WASHROOM_MS, type CleanerState } from './cleaner';
 import { deskOf, receptionUniform, RECEPTION_UNIFORM, type ReceptionState } from './receptionist';
 import { STAFF_DESK, STAFF_DESK_SWAP } from '../layout/staff';
 import { MAX_SHINE, SHINE_FADE_MS, ShineList, shineExpired, shineLevel, type ShinePatch } from './shine';
@@ -255,7 +255,7 @@ describe('escala da limpeza', () => {
     expect(spreadPatches([], 3, rng)).toEqual([]);
   });
 
-  it('não limpa em cima de quem está parado nem nos lugares de uso, e leva o kit', () => {
+  it('não limpa em cima de quem está parado nem nos lugares de uso; placa e balde só com mop', () => {
     const { sim, clock } = office([agent('ana', { status: 'working' })]);
     const id = 'staff:cleaner:0';
     cleanerState(sim, id).forced = '/a';
@@ -264,18 +264,26 @@ describe('escala da limpeza', () => {
     const kit: KitItem[] = [];
     let sawSign = false;
     let sawBucket = false;
+    let mopped = false;
+    let vacuumed = false;
+    let started = false;
     run(sim, clock, 200, () => {
       sim.staff.kit(kit, clock.now);
       sawSign ||= kit.some((k) => k.kind === 'sign');
       sawBucket ||= kit.some((k) => k.kind === 'bucket');
-      if (ch.step?.t === 'act' && ch.step.pose === 'mop') {
+      started ||= cleanerState(sim, id).area === '/a';
+      if (ch.step?.t === 'act' && (ch.step.pose === 'mop' || ch.step.pose === 'vacuum')) {
+        if (ch.step.pose === 'mop') mopped = true;
+        else vacuumed = true;
         for (const s of sim.spots.all()) if (s.tx === ch.tx && s.ty === ch.ty) throw new Error(`limpando no spot ${s.id}`);
         expect(ch.tx === sim.chars.get('ana')!.tx && ch.ty === sim.chars.get('ana')!.ty).toBe(false);
       }
-      return cleanerState(sim, id).area === null && sawSign;
+      return started && cleanerState(sim, id).area === null;
     });
-    expect(sawSign).toBe(true);
-    expect(sawBucket).toBe(true);
+    expect(mopped || vacuumed).toBe(true);
+    // sala de carpete/tapete: aspirador, sem placa de piso molhado nem balde
+    expect(sawSign).toBe(mopped);
+    expect(sawBucket).toBe(mopped);
   });
 });
 
@@ -566,5 +574,102 @@ describe('recepção', () => {
     expect(waved).toBe(true);
     const tv = sendAll(sim, 'tv', clock.now)!;
     expect(tv.sent.length + tv.busy + tv.full).toBe(2);
+  });
+});
+
+describe('piso molhado só em piso duro', () => {
+  /** Carpete ou tapete num ponto, conferido direto nos pisos e tapetes das áreas (independente do código da limpeza). */
+  const carpetOf = (sim: Sim) => {
+    const areas = [...sim.building.areas, ...sim.building.rooms];
+    return (px: number, py: number): boolean =>
+      areas.some((a) => {
+        const r = a.rect;
+        if (px < r.x * 16 || py < r.y * 16 || px >= (r.x + r.w) * 16 || py >= (r.y + r.h) * 16) return false;
+        if (a.rugs.some((g) => px >= g.x && px < g.x + g.w && py >= g.y && py < g.y + g.h)) return true;
+        let c = false;
+        for (const f of a.floors) if (px >= f.x && px < f.x + f.w && py >= f.y && py < f.y + f.h) c = f.kind === 'carpet';
+        return c;
+      });
+  };
+
+  it('o encaixe do trecho: mop longe do carpete (margem de 1 tile), aspirador dentro dele', () => {
+    // carpete à esquerda de x = 100
+    const carpet = (x: number) => x < 100;
+    const isCarpet = (x: number) => carpet(x);
+    expect(patchFits(isCarpet, 100 + MOP_PATCH.rx + CARPET_MARGIN + 2, 50, false)).toBe(true);
+    expect(patchFits(isCarpet, 100 + MOP_PATCH.rx + 4, 50, false)).toBe(false);
+    expect(patchFits(isCarpet, 100 - VACUUM_PATCH.rx - 2, 50, true)).toBe(true);
+    expect(patchFits(isCarpet, 100 - VACUUM_PATCH.rx + 6, 50, true)).toBe(false);
+  });
+
+  it('no campus: nenhum mop, brilho ou placa encosta em carpete, tapete ou no carpete da mesquita', () => {
+    const { sim, clock } = office([agent('ana', { campus: true }), agent('bia', { campus: true, look: 'f', roomId: '/b' })], 2);
+    const isCarpet = carpetOf(sim);
+    const cleaners = cleanersOf(sim);
+    const woman = cleaners.find((c) => c.info.look === 'f')!;
+    const man = cleaners.find((c) => c.info.look === 'm')!;
+    expect(woman && man).toBeTruthy();
+    const kit: KitItem[] = [];
+    const jobs: [typeof man, string][] = [
+      [woman, 'mosque:mulheres'],
+      [man, 'mosque:homens'],
+      [man, '/a'],
+      [woman, '/b'],
+      [man, 'core:copa'],
+      [woman, 'core:recepcao'],
+      [man, 'rec:descanso'],
+    ];
+    let mosqueVacuum = 0;
+    for (const [c, area] of jobs) {
+      const st = cleanerState(sim, c.id);
+      st.forced = area;
+      sim.clearPlan(c);
+      let started = false;
+      run(sim, clock, 400, () => {
+        started ||= st.area === area;
+        sim.staff.kit(kit, clock.now);
+        for (const k of kit) if (k.kind === 'sign') expect(isCarpet(k.x, k.y - 2), `placa em carpete (${area})`).toBe(false);
+        if (area.startsWith('mosque') && c.step?.t === 'act' && c.step.pose === 'vacuum') mosqueVacuum++;
+        return started && st.area === null;
+      });
+      expect(started, area).toBe(true);
+    }
+    const floor = sim.staff.shine.items.filter((p) => !p.gleam);
+    expect(floor.some((p) => !p.carpet)).toBe(true);
+    expect(floor.some((p) => p.carpet)).toBe(true);
+    expect(mosqueVacuum).toBeGreaterThan(0);
+    for (const p of floor) {
+      const m = p.carpet ? 0 : CARPET_MARGIN;
+      for (let y = p.y - p.ry - m; y <= p.y + p.ry + m; y += 2) {
+        for (let x = p.x - p.rx - m; x <= p.x + p.rx + m; x += 2) {
+          if (isCarpet(x, y) !== p.carpet) throw new Error(`${p.carpet ? 'aspirador fora' : 'mop sobre'} do carpete em ${x},${y} (trecho ${p.x},${p.y})`);
+        }
+      }
+    }
+  });
+
+  it('salão da mesquita: o aspirador espera o salão esvaziar (ninguém no carpete)', () => {
+    const { sim, clock } = office([agent('ana', { campus: true })], 2);
+    const man = cleanersOf(sim).find((c) => c.info.look === 'm')!;
+    // alguém sentado no carpete do salão masculino o tempo todo
+    const hall = sim.building.areas.find((a) => a.id === 'mosque:homens')!;
+    const ana = sim.chars.get('ana')!;
+    sim.clearPlan(ana);
+    ana.placeAtTile(hall.rect.x + 6, hall.rect.y + 6);
+    ana.queue.push({ t: 'act', pose: 'stand', ms: 1e9 });
+    const st = cleanerState(sim, man.id);
+    st.forced = 'mosque:homens';
+    sim.clearPlan(man);
+    let vacuumed = false;
+    let mopped = false;
+    let started = false;
+    run(sim, clock, 400, () => {
+      started ||= st.area === 'mosque:homens';
+      if (man.step?.t === 'act' && man.step.pose === 'vacuum') vacuumed = true;
+      if (man.step?.t === 'act' && man.step.pose === 'mop') mopped = true;
+      return started && st.area === null;
+    });
+    expect(mopped).toBe(true);
+    expect(vacuumed).toBe(false);
   });
 });

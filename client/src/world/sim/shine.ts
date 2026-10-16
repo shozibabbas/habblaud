@@ -23,6 +23,8 @@ export interface ShinePatch {
 
 /** Quanto tempo o brilho leva para sumir depois da limpeza. */
 export const SHINE_FADE_MS = 150_000;
+/** Carpete aspirado: só um "recém-aspirado" sutil e curto. */
+export const CARPET_FADE_MS = 40_000;
 /** Mais que isto e os trechos mais antigos saem (já estão quase apagados). */
 export const MAX_SHINE = 160;
 
@@ -31,7 +33,7 @@ export function shineLevel(p: ShinePatch, now: number): number {
   const t = now - p.at;
   if (t <= 0) return 0;
   if (t < p.grow) return 0.35 + 0.65 * (t / p.grow);
-  const k = (t - p.grow) / SHINE_FADE_MS;
+  const k = (t - p.grow) / (p.carpet ? CARPET_FADE_MS : SHINE_FADE_MS);
   if (k >= 1) return 0;
   // começa a cair devagar e termina suave (smoothstep invertido)
   return 1 - k * k * (3 - 2 * k);
@@ -39,7 +41,7 @@ export function shineLevel(p: ShinePatch, now: number): number {
 
 /** O trecho já sumiu de vez? */
 export function shineExpired(p: ShinePatch, now: number): boolean {
-  return now - p.at >= p.grow + SHINE_FADE_MS;
+  return now - p.at >= p.grow + (p.carpet ? CARPET_FADE_MS : SHINE_FADE_MS);
 }
 
 export interface ShineView {
