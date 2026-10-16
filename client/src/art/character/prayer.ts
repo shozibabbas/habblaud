@@ -56,7 +56,7 @@ export function renderPrayer(req: CharacterFrameRequest): BufSprite {
       drawRuku(dc);
       break;
     case 'sujood':
-      drawSujood(dc);
+      drawSujood(dc, req.held === 'turbah');
       break;
     case 'jalsa':
     case 'salam':
@@ -237,9 +237,11 @@ function kneelLegsSitting(dc: Dc): void {
 }
 
 /** Sujood: ajoelhado, tronco à frente na horizontal, testa e nariz no chão, mãos espalmadas ao lado da cabeça. */
-function drawSujood(dc: Dc): void {
+function drawSujood(dc: Dc, turbah = false): void {
   const hx = 12;
-  const hy = HIP_Y + 1;
+  // com a turbah, a cabeça fica 2 px mais alta: a testa repousa sobre ela
+  const hy = HIP_Y + 1 - (turbah ? 2 : 0);
+  if (turbah) drawTurbah(dc.b, TURBAH_X, CHAR_AY);
   const fem = dc.a.look === 'f';
   const z = withRig(dc, { ub: 0, lean: 0 });
   const sl = Math.min(P.sleeveLength(dc.a), 3);
@@ -248,6 +250,25 @@ function drawSujood(dc: Dc): void {
   kneelLegsUpright(dc, hx - 3, hy - 1);
   bowedUpperBody(dc, hx, hy);
   P.drawArm(z, fem ? P.arm([5, hy], [2, 28], [-3, 29]) : P.arm([5, hy - 1], [2, 25], [-2, 29]), dc.p.top, sl, 0, true);
+}
+
+/**
+ * Turbah (sajdagah) sob a testa no sujood, em coordenadas padrão: (x, y) = canto esquerdo da linha de baixo. O mundo
+ * desenha a do carpete no mesmo lugar (render/mosque.ts, TURBAH_DX), então as duas coincidem.
+ */
+export const TURBAH_X = -6;
+/**
+ * Deslocamento (px) do canto esquerdo da turbah em relação aos pés de quem reza virado para oeste: TURBAH_X - CHAR_AX.
+ * Literal de propósito (render.ts importa este módulo; nada dele pode ser lido no carregamento). A base fica nos pés.
+ */
+export const TURBAH_DX = -18;
+
+export function drawTurbah(b: PixelBuf, x: number, baseY: number): void {
+  // tablete redondo de barro (8 x 3), visto de lado: topo claro, borda escura embaixo
+  b.hline(x + 1, x + 6, baseY - 2, '#c2b6a5');
+  b.rect(x, baseY - 1, 8, 1, '#9a8e7e');
+  b.hline(x + 1, x + 6, baseY, '#71675a');
+  b.set(x + 2, baseY - 1, '#b3a797');
 }
 
 /** Jalsa/tashahhud (cabeça de perfil) e salam (cabeça virada: 'up' = à direita/norte, 'down' = à esquerda/sul). */

@@ -42,7 +42,7 @@ const HELD: readonly HeldItem[] = ['coffee', 'water', 'papers', 'laptop', 'book'
 const HELD_PT: Record<HeldItem, string> = {
   none: 'nada', coffee: 'café', water: 'água', papers: 'papéis', laptop: 'notebook', book: 'livro', box: 'caixa', paddle: 'raquete', popcorn: 'pipoca',
   controller: 'controle', phone: 'celular', lipstick: 'batom', comb: 'pente', rock: 'pedra', paper: 'papel', scissors: 'tesoura',
-  racket: 'raquete de tênis', cigarette: 'cigarro', mop: 'mop', vacuum: 'aspirador', tasbih: 'tasbih',
+  racket: 'raquete de tênis', cigarette: 'cigarro', mop: 'mop', vacuum: 'aspirador', tasbih: 'tasbih', turbah: 'turbah',
 };
 const SCREENS: readonly ScreenMode[] = ['off', 'standby', 'idle', 'code', 'terminal', 'browser', 'search', 'chat', 'docs', 'tasks', 'alert', 'progress', 'show', 'game'];
 const SCREEN_PT: Record<ScreenMode, string> = {

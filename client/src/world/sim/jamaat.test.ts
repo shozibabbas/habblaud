@@ -10,7 +10,7 @@ import type { Appearance, ArtModule, RoomTheme } from '../../art/api';
 import { DEFAULT_WORLD_OPTIONS } from '../api';
 import { CLERIC_IMAM, clericGroup, MEN_ID, WOMEN_ID } from '../layout/mosque';
 import { CLERIC_NAMES } from './cleric';
-import { currentPrayer, followPose, jamaatOf, startJamaat, turbahsOf, type Follow, type Jamaat } from './jamaat';
+import { currentPrayer, followPose, imamTurbahs, jamaatOf, startJamaat, turbahsOf, type Follow, type Jamaat } from './jamaat';
 import { GRACE_MS, PrayerClock } from './prayer-clock';
 import { makeupSequence, missedRakahs, prayersFor, prayerSequence, RAKAHS, sequenceMs, sessionSequence, skipCall } from './salat';
 import { sendAll } from './send-all';
@@ -254,9 +254,10 @@ describe('religiosos e congregação', () => {
     for (const id of jf.members) expect(sim.chars.get(id)!.appearance.look).toBe('f');
     expect(turbahs).toBeGreaterThanOrEqual(8);
     expect(majlis).toBe(true);
-    // todos levantam, devolvem a turbah e saem
+    // todos levantam, devolvem a turbah e saem: ficam só as turbahs fixas dos dois lugares do imam
     run(sim, clock, 8);
-    expect([...turbahsOf(sim)]).toHaveLength(0);
+    expect(turbahsOf(sim)).toEqual(imamTurbahs(sim));
+    expect(imamTurbahs(sim)).toHaveLength(2);
     void WOMEN_ID;
   });
 

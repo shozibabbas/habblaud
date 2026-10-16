@@ -96,7 +96,8 @@ export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book
   | 'mop'
   | 'vacuum'
   // --- mesquita (aditivo; character/cleric.ts)
-  | 'tasbih'; // terço de contas pendurado na mão (também nas posturas ajoelhadas da oração)
+  | 'tasbih' // terço de contas pendurado na mão (também nas posturas ajoelhadas da oração)
+  | 'turbah'; // (só no sujood) a turbah/sajdagah no chão sob a testa, estilo shia: a testa encosta nela
 
 export type HairStyle =
   | 'short' | 'buzz' | 'spiky' | 'side_part' | 'curly' | 'afro' | 'bob' | 'long' | 'ponytail' | 'bun' | 'pigtails'

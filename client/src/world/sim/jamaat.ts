@@ -8,6 +8,7 @@
 import type { PrayerStyle } from '../../../../shared/mosque';
 import type { PrayerName } from '../../../../shared/prayer-times';
 import type { MosqueSection } from '../layout/mosque';
+import { TURBAH_DX } from '../../art/character/prayer';
 import type { Character } from './character';
 import { makeupSequence, missedRakahs, phaseAt, prayersFor, RAKAHS, sequenceMs, sessionSequence, standing, type PrayerPhase, type Posture } from './salat';
 import type { Sim } from './sim';
@@ -175,16 +176,44 @@ export function setTurbah(sim: Sim, ch: Character, at: { x: number; y: number } 
   else t.delete(ch.id);
 }
 
-/** Turbahs no carpete agora (para o desenho). */
-export function turbahsOf(sim: Sim): Iterable<{ x: number; y: number }> {
-  const t = state(sim).turbahs;
-  for (const id of t.keys()) if (!sim.chars.has(id)) t.delete(id);
-  return t.values();
+/** A turbah de alguém ainda está diante dele (não saiu do lugar)? */
+const before = (ch: Character, t: { x: number; y: number }) => Math.abs(Math.round(ch.x) + TURBAH_DX - t.x) <= 3 && Math.abs(Math.round(ch.y) - t.y) <= 3;
+
+/**
+ * Turbahs fixas dos lugares do imam (estilo shia): o aalim e a aalima têm a sua sempre ali, no tapete diante do
+ * mihrab — para a congregação e para o nafl deles.
+ */
+export function imamTurbahs(sim: Sim): { x: number; y: number }[] {
+  if (sim.mosque.style !== 'shia') return [];
+  return sim.spots.ofKind('staff').filter((s) => s.group?.startsWith('cleric:imam:')).map((s) => turbahSpot(s.x, s.y));
 }
 
-/** Onde a turbah fica para quem reza com os pés em (x, y) virado para oeste (a testa no sujood). */
+/** Turbahs no carpete agora (para o desenho): as dos lugares do imam e as de quem está no lugar onde a pôs. */
+export function turbahsOf(sim: Sim): { x: number; y: number }[] {
+  const t = state(sim).turbahs;
+  const out = imamTurbahs(sim);
+  for (const [id, at] of t) {
+    const ch = sim.chars.get(id);
+    if (!ch) t.delete(id);
+    else if (before(ch, at) && !out.some((o) => o.x === at.x && o.y === at.y)) out.push(at);
+  }
+  return out;
+}
+
+/** Há uma turbah sob a testa de quem está em (ch.x, ch.y) virado para oeste? (o sujood desenha a testa sobre ela) */
+export function turbahUnder(sim: Sim, ch: Character): boolean {
+  if (sim.mosque.style !== 'shia' || ch.dir !== 'left') return false;
+  const mine = state(sim).turbahs.get(ch.id);
+  if (mine && before(ch, mine)) return true;
+  return imamTurbahs(sim).some((t) => before(ch, t));
+}
+
+/**
+ * Onde a turbah fica (canto esquerdo da base) para quem reza com os pés em (x, y) virado para oeste: sob a testa no
+ * sujood, no mesmo lugar onde a arte a desenha (art/character/prayer.ts, TURBAH_DX).
+ */
 export function turbahSpot(x: number, y: number): { x: number; y: number } {
-  return { x: Math.round(x) - 18, y: Math.round(y) - 1 };
+  return { x: Math.round(x) + TURBAH_DX, y: Math.round(y) };
 }
 
 /** Esquece tudo (aba oculta: ninguém estava rezando de verdade). */
