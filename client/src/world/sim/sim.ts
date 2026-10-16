@@ -38,7 +38,11 @@ import { RoomState } from './room-state';
 import { countShells, latestShellDone, shellLabel, shellStage, shellWaitSince, spinDir, spinPhase, yawnPhase } from './shell';
 import { SpotRegistry } from './spots';
 import { planPrayerExit, planPrayerVisit, resetPrayer, stepPray, wantsToPray } from './prayer';
+import { readyToStart, resetJamaat, tickJamaat } from './jamaat';
 import { isStaff, StaffCrew } from './staff';
+// os religiosos da mesquita se registram na equipe (sim/cleric.ts)
+import './cleric';
+import { DEFAULT_MOSQUE, type MosqueSettings } from '../../../../shared/mosque';
 import type { Step } from './steps';
 import { tr } from '../../../../shared/i18n';
 
@@ -105,6 +109,8 @@ export class Sim {
   readonly stallBusy = new Set<string>();
   /** Último "chamado para a oração" da interface (ms; 0 = nunca): os minaretes brilham por uns segundos. */
   callToPrayerAt = 0;
+  /** Mesquita do campus: estilo da oração, cidade e chamado (OfficeSnapshot.meta.mosque; shared/mosque.ts). */
+  mosque: MosqueSettings = DEFAULT_MOSQUE;
   /** Campus: cápsulas de dormir ocupadas (furnitureId) — sim/recreation.ts. */
   readonly podBusy = new Set<string>();
   /** Dono do escritório (meta.owner): no campus, a diretoria (layout/ceo.ts). null = sem dono. */
@@ -173,6 +179,7 @@ export class Sim {
     this.now = now;
     const first = !this.initialized;
     this.initialized = true;
+    this.mosque = snap.meta.mosque ?? DEFAULT_MOSQUE;
     this.accounts = new Map(snap.accounts.map((a) => [a.id, { short: a.short, color: a.color, name: a.name, ...(a.provider === 'codex' ? { provider: a.provider } : {}) }]));
 
     // ---- campus (escritório combinado): máquinas e lugares antes das salas, que dependem deles
@@ -769,6 +776,8 @@ export class Sim {
       }
     }
     this.staff.update(now);
+    // congregações da mesquita: o imam começa quando todos estão no lugar (sim/jamaat.ts)
+    tickJamaat(this, now, (j) => readyToStart(this, j));
     if (now >= this.nextHousekeeping) {
       this.nextHousekeeping = now + 1000;
       this.housekeeping(now);
@@ -1079,7 +1088,7 @@ export class Sim {
         ch.gone = true;
         return true;
       case 'pray':
-        return stepPray(ch, s, ch.stepT + dt * 1000);
+        return stepPray(ch, s, ch.stepT + dt * 1000, now);
     }
   }
 
@@ -1946,6 +1955,7 @@ export class Sim {
       }
       ch.gathering = null;
       resetPrayer(ch);
+      resetJamaat(this);
       if (ch.leaving && !ch.gone) ch.gone = true;
       if (ch.gone) {
         this.spots.releaseAll(ch.id);

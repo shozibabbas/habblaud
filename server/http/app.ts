@@ -10,6 +10,8 @@ import type { Federation } from '../federation/federation';
 import { parsePresence, type RemotePresence } from '../federation/presence';
 import type { Office } from '../model/office';
 import { ownerFromBody, type OwnerSource } from '../owner';
+import type { MosqueSource } from '../mosque';
+import type { MosqueSettings } from '../../shared/mosque';
 import type { CodexLive } from '../sources/codex/live';
 import type { SessionLookup } from '../sources/source';
 import { isJsonContentType, isLoopbackHost } from './guard';
@@ -93,6 +95,11 @@ export interface ApiDeps {
    * snapshot muda junto. No escritório combinado só vale o deste computador (o dos pares nunca entra).
    */
   owner?: { get(): OwnerInfo | undefined; source(): OwnerSource; set(owner: OwnerInfo | null): void };
+  /**
+   * Mesquita do campus (GET/PUT /api/mosque; server/mosque.ts): `update` aplica um corpo parcial e grava no
+   * mosque.json. Gravar segue a trava do dono (bind local + Host local).
+   */
+  mosque?: { get(): MosqueSettings; source(): MosqueSource; update(body: unknown): { mosque: MosqueSettings } | { invalid: string } };
   /** Estatísticas do "Meu dia" (GET /api/stats, http/stats.ts). */
   stats?: DayStatsService;
   /** Verificação de versão nova no GitHub (GET /api/updates, POST /api/updates/check; updates/checker.ts). */
@@ -734,6 +741,33 @@ export function createApiHandler(deps: ApiDeps): (req: IncomingMessage, res: Ser
             }
             owner.set(r.owner);
             sendJson(res, 200, { owner: r.owner, source: owner.source() });
+          })
+          .catch((err) => fail(res, err));
+      return true;
+    }
+    if (path === '/api/mosque') {
+      // Ler é livre (já vai no snapshot); gravar só pelo próprio computador, como o dono do escritório.
+      const mosque = deps.mosque;
+      if (!isRead && method !== 'PUT') methodNotAllowed(res, 'GET, PUT');
+      else if (!mosque) {
+        req.resume();
+        sendJson(res, 404, { error: tr('rota desconhecida') });
+      } else if (isRead) sendJson(res, 200, { mosque: mosque.get(), source: mosque.source() });
+      else if (!deps.terminal) {
+        req.resume();
+        sendJson(res, 403, { error: tr('mudar a mesquita desligado: só funciona com o Habblaud acessível apenas pelo próprio computador') });
+      } else if (!trusted(req)) {
+        req.resume();
+        sendJson(res, 403, { error: denied(req, tr('a mesquita só é configurada pelo próprio computador (http://localhost)')) });
+      } else
+        readJson(req)
+          .then((body) => {
+            const r = mosque.update(body);
+            if ('invalid' in r) {
+              sendJson(res, 400, { error: tr('mesquita: campo "{0}" fora do formato', [r.invalid]), field: r.invalid });
+              return;
+            }
+            sendJson(res, 200, { mosque: r.mosque, source: mosque.source() });
           })
           .catch((err) => fail(res, err));
       return true;

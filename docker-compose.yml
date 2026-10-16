@@ -54,6 +54,7 @@ services:
       # Dono do escritório (JSON: nome, cargo, look, peças e a secretária): só o valor inicial; depois valem as
       # Configurações (owner.json na pasta de dados). No campus, a diretoria.
       HABBLAUD_OWNER: ${HABBLAUD_OWNER:-}
+      HABBLAUD_PRAYER_STYLE: ${HABBLAUD_PRAYER_STYLE:-}
       # 0 desliga as sessões do Codex no escritório.
       HABBLAUD_CODEX: ${HABBLAUD_CODEX:-}
       # 1 liga o Novo agente pelo escritório (no Docker, quem começa a sessão é o auxiliar do host, npm run

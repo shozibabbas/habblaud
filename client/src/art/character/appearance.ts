@@ -56,6 +56,8 @@ const ACC_COLORS: Record<Accessory, readonly string[]> = {
   // Branco/creme (gorro de oração) e cinza/preto (karakul).
   topi: ['#f4f2ee', '#ede3cc', '#9a9ea6', '#4a4d55', '#26272e'],
   headset: ['#2b2b33', '#aeb4bd', '#f1efe9'],
+  // Turbante dos religiosos: preto (sayyid) ou branco.
+  amama: ['#1f1d24', '#f2efe7'],
 };
 // Roupas do sul da Ásia (shalwar kameez, kurta, colete): brancos, cremes, pastéis e tons escuros sóbrios na kurta;
 // cores mais vivas no kameez e na dupatta; coletes escuros.
@@ -116,13 +118,13 @@ const HAIR_W: Record<'f' | 'm', Weights<HairStyle>> = {
 // Os estilos com peso 0 (no fim de cada tabela, para não mudar o sorteio de nenhuma semente) só aparecem quando
 // escolhidos no editor.
 const TOP_W: Record<'f' | 'm', Weights<TopStyle>> = {
-  m: { tshirt: 20, hoodie: 16, shirt_tie: 10, sweater: 13, jacket: 13, blouse: 2, polo: 14, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0, suit: 0 },
-  f: { tshirt: 17, hoodie: 14, shirt_tie: 5, sweater: 14, jacket: 12, blouse: 20, polo: 8, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0, suit: 0 },
+  m: { tshirt: 20, hoodie: 16, shirt_tie: 10, sweater: 13, jacket: 13, blouse: 2, polo: 14, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0, suit: 0, qaba_aba: 0, abaya: 0 },
+  f: { tshirt: 17, hoodie: 14, shirt_tie: 5, sweater: 14, jacket: 12, blouse: 20, polo: 8, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0, suit: 0, qaba_aba: 0, abaya: 0 },
 };
 
 const ACC_W: Record<'f' | 'm', Weights<Accessory>> = {
-  m: { none: 40, glasses: 18, sunglasses: 4, headphones: 13, cap: 7, beanie: 6, earrings: 2, bow: 0.3, dupatta: 0, hijab: 0, topi: 0, headset: 0 },
-  f: { none: 36, glasses: 16, sunglasses: 4, headphones: 11, cap: 4, beanie: 5, earrings: 13, bow: 7, dupatta: 0, hijab: 0, topi: 0, headset: 0 },
+  m: { none: 40, glasses: 18, sunglasses: 4, headphones: 13, cap: 7, beanie: 6, earrings: 2, bow: 0.3, dupatta: 0, hijab: 0, topi: 0, headset: 0, amama: 0 },
+  f: { none: 36, glasses: 16, sunglasses: 4, headphones: 11, cap: 4, beanie: 5, earrings: 13, bow: 7, dupatta: 0, hijab: 0, topi: 0, headset: 0, amama: 0 },
 };
 
 const FACIAL_W: Weights<FacialHair> = { none: 62, stubble: 12, beard: 13, mustache: 7, goatee: 6, short_beard: 0 };

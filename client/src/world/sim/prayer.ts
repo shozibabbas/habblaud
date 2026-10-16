@@ -6,7 +6,6 @@
 // Durante a oração ninguém interrompe; se chega trabalho de verdade, a pessoa termina depressa (senta, salam)
 // e sai, devolvendo o que pegou. As peças (topi, hijab, pés descalços) são camadas de desenho (sim/wear.ts).
 import { hash32 } from '../../../../shared/hash';
-import type { Pose } from '../../art/api';
 import { hijabColor } from '../../art/character/prayer';
 import { sectionArea, sectionOf, type MosqueSection } from '../layout/mosque';
 import type { SpotDef, SpotKind } from '../layout/types';
@@ -14,21 +13,18 @@ import type { Character } from './character';
 import type { Sim } from './sim';
 import type { Step } from './steps';
 import { prayerHeadwear, putOn, shoesOff, takeOff } from './wear';
+import { followPose, joinable, jamaatOf, majlisOver, prayerOver, setTurbah, START_WAIT_MS, turbahSpot, type Follow } from './jamaat';
+import { hurrySequence, phaseAt, prayerSequence, RAKAHS, sessionSequence, standing, type PrayerPhase, type Posture } from './salat';
 
-/** Postura da oração (as poses da arte). */
-export type Posture = Extract<Pose, 'takbir' | 'qiyam' | 'ruku' | 'sujood' | 'jalsa' | 'salam'>;
-
-export interface PrayerPhase {
-  pose: Posture;
-  ms: number;
-}
+// sequências e o jeito de rezar: sim/salat.ts (reexportados aqui)
+export { hurrySequence, phaseAt, prayerSequence, sequenceMs, type PrayerPhase, type Posture } from './salat';
 
 /** Visita em andamento: o que a pessoa está usando e precisa devolver na saída. */
 export interface PrayerVisit {
   section: MosqueSection;
   /** Sapatos na sapateira (pés descalços). */
   shoesOff: boolean;
-  /** Com o topi/hijab da mesquita. */
+  /** Com o topi/hijab da mesquita (e, no estilo shia, a turbah). */
   covered: boolean;
 }
 
@@ -47,71 +43,13 @@ export function prays(seed: number): boolean {
 
 const jitter = (rng: () => number, ms: number, k = 0.15) => Math.round(ms * (1 - k + rng() * 2 * k));
 
-/**
- * Sequência de posturas de `rakahs` rak'ahs (2 no nafl): takbir, qiyam (recitação), ruku, qawmah (em pé de novo),
- * sujood, jalsa, sujood; no fim, tashahhud sentado e o salam (direita e esquerda). Tempos encurtados, mas no
- * ritmo calmo de quem reza.
- */
-export function prayerSequence(rng: () => number, rakahs = 2): PrayerPhase[] {
-  const seq: PrayerPhase[] = [{ pose: 'takbir', ms: jitter(rng, 1100) }];
-  for (let r = 0; r < rakahs; r++) {
-    seq.push(
-      { pose: 'qiyam', ms: jitter(rng, r === 0 ? 6500 : 5000) },
-      { pose: 'ruku', ms: jitter(rng, 2600) },
-      { pose: 'qiyam', ms: jitter(rng, 1300) },
-      { pose: 'sujood', ms: jitter(rng, 2600) },
-      { pose: 'jalsa', ms: jitter(rng, 1500) },
-      { pose: 'sujood', ms: jitter(rng, 2600) },
-    );
-    // depois da 2ª rak'ah (e da última): tashahhud sentado
-    if (r % 2 === 1 || r === rakahs - 1) seq.push({ pose: 'jalsa', ms: jitter(rng, r === rakahs - 1 ? 5500 : 3500) });
-  }
-  // salam: a pose tem dois quadros (cabeça à direita, depois à esquerda) de 1,3 s cada
-  seq.push({ pose: 'salam', ms: 2600 });
-  return seq;
-}
-
-export function sequenceMs(seq: readonly PrayerPhase[]): number {
-  let t = 0;
-  for (const p of seq) t += p.ms;
-  return t;
-}
-
-/** Postura no instante `t` (ms desde o início); null depois do fim. */
-export function phaseAt(seq: readonly PrayerPhase[], t: number): { i: number; phase: PrayerPhase; left: number } | null {
-  let acc = 0;
-  for (let i = 0; i < seq.length; i++) {
-    acc += seq[i].ms;
-    if (t < acc) return { i, phase: seq[i], left: acc - t };
-  }
-  return null;
-}
-
-/**
- * Chegou trabalho no meio da oração: termina depressa, sem pular o essencial. A postura atual vai até no
- * máximo 0,6 s; quem está em pé ou curvado desce em sujood; depois o tashahhud curto e o salam. Retorna a
- * sequência que começa AGORA (tempos relativos ao instante `t` da sequência antiga).
- */
-export function hurrySequence(seq: readonly PrayerPhase[], t: number): PrayerPhase[] {
-  const at = phaseAt(seq, t);
-  if (!at) return [];
-  const cur = at.phase.pose;
-  const out: PrayerPhase[] = [{ pose: cur, ms: Math.min(at.left, 600) }];
-  if (cur === 'salam') {
-    out[0].ms = Math.min(at.left, 1300);
-    return out;
-  }
-  if (cur === 'takbir' || cur === 'qiyam' || cur === 'ruku') out.push({ pose: 'sujood', ms: 1000 });
-  if (cur !== 'jalsa') out.push({ pose: 'jalsa', ms: 1200 });
-  else out[0].ms = Math.min(at.left, 1200);
-  out.push({ pose: 'salam', ms: 2600 });
-  return out;
-}
-
 // =================================================================== passo de oração
 
-/** Passo da fila: reza a sequência no lugar (não interrompível; chegando trabalho, abrevia). */
-export type PrayStep = { t: 'pray'; seq: PrayerPhase[]; hurried?: boolean; base?: number };
+/**
+ * Passo da fila: reza no lugar (não interrompível; chegando trabalho, abrevia). Com `follow`, acompanha a congregação
+ * (sim/jamaat.ts): as posturas vêm da linha do tempo do imam; sem ela, da própria sequência `seq`.
+ */
+export type PrayStep = { t: 'pray'; seq: PrayerPhase[]; hurried?: boolean; base?: number; follow?: Follow };
 
 /** Precisa sair (trabalho, usuário, ir embora)? */
 function calledAway(ch: Character): boolean {
@@ -119,14 +57,44 @@ function calledAway(ch: Character): boolean {
 }
 
 /** Executa o passo 'pray' (sempre virado para a qibla, a oeste). `elapsed` = ms desde o início do passo. */
-export function stepPray(ch: Character, s: PrayStep, elapsed: number): boolean {
+export function stepPray(ch: Character, s: PrayStep, elapsed: number, now = elapsed): boolean {
+  ch.dir = 'left';
+  const f = s.follow;
+  if (f) {
+    const j = f.j;
+    // sai da congregação e segue sozinho com `seq` a partir de agora
+    const solo = (seq: PrayerPhase[]) => {
+      s.follow = undefined;
+      s.base = elapsed;
+      s.seq = seq;
+    };
+    const whole = () => sessionSequence(ch.rng, j.prayers.map((p) => RAKAHS[p]), j.style);
+    if (!s.hurried && calledAway(ch) && !f.lead) {
+      // chamado no meio: termina depressa a partir da postura em que está
+      solo(hurrySequence([{ pose: (ch.pose as Posture) ?? standing(j.style), ms: 600 }], 0));
+      s.hurried = true;
+    } else if (j.startAt === null && now - j.calledAt > START_WAIT_MS * 1.5) {
+      // a congregação não começou (ninguém para puxar): reza sozinho
+      solo(whole());
+    } else if (f.joinedAt === undefined && j.startAt !== null && prayerOver(j, now)) {
+      // chegou depois do fim: reza a oração inteira sozinho
+      solo(whole());
+    } else {
+      const pose = followPose(f, now, ch.rng);
+      if (pose === null) {
+        ch.setPose('stand');
+        return true;
+      }
+      ch.setPose(pose);
+      return false;
+    }
+  }
   if (!s.hurried && calledAway(ch)) {
     s.seq = hurrySequence(s.seq, elapsed - (s.base ?? 0));
     s.base = elapsed;
     s.hurried = true;
   }
   const at = phaseAt(s.seq, elapsed - (s.base ?? 0));
-  ch.dir = 'left';
   if (!at) {
     ch.setPose('stand');
     return true;
@@ -175,10 +143,17 @@ function quickSpot(sim: Sim, ch: Character, kind: 'shoes' | 'headwear', section:
   return pool[Math.floor(ch.rng() * pool.length)];
 }
 
-/** Lugar na fila: o de menor `rank` livre (frente para trás, meio para as pontas). */
-export function pickPrayerSpot(spots: readonly SpotDef[], isFree: (id: string) => boolean): SpotDef | null {
+/**
+ * Lugar na fila: o de menor `rank` livre (frente para trás, meio para as pontas; sozinho, uma fileira sim, outra não).
+ * Em congregação (`tight`), ombro a ombro: a fila da frente enche inteira antes da próxima.
+ */
+export function pickPrayerSpot(spots: readonly SpotDef[], isFree: (id: string) => boolean, tight = false): SpotDef | null {
+  const rank = (s: SpotDef) => {
+    const r = s.rank ?? 0;
+    return tight ? Math.floor(r / 100) * 100 + (r % 50) : r;
+  };
   let best: SpotDef | null = null;
-  for (const s of spots) if (s.kind === 'prayer' && isFree(s.id) && (!best || (s.rank ?? 0) < (best.rank ?? 0))) best = s;
+  for (const s of spots) if (s.kind === 'prayer' && isFree(s.id) && (!best || rank(s) < rank(best))) best = s;
   return best;
 }
 
@@ -220,7 +195,11 @@ export function planPrayerVisit(sim: Sim, ch: Character, now: number, opts: { qu
   const section = sectionOf(ch.appearance.look);
   const area = sectionArea(section);
   const free = (id: string) => sim.spots.isFree(id, ch.id);
-  const place = pickPrayerSpot(sim.spots.ofKind('prayer').filter((s) => s.areaId === area), free);
+  // há uma congregação na ala (chamado para a oração): entra nela, nas filas da frente
+  const cur = jamaatOf(sim, section);
+  const j = joinable(cur, now) ? cur : undefined;
+  const style = sim.mosque.style;
+  const place = pickPrayerSpot(sim.spots.ofKind('prayer').filter((s) => s.areaId === area), free, !!j);
   const stools = sim.spots.ofKind('wudu').filter((s) => s.areaId === area);
   let stool = stools.find((s) => free(s.id) && ch.rng() < 0.7) ?? stools.find((s) => free(s.id));
   // chamado para a oração: torneiras ocupadas, espera a vez numa delas
@@ -240,6 +219,8 @@ export function planPrayerVisit(sim: Sim, ch: Character, now: number, opts: { qu
   }
   const tap = stool;
   const visit: PrayerVisit = { section, shoesOff: false, covered: false };
+  if (j) j.members.add(ch.id);
+  const turbah = style === 'shia';
   ch.prayer = visit;
   nextAt.set(ch, now + cooldown(ch));
   const rng = ch.rng;
@@ -264,14 +245,20 @@ export function planPrayerVisit(sim: Sim, ch: Character, now: number, opts: { qu
     { t: 'act', pose: 'wudu', ms: jitter(rng, 8000), seated: true },
     { t: 'exit' },
     { t: 'do', fn: () => sim.spots.release(tap.id, ch.id) },
-    // topi (homens) ou hijab do cabideiro (mulheres)
+    // topi (homens) ou hijab do cabideiro (mulheres); no estilo shia, também uma turbah da caixinha ao lado
     { t: 'go', tx: head.tx, ty: head.ty, fx: head.x, fy: head.y, dir: head.dir },
-    { t: 'act', pose: 'use', ms: jitter(rng, section === 'f' ? 1800 : 1100), dir: head.dir },
+    { t: 'act', pose: 'use', ms: jitter(rng, (section === 'f' ? 1800 : 1100) + (turbah ? 900 : 0)), dir: head.dir },
     { t: 'do', fn: () => cover(ch, visit) },
-    // reza no lugar da fila, virado para a qibla
+    // reza no lugar da fila, virado para a qibla (a turbah no carpete, onde a testa encosta)
     { t: 'go', tx: place.tx, ty: place.ty, fx: place.x, fy: place.y, dir: 'left' },
+    { t: 'do', fn: () => turbah && setTurbah(sim, ch, turbahSpot(place.x, place.y)) },
     { t: 'act', pose: 'stand', ms: jitter(rng, 700), dir: 'left' },
-    { t: 'pray', seq: prayerSequence(rng) },
+    j ? { t: 'pray', seq: [], follow: { j } } : { t: 'pray', seq: prayerSequence(rng, 2, style) },
+  );
+  // depois da congregação, o majlis: quem rezou fica sentado ouvindo, na sua fileira
+  if (j) steps.push({ t: 'until', cond: () => majlisOver(sim, section, sim.now), minMs: 1500, maxMs: 60_000, pose: 'jalsa', dir: 'left' });
+  steps.push(
+    { t: 'do', fn: () => setTurbah(sim, ch, null) },
     { t: 'do', fn: () => sim.spots.release(place.id, ch.id) },
   );
   // a saída já vai planejada: devolve o topi/hijab e calça os sapatos (os passos 'do' acima os tiram)
@@ -283,7 +270,7 @@ export function planPrayerVisit(sim: Sim, ch: Character, now: number, opts: { qu
 
 /** Devolve o topi/hijab e calça os sapatos (o fim normal da visita e a saída às pressas). */
 function exitSteps(sim: Sim, ch: Character, visit: PrayerVisit, wearing: { covered: boolean; shoesOff: boolean }, hurry: boolean): Step[] {
-  const steps: Step[] = [];
+  const steps: Step[] = [{ t: 'do', fn: () => setTurbah(sim, ch, null) }];
   const run = hurry && (ch.mode === 'wait' || ch.mode === 'work');
   if (wearing.covered) {
     const head = quickSpot(sim, ch, 'headwear', visit.section);

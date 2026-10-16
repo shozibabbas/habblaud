@@ -12,9 +12,9 @@ import type { BufSprite } from '../core/sprite';
 import type { HeadView } from './hair';
 import { CHAR_AX, CHAR_AY, CHAR_H, CHAR_PARTS as P, type Arm, type Dc, type Rig } from './render';
 
-export type PrayerPose = Extract<Pose, 'takbir' | 'qiyam' | 'ruku' | 'sujood' | 'jalsa' | 'salam' | 'wudu'>;
+export type PrayerPose = Extract<Pose, 'takbir' | 'qiyam' | 'ruku' | 'sujood' | 'jalsa' | 'salam' | 'wudu' | 'sadl' | 'qunoot' | 'dars'>;
 
-const PRAYER_POSES: ReadonlySet<string> = new Set<PrayerPose>(['takbir', 'qiyam', 'ruku', 'sujood', 'jalsa', 'salam', 'wudu']);
+const PRAYER_POSES: ReadonlySet<string> = new Set<PrayerPose>(['takbir', 'qiyam', 'ruku', 'sujood', 'jalsa', 'salam', 'wudu', 'sadl', 'qunoot', 'dars']);
 
 export function isPrayerPose(pose: Pose): pose is PrayerPose {
   return PRAYER_POSES.has(pose);
@@ -38,14 +38,19 @@ export function renderPrayer(req: CharacterFrameRequest): BufSprite {
     return { buf: left.buf.flipped(), ax: PRAYER_W - left.ax, ay: left.ay };
   }
   const pose = req.pose as PrayerPose;
-  const f = Math.max(0, Math.floor(req.frame)) % (pose === 'salam' || pose === 'wudu' ? 2 : 1);
+  const f = Math.max(0, Math.floor(req.frame)) % (pose === 'salam' || pose === 'wudu' || pose === 'dars' ? 2 : 1);
   const out = new PixelBuf(PRAYER_W, CHAR_H);
   out.ox = DX;
   const dc = context(req, out, pose === 'wudu');
   switch (pose) {
     case 'takbir':
     case 'qiyam':
+    case 'sadl':
+    case 'qunoot':
       drawStanding(dc, pose);
+      break;
+    case 'dars':
+      drawKneeling(dc, 'side', req.held, f);
       break;
     case 'ruku':
       drawRuku(dc);
@@ -55,7 +60,7 @@ export function renderPrayer(req: CharacterFrameRequest): BufSprite {
       break;
     case 'jalsa':
     case 'salam':
-      drawKneeling(dc, pose === 'salam' ? (f === 0 ? 'up' : 'down') : 'side');
+      drawKneeling(dc, pose === 'salam' ? (f === 0 ? 'up' : 'down') : 'side', req.held);
       break;
     case 'wudu':
       drawWudu(dc, f);
@@ -63,7 +68,7 @@ export function renderPrayer(req: CharacterFrameRequest): BufSprite {
   }
   out.ox = 0;
   out.outline();
-  if (pose === 'takbir' || pose === 'qiyam' || pose === 'ruku') out.shadow(DX + CHAR_AX, CHAR_AY - 0.5, 6, 2, '#1c2034', 0.2);
+  if (pose === 'takbir' || pose === 'qiyam' || pose === 'sadl' || pose === 'qunoot' || pose === 'ruku') out.shadow(DX + CHAR_AX, CHAR_AY - 0.5, 6, 2, '#1c2034', 0.2);
   else if (pose === 'sujood') out.shadow(DX + CHAR_AX - 8, CHAR_AY - 0.5, 13, 2, '#1c2034', 0.2);
   else if (pose !== 'wudu') out.shadow(DX + CHAR_AX - 1, CHAR_AY - 0.5, 8, 2, '#1c2034', 0.2);
   return { buf: out, ax: PRAYER_AX, ay: CHAR_AY };
@@ -101,13 +106,20 @@ function arms(dc: Dc, far: Arm, near: Arm, sleeve = P.sleeveLength(dc.a)): { far
   };
 }
 
-/** Em pé: takbir (mãos abertas junto às orelhas) ou qiyam (mãos cruzadas abaixo do umbigo; mulheres, no peito). */
-function drawStanding(dc: Dc, pose: 'takbir' | 'qiyam'): void {
+/**
+ * Em pé: takbir (mãos abertas junto às orelhas), qiyam (mãos cruzadas abaixo do umbigo; mulheres, no peito), sadl
+ * (estilo shia: braços soltos ao lado do corpo) ou qunoot (as duas mãos erguidas diante do rosto, palmas para cima).
+ */
+function drawStanding(dc: Dc, pose: 'takbir' | 'qiyam' | 'sadl' | 'qunoot'): void {
   const fem = dc.a.look === 'f';
   const a =
     pose === 'takbir'
       ? arms(dc, P.arm([12, 18], [14, 16], [13, 11]), P.arm([10, 18], [7, 17], [7, 11]))
-      : fem
+      : pose === 'sadl'
+        ? arms(dc, P.arm([12, 18], [12, 22]), P.arm([10, 18], [10, 22]))
+        : pose === 'qunoot'
+          ? arms(dc, P.arm([12, 18], [10, 20], [6, 17]), P.arm([10, 18], [8, 20], [4, 17]))
+          : fem
         ? arms(dc, P.arm([12, 18], [12, 20], [8, 19]), P.arm([10, 18], [10, 20], [7, 19]))
         : arms(dc, P.arm([12, 18], [12, 21], [8, 22]), P.arm([10, 18], [10, 21], [7, 22]));
   a.far();
@@ -122,6 +134,11 @@ function drawStanding(dc: Dc, pose: 'takbir' | 'qiyam'): void {
     return;
   }
   a.near();
+  if (pose === 'qunoot') {
+    // palmas abertas para cima, juntas diante do rosto (a borda clara de cima é a palma)
+    const sk = dc.p.skin;
+    for (const x of [3, 4, 5, 6, 7]) dc.b.set(x, 16 + dc.r.ub, x < 5 ? sk.lt : sk.base);
+  }
 }
 
 /**
@@ -234,15 +251,19 @@ function drawSujood(dc: Dc): void {
 }
 
 /** Jalsa/tashahhud (cabeça de perfil) e salam (cabeça virada: 'up' = à direita/norte, 'down' = à esquerda/sul). */
-function drawKneeling(dc: Dc, view: HeadView): void {
+function drawKneeling(dc: Dc, view: HeadView, held: CharacterFrameRequest['held'] = 'none', talk = -1): void {
   const drop = 5;
-  const d = withRig(dc, { ub: drop });
-  const a = arms(d, P.arm([12, 18], [12, 21], [8, 22]), P.arm([10, 18], [10, 21], [7, 22]));
+  const d = withRig(dc, { ub: drop, mouth: talk === 0 ? 'open' : 'none', eyes: talk >= 0 ? 'open' : dc.r.eyes });
+  // dars: a mão de perto gesticula (na altura do peito e um pouco mais alta)
+  const near = talk < 0 ? P.arm([10, 18], [10, 21], [7, 22]) : talk === 0 ? P.arm([10, 18], [8, 20], [5, 19]) : P.arm([10, 18], [8, 19], [5, 16]);
+  const a = arms(d, P.arm([12, 18], [12, 21], [8, 22]), near);
   a.far();
   kneelLegsSitting(d);
   P.drawTorso(d);
   head(d, view);
   a.near();
+  // o terço na mão que descansa na coxa (a de trás, no dars)
+  if (held === 'tasbih') P.drawTasbih(dc.b, talk < 0 ? 7 : 9, 23 + drop);
 }
 
 /** Ablução sentado no banquinho: mãos na água da torneira (0) e no rosto (1), mangas arregaçadas. */

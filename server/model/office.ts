@@ -30,6 +30,7 @@ import { nameKey, type AppearanceParts } from '../../shared/appearance';
 import { DemoSimulator } from '../../shared/demo/simulator';
 import { describeGitHubEvent, githubEventKey, RoomEffects, type GitHubEvent } from '../../shared/github';
 import { hash32 } from '../../shared/hash';
+import type { MosqueSettings } from '../../shared/mosque';
 import { appearanceProfileOf, type NameSet as NameSetId } from '../../shared/names';
 import { applyPermission } from '../permissions/registry';
 import type { NameStore, StoredCharacter } from './names';
@@ -91,6 +92,8 @@ export interface OfficeDeps {
   ptys?: () => { status: PtyStatus; list: PtyInfo[] };
   /** Dono do escritório (owner.json ou HABBLAUD_OWNER; server/owner.ts): vai para OfficeSnapshot.meta.owner. */
   owner?: () => OwnerInfo | undefined;
+  /** Configuração da mesquita do campus (mosque.json; server/mosque.ts): vai para OfficeSnapshot.meta.mosque. */
+  mosque?: () => MosqueSettings;
   now?: () => number;
 }
 
@@ -1059,6 +1062,7 @@ export class Office {
     for (const a of real) if (a.kind === 'main' && a.status !== 'offline') sessions.set(a.account, (sessions.get(a.account) ?? 0) + 1);
     const ptys = this.deps.ptys?.();
     const owner = this.deps.owner?.();
+    const mosque = this.deps.mosque?.();
     return {
       rev: this.rev,
       serverTime: now,
@@ -1077,6 +1081,7 @@ export class Office {
         ...(ptys ? { pty: ptys.status } : {}),
         updates: this.deps.updates?.(),
         ...(owner ? { owner } : {}),
+        ...(mosque ? { mosque } : {}),
       },
     };
   }

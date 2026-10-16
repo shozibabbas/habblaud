@@ -1,5 +1,6 @@
 // Mundo do escritório: liga a simulação (sim/), o desenho (render/), a câmera e a entrada,
 // e implementa o contrato WorldApi consumido pela UI.
+import type { PrayerName } from '../../../shared/prayer-times';
 import * as artModule from '../art';
 import { TILE, type ArtModule } from '../art/api';
 import type { OfficeStore } from '../net/store';
@@ -10,6 +11,7 @@ import { createDebug, type WorldDebug } from './debug';
 import { parseHijriParam } from './hijri';
 import { campusMockFrom, mockCampusSnapshot } from './campus-mock';
 import { availableActivities, sendAll } from './sim/send-all';
+import { PrayerClock } from './sim/prayer-clock';
 import { inRect, rectPx } from './layout/geometry';
 import { attachInput, type Hit } from './input';
 import { rebaseSnapshot } from './playback';
@@ -39,6 +41,10 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
   const hoverCbs = new Set<(id: string | null) => void>();
   const socialCbs = new Set<(e: SocialEvent) => void>();
   const soundCbs = new Set<(c: SoundCue) => void>();
+  /** Horários das orações (chamado automático no campus): quem ouve o aviso (a UI). */
+  const prayerCbs = new Set<(e: { name: PrayerName; at: number; called: boolean; hidden: boolean; sent: number }) => void>();
+  const prayerClock = new PrayerClock();
+  let nextPrayerCheck = 0;
   const roomMenuCbs = new Set<(roomId: string, at: { x: number; y: number }) => void>();
   let cues = new SoundCues(sim, camera, Math.random, () => renderer.cars);
   let selection: Selection = null;
@@ -270,6 +276,17 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
       const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
       if (canvas.clientWidth !== camera.viewW || canvas.clientHeight !== camera.viewH || dpr !== camera.dpr) resize();
       sim.update(dt, now);
+      // horários das orações: o chamado automático (minaretes, sino, todos para a mesquita) e o aviso
+      if (!playback && sim.initialized && real >= nextPrayerCheck) {
+        nextPrayerCheck = real + 1000;
+        if (sim.building.campus?.mosque && availableActivities(sim).some((a) => a.id === 'prayer')) {
+          for (const ev of prayerClock.check(sim.mosque, real)) {
+            const r = ev.call ? sendAll(sim, 'prayer', real, { prayer: ev.name }) : null;
+            if (r?.sent.length) soundCbs.forEach((cb) => cb({ kind: 'prayerCall', gain: 1, pan: 0 }));
+            prayerCbs.forEach((cb) => cb({ name: ev.name, at: ev.at, called: !!r, hidden: ev.hidden, sent: r?.sent.length ?? 0 }));
+          }
+        }
+      }
       // partidas e apostas resolvidas: para o feed (as do timelapse são encenação do passado: ficam fora)
       const events = sim.social.events;
       if (events.length) {
@@ -442,6 +459,10 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
       worldNow = p ? p.clock() : 0;
       rebuild();
     },
+    onPrayerTime: (cb) => {
+      prayerCbs.add(cb);
+      return () => void prayerCbs.delete(cb);
+    },
     onSound: (cb) => {
       soundCbs.add(cb);
       return () => void soundCbs.delete(cb);
@@ -458,6 +479,7 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
       hoverCbs.clear();
       socialCbs.clear();
       soundCbs.clear();
+      prayerCbs.clear();
     },
     get debug() {
       return debug;

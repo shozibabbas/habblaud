@@ -7,6 +7,7 @@ import { PixelBuf, type Palette } from '../core/pixbuf';
 import type { BufSprite } from '../core/sprite';
 import { LONG_TOPS, suitShirt } from './appearance';
 import { HAIR, HEAD_BASE, TEXTURED, type HeadView, type Tpl } from './hair';
+import { CLERIC_TOPS, drawAmama, drawClericTop, drawTasbih } from './cleric';
 import { isPrayerPose, renderPrayer } from './prayer';
 import { isCleaningRequest, renderCleaning } from './cleaning';
 
@@ -25,6 +26,7 @@ export const POSE_FRAMES: Readonly<Record<Pose, number>> = {
   read: 2, play: 2, wait: 2, cheer: 2, laugh: 2, game: 2, rps: 2, groom: 2, sulk: 2,
   takbir: 1, qiyam: 1, ruku: 1, sujood: 1, jalsa: 1, salam: 2, wudu: 2, phone: 3, phone_walk: 4, type_stand: 4,
   mop: 4, vacuum: 4, push: 4, scrub: 4, wipe: 4,
+  sadl: 1, qunoot: 1, dars: 2,
 };
 
 export const POSE_DURATION: Readonly<Record<Pose, number>> = {
@@ -33,6 +35,7 @@ export const POSE_DURATION: Readonly<Record<Pose, number>> = {
   takbir: 1000, qiyam: 1000, ruku: 1000, sujood: 1000, jalsa: 1000, salam: 1300, wudu: 700, phone: 420, phone_walk: 170,
   type_stand: 120,
   mop: 230, vacuum: 260, push: 150, scrub: 170, wipe: 210,
+  sadl: 1000, qunoot: 1000, dars: 520,
 };
 
 const SEATED_ONLY: ReadonlySet<Pose> = new Set<Pose>(['sit', 'type', 'sleep', 'wait']);
@@ -840,6 +843,9 @@ function drawAccessory(dc: Dc): void {
   const it = p.item;
   const v = r.view;
   switch (a.accessory) {
+    case 'amama':
+      drawAmama(dc, ox, oy);
+      break;
     case 'glasses': {
       // Duas lentes emolduradas (o olho continua visível dentro) + ponte e hastes.
       const fr = shade(it.dk, -0.08);
@@ -1412,6 +1418,11 @@ function drawTorso(dc: Dc): void {
     drawLanyard(dc);
     return;
   }
+  // qaba e aba / abaya dos religiosos da mesquita (character/cleric.ts)
+  if (CLERIC_TOPS.has(a.topStyle)) {
+    drawClericTop(dc);
+    return;
+  }
   if (r.view === 'side') {
     // Tronco de perfil (x 8..14), frente à esquerda.
     b.rect(8 + lx, y, 7, 6, t.base);
@@ -1930,6 +1941,9 @@ function drawItem(dc: Dc, x: number, y: number): void {
     case 'comb':
       b.stamp(['cccc', 'c.c.'], x, y, { c: '#3d4252' });
       break;
+    case 'tasbih':
+      drawTasbih(b, x, y);
+      break;
     case 'rock':
     case 'paper':
     case 'scissors':
@@ -2213,6 +2227,7 @@ export const CHAR_PARTS = {
   drawFacialHair,
   drawHair,
   drawAccessory,
+  drawTasbih,
   drawArm,
   drawLegs,
   drawTorso,

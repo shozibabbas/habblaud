@@ -124,11 +124,12 @@ describe('chamado para a oração', () => {
     expect(sim.callToPrayerAt).toBe(clock.now);
     for (const id of res.sent) expect(sim.chars.get(id)!.prayer).not.toBeNull();
     expect(sim.chars.get('w1')!.prayer).toBeNull();
-    // safs: as vagas reservadas são as de menor rank em cada ala
+    // safs: em congregação, ombro a ombro na fila da frente (do meio para as pontas, sem pular fileiras)
+    const tight = (r: number) => Math.floor(r / 100) * 100 + (r % 50);
     for (const area of [MEN_ID, WOMEN_ID]) {
       const rows = sim.spots.ofKind('prayer').filter((s) => s.areaId === area);
-      const taken = rows.filter((s) => sim.spots.ownerOf(s.id)).map((s) => s.rank ?? 0).sort((a, b) => a - b);
-      expect(taken).toEqual(rows.map((s) => s.rank ?? 0).sort((a, b) => a - b).slice(0, 4));
+      const taken = rows.filter((s) => sim.spots.ownerOf(s.id)).map((s) => tight(s.rank ?? 0)).sort((a, b) => a - b);
+      expect(taken).toEqual(rows.map((s) => tight(s.rank ?? 0)).sort((a, b) => a - b).slice(0, 4));
     }
     // e de fato chegam lá e rezam
     let praying = 0;

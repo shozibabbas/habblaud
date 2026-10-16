@@ -719,6 +719,32 @@ In Docker, put both in `.env` and use `http://host.docker.internal:<port>` for t
   open on it plus the pages open on the combined office (which reports its count every 10 seconds), so a computer whose
   agents nobody is watching keeps asking in the terminal. All computers must run this version for that count.
 
+#### Mosque (combined office)
+
+The campus has a mosque north of the recreation band, with separate halls, entrances, shoe racks and wudu areas for
+men and women, and the rows (saf) facing the qibla (west). Two clerics live there as staff (they never count as
+agents): an aalim in the men's hall and an aalima in the women's. They lead the congregational prayers from the front
+by the mihrab, give a short majlis afterwards (the aalim seated on the minbar), read the Quran, sit in reflection with a
+tasbih and greet worshippers.
+
+**Settings › Mosque** (changeable only from the computer itself, saved in `mosque.json` in the data folder; also
+`GET`/`PUT /api/mosque`):
+
+- **Prayer style** — `sunni` (hands folded in qiyam; the default) or `shia` (hands at the sides, a turbah on the carpet
+  for prostration picked up at the entrance, and qunoot in the second rak'ah). `HABBLAUD_PRAYER_STYLE` sets the
+  starting style until the setting is saved.
+- **City** — name, latitude and longitude for the five daily prayer times, calculated in the browser (no external
+  service) in the browser's time zone: the Jafari method for `shia` (Fajr 16°, Maghrib 4°, Isha 14°), Karachi
+  otherwise (Fajr and Isha 18°). Islamabad until set. Today's times are shown in the group.
+- **Call to prayer at prayer times** (on by default) — at each time the minarets light up, a soft bell plays (no
+  imitation of the azan), a notice says "🕌 Dhuhr — time for prayer" and everyone free goes to the mosque: worshippers
+  line up behind the cleric and all postures follow the imam together (4 rak'ahs for Dhuhr, Asr and Isha, 3 for Maghrib,
+  2 for Fajr). Latecomers join and complete the rak'ahs they missed. A time that passes while the tab is hidden only
+  gives a notice (or the call, within the first few minutes).
+- **Combine Dhuhr with Asr and Maghrib with Isha** (Shia style) — both prayers back to back at the first time.
+
+Try it in the mock: `?mock=1&machines=4&prayer=shia` and, in the console, `habblaud.world.debug.prayerTime('dhuhr')`.
+
 #### Executive suite (combined office)
 
 Set yourself as the office owner in **Settings › Office owner** (your name, a title such as "CEO", the look, and
@@ -830,6 +856,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_MACHINE_NAME` | hostname | This computer's name in the combined office. |
 | `HABBLAUD_NAMES` | `br` | Name set for the characters: `br` (Brazilian) or `pk` (Pakistani). Characters that already had a name from the other set get a new one. `pk` also gives the characters a Pakistani look (skin, hair, eyes, beards, hairstyles and clothes); in a combined office each machine keeps its own. Try it with the mock: `?mock=1&names=pk`. |
 | `HABBLAUD_ROOMS` | `folder` | How rooms are made: `folder` (one room per project folder), `auto` (when two or more sessions share a folder, each session gets its own room, named from its title, e.g. "Product: Training of Sales"; a folder with a single session keeps its folder room) or `session` (always one room per session). Subagents stay in their parent's room. In `auto`, a session that is left alone keeps its room until it ends, so rooms don't move every time a session opens or closes. The name comes from the session's title (Claude Code's or its first prompt, shortened on this computer; nothing is sent anywhere), otherwise the folder name plus a number ("srv 2"). Renaming a session room keeps that name while the session lives (`rooms.json`); a character saved in it stays with that room, and a session room with no character of its own uses the folder's. In My day, each session room is its own line. |
+| `HABBLAUD_PRAYER_STYLE` | `sunni` | Starting prayer style of the campus mosque: `sunni` or `shia` (see [Mosque](#mosque-combined-office)). Only used until the style is saved in **Settings › Mosque** (`mosque.json` in the data folder then wins). |
 | `HABBLAUD_OWNER` | — | Optional starting value for the office owner, who is normally set in **Settings › Office owner** (see [Executive suite](#executive-suite-combined-office)). JSON: `name`, optional `title` (default `CEO`), `look` (`f` or `m`), optional `parts` (the same fields as the character editor) and an optional `secretary` with `name`, `look` and `parts`. Only used until the owner is saved or removed in Settings (`owner.json` in the data folder then wins). Anything malformed ignores the whole value with a line in the log. Try the suite with the mock: `?mock=1&machines=4&owner=1`. |
 | `HABBLAUD_TERMINAL` | on (local access only) | `0` turns off the terminal, answering and sending messages from the office, and the character editor. With the port exposed they're already off, with no way to turn them on. |
 | `HABBLAUD_PTY` | off | `1` turns on the interactive terminal (open, take over and end Claude Code sessions from the office; local access only and outside Docker) and **New agent** (also in Docker, through `npm run codex:bridge`). Read the warning in [Privacy and security](#privacy-and-security). |
@@ -843,7 +870,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_LANG` | system language (except English), otherwise `pt-BR` | Language of the texts the server builds (activities, notices, logs): `pt-BR`, `en`, `es` or `fr`. The interface follows the browser or the choice in Settings › Language. See [Languages](#languages). |
 | `HABBLAUD_ACCOUNTS` | — | JSON to customize name, letter or color, matched by the account folder name. E.g. `[{"id":".claude-conta2","name":"Trabalho","short":"T","color":"#5cc97b"}]`. |
 
-**In Docker**, `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_FRAME_ANCESTORS`, `HABBLAUD_PEERS`, `HABBLAUD_MACHINE_NAME`, `HABBLAUD_NAMES`, `HABBLAUD_ROOMS`, `HABBLAUD_OWNER`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
+**In Docker**, `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_FRAME_ANCESTORS`, `HABBLAUD_PEERS`, `HABBLAUD_MACHINE_NAME`, `HABBLAUD_NAMES`, `HABBLAUD_ROOMS`, `HABBLAUD_OWNER`, `HABBLAUD_PRAYER_STYLE`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
 `HABBLAUD_MENSAGENS`, `HABBLAUD_CODEX`, `HABBLAUD_UPDATE_CHECK`, `HABBLAUD_LANG`, `HABBLAUD_PTY` and the
 `HABBLAUD_REMOTE_*` apply (in `.env` or in the environment), as do `HABBLAUD_CLAUDE_DIRS`, `HABBLAUD_CODEX_DIRS`, `HABBLAUD_USAGE_DIR` and
 `HABBLAUD_ACCOUNTS` (read by `docker:up` on the host); the rest are fixed inside the container. Options: `npm run docker:up -- --no-build` (starts without rebuilding),
@@ -1281,7 +1308,7 @@ the mosque · 3 busy stayed").
 
 | | Activity | |
 | --- | --- | --- |
-| 🕌 | **Call to prayer** *(combined office)* | Everyone free goes to the mosque — men and women, each to their hall: shoes off, wudu (queueing when the taps are busy), topi or hijab, two rak'ahs in the saf rows from the front. The minaret lamps and the crescents glow for a few seconds; no sound. |
+| 🕌 | **Call to prayer** *(combined office)* | Everyone free goes to the mosque — men and women, each to their hall: shoes off, wudu (queueing when the taps are busy), topi or hijab, then the congregational prayer of the current time behind the cleric, shoulder to shoulder in the saf rows from the front. The minaret lamps and the crescents glow for a few seconds and a soft bell plays. It also happens by itself at the prayer times (see [Mosque](#mosque-combined-office)). |
 | ☕ | **Chai break** | Kitchen chats, as many tables as needed. |
 | 📺 | **Lounge TV** | The couch and armchairs in front of the TV. |
 | 🏓 | **Table tennis** | Every table, doubles where four are free; the rest watch. |

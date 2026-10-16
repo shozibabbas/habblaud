@@ -26,6 +26,7 @@ import { NameStore } from './model/names';
 import { Office } from './model/office';
 import { RoomAliases } from './model/room-aliases';
 import { OwnerStore } from './owner';
+import { MosqueStore } from './mosque';
 import { createPtyRoutes } from './http/pty';
 import { claudeBinFrom, isExecutableFile, loadPty, PtyManager, type ScreenFactory, type SpawnPty } from './pty/manager';
 import { loadHeadlessScreen } from './pty/screen';
@@ -76,6 +77,9 @@ roomAliases.load();
 // Dono do escritório (a diretoria do campus): owner.json, gravado pelas Configurações; HABBLAUD_OWNER só até ele existir.
 const owner = new OwnerStore(join(config.dataDir, 'owner.json'), config.owner);
 owner.load();
+// Mesquita do campus (estilo da oração, cidade, chamado): mosque.json, gravado pelas Configurações.
+const mosque = new MosqueStore(join(config.dataDir, 'mosque.json'), config.prayerStyle);
+mosque.load();
 
 // Office, contas e fontes de agentes se referenciam (avisos de mudança / fontes): ligação tardia.
 const late: { office?: Office; agents?: SourceSet; permissions?: PermissionRegistry; messages?: MessageRegistry; ptys?: PtyManager; ptyOff?: string } = {};
@@ -99,6 +103,7 @@ const office = new Office({
   names,
   nameSet: config.nameSet,
   owner: () => owner.get(),
+  mosque: () => mosque.get(),
   roomAlias: (path) => roomAliases.get(path),
   rooms: config.rooms,
   sessionRoomAlias: (id) => roomAliases.getSession(id),
@@ -305,6 +310,15 @@ const api = createApiHandler({
     set: (o) => {
       owner.set(o);
       office.markDirty();
+    },
+  },
+  mosque: {
+    get: () => mosque.get(),
+    source: () => mosque.source(),
+    update: (body) => {
+      const r = mosque.update(body);
+      if ('mosque' in r) office.markDirty();
+      return r;
     },
   },
   renameRoom: (id, name) => {

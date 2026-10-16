@@ -5,6 +5,7 @@
 // Renomear/remover campos quebra servidor, mundo e UI ao mesmo tempo.
 
 import type { AppearanceParts } from './appearance';
+import type { MosqueSettings } from './mosque';
 
 /** Perfil regional da aparência dos personagens ('pk' = paquistanês). */
 export type AppearanceProfile = 'pk';
@@ -413,6 +414,11 @@ export interface OfficeSnapshot {
      * (client/src/world/layout/ceo.ts). Ausente = sem diretoria.
      */
     owner?: OwnerInfo;
+    /**
+     * (Aditivo) Mesquita do campus: estilo da oração, cidade dos horários, chamado automático (shared/mosque.ts;
+     * server/mosque.ts). Ausente = o padrão (sunni, Islamabad, chamado ligado).
+     */
+    mosque?: MosqueSettings;
   };
 }
 

@@ -6,10 +6,10 @@ export const HAIR_STYLES = [
   'short', 'buzz', 'spiky', 'side_part', 'curly', 'afro', 'bob', 'long', 'ponytail', 'bun', 'pigtails', 'mohawk', 'bald', 'wavy', 'braid',
 ] as const;
 export const TOP_STYLES = [
-  'tshirt', 'hoodie', 'shirt_tie', 'sweater', 'jacket', 'blouse', 'polo', 'kurta', 'shalwar_kameez', 'kurta_waistcoat', 'suit',
+  'tshirt', 'hoodie', 'shirt_tie', 'sweater', 'jacket', 'blouse', 'polo', 'kurta', 'shalwar_kameez', 'kurta_waistcoat', 'suit', 'qaba_aba', 'abaya',
 ] as const;
 export const ACCESSORIES = [
-  'none', 'glasses', 'sunglasses', 'headphones', 'cap', 'beanie', 'earrings', 'bow', 'dupatta', 'hijab', 'topi', 'headset',
+  'none', 'glasses', 'sunglasses', 'headphones', 'cap', 'beanie', 'earrings', 'bow', 'dupatta', 'hijab', 'topi', 'headset', 'amama',
 ] as const;
 export const FACIAL_HAIR = ['none', 'stubble', 'beard', 'mustache', 'goatee', 'short_beard'] as const;
 export const BOTTOM_STYLES = ['pants', 'shorts', 'skirt', 'shalwar'] as const;

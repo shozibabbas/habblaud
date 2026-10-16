@@ -411,3 +411,27 @@ export function prayerTimes(): BufFurniture {
   wallShadow(b, x - 1, y - 1, w + 2, h + 2);
   return { base: s };
 }
+
+/** Caixinha de madeira aberta com as turbahs (tabletes redondos de barro da prostração, estilo shia). */
+export function turbahBox(): BufFurniture {
+  const s = floorSheet(1, 1, 10);
+  const b = s.buf;
+  const w = M.walnut;
+  topFace(b, 1, 2, 14, 4, w);
+  frontFace(b, 1, 6, 14, 8, w);
+  b.rect(2, 3, 12, 3, w.dd);
+  // tabletes de barro (cinza-terra) em fila dentro da caixa, mais uns empilhados na tampa
+  const clay = ramp('#9c8f80', 0.07);
+  for (const x of [3, 6, 9, 12]) {
+    b.rect(x, 3, 2, 2, clay.base);
+    b.set(x, 3, clay.lt);
+  }
+  for (const [x, y] of [[4, -1], [8, -1], [6, -3]] as const) {
+    b.rect(x, y, 4, 2, clay.base);
+    b.hline(x, x + 3, y, clay.lt);
+    b.set(x + 3, y + 1, clay.dk);
+  }
+  b.outline();
+  contact(b, 1, 13, 14, 3, 0.2);
+  return { base: s };
+}

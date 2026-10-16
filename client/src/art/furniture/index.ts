@@ -167,6 +167,8 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
       return Q.archWindow();
     case 'prayer_times':
       return Q.prayerTimes();
+    case 'turbah_box':
+      return Q.turbahBox();
     case 'exec_desk':
       return E.execDesk(state, seed);
     case 'exec_chair':
