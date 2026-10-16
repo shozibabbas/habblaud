@@ -25,6 +25,7 @@ import { errMsg, log } from './log';
 import { NameStore } from './model/names';
 import { Office } from './model/office';
 import { RoomAliases } from './model/room-aliases';
+import { OwnerStore } from './owner';
 import { createPtyRoutes } from './http/pty';
 import { claudeBinFrom, isExecutableFile, loadPty, PtyManager, type ScreenFactory, type SpawnPty } from './pty/manager';
 import { loadHeadlessScreen } from './pty/screen';
@@ -72,6 +73,9 @@ names.load();
 // Nomes de sala escolhidos pelo usuário (botão direito > Renomear).
 const roomAliases = new RoomAliases(join(config.dataDir, 'rooms.json'));
 roomAliases.load();
+// Dono do escritório (a diretoria do campus): owner.json, gravado pelas Configurações; HABBLAUD_OWNER só até ele existir.
+const owner = new OwnerStore(join(config.dataDir, 'owner.json'), config.owner);
+owner.load();
 
 // Office, contas e fontes de agentes se referenciam (avisos de mudança / fontes): ligação tardia.
 const late: { office?: Office; agents?: SourceSet; permissions?: PermissionRegistry; messages?: MessageRegistry; ptys?: PtyManager; ptyOff?: string } = {};
@@ -94,7 +98,7 @@ const accounts = new AccountsService({
 const office = new Office({
   names,
   nameSet: config.nameSet,
-  owner: config.owner,
+  owner: () => owner.get(),
   roomAlias: (path) => roomAliases.get(path),
   version: config.version,
   // No modo dev o Vite serve o cliente direto do código-fonte: não há build para comparar.
@@ -292,6 +296,14 @@ const ticker = setInterval(() => {
 const api = createApiHandler({
   federation,
   presence,
+  owner: {
+    get: () => owner.get(),
+    source: () => owner.source(),
+    set: (o) => {
+      owner.set(o);
+      office.markDirty();
+    },
+  },
   renameRoom: (id, name) => {
     const path = office.roomPath(id);
     if (!path) return undefined;
@@ -468,7 +480,8 @@ server.listen(config.port, config.host, () => {
   if (config.frameAncestors.length) log.info(tr('   Pode ser embutido em: {0}.', [config.frameAncestors.join(' ')]));
   for (const item of config.peersInvalid) log.warn(tr('   HABBLAUD_PEERS: "{0}" ignorado (use id=http://host:porta; id com letras minúsculas, números e -).', [item]));
   if (config.ownerInvalid) log.warn(tr('   HABBLAUD_OWNER ignorado: campo "{0}" fora do formato (veja Configuração no README).', [config.ownerInvalid]));
-  if (config.owner) log.info(tr('   Diretoria: {0} ({1}), no campus do escritório combinado.', [config.owner.name, config.owner.title ?? 'CEO']));
+  const boss = owner.get();
+  if (boss) log.info(tr('   Diretoria: {0} ({1}), no campus do escritório combinado.', [boss.name, boss.title ?? 'CEO']));
   if (federation) log.info(tr('   Escritório combinado: {0} ({1}) + {2}.', [config.machineName, tr('este computador'), federation.peers.map((p) => `${p.id} (${p.url})`).join(', ')]));
   if (office.isDemo()) log.info(tr('   Modo demonstração ligado (agentes simulados misturados aos reais).'));
   if (config.terminal) log.info(tr('   Terminal: ligado (acesso só local).'));

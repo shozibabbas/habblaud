@@ -1,15 +1,18 @@
-// Diretoria do campus (escritório combinado): um prediozinho próprio, a leste da área de fumantes e logo ao norte do
-// prédio da máquina local (o lugar 0, leste da linha 0), com a sala do dono e a antessala da secretária. Só existe
-// no campus (2+ máquinas) e quando o snapshot traz um dono (OfficeSnapshot.meta.owner, HABBLAUD_OWNER). Puro.
+// Diretoria do campus (escritório combinado): um prediozinho executivo próprio no gramado, a leste da área de
+// fumantes e logo ao norte do prédio da máquina local (o lugar 0, leste da linha 0). Entra-se pela antessala da
+// secretária; a sala do dono fica atrás dela, pela porta de vidro. Na frente, um jardinzinho com canteiros e um
+// caminho curto até o calçadão. Só existe no campus (2+ máquinas) e quando o snapshot traz um dono
+// (OfficeSnapshot.meta.owner: as Configurações, owner.json, ou o HABBLAUD_OWNER). Puro.
 //
 //   x  72          83 84                            101
-//   y -20 ┌── antessala ──┬──────── sala do dono (janelas ao norte) ────────┐
-//         │ placa  quadro │ aparador  prêmios   janela    quadro    bar ☕  │
+//   y -23 ┌── antessala ──┬──────── sala do dono (janelas ao norte) ────────┐
+//         │ relógio quadro│ aparador  prêmios   janela    quadro    bar ☕  │
 //         │ espera ▢ ▢    ┊         [  mesa de pé  ]                       │
 //         │      [mesa da ┊            cadeira                             │
 //         │      secretária]  ◇ porta de vidro (placa "CEO")               │
 //         │               ┊ sofá           ( mesa oval )                   │
-//      -5 └──── entrada ──┴────────────────────────────────────────────────┘
+//      -8 └── entrada ▔▔ placa ─┴──── fachada de vidro ──────────────────────┘
+//         ✿✿ canteiros ║ caminho ║ canteiros ✿✿
 //      -4 ══════════════ calçadão da recreação, que se estende até aqui ══════════
 //
 // Spots (por kind; os ids seguem o AreaBuilder: `<área>#s<n>:<kind>`, então procure pelo kind e pelo grupo):
@@ -40,6 +43,8 @@ const OFFICE_W = 18;
 export const CEO_W = RECEPTION_W + OFFICE_W;
 /** Face norte (2) + 13 fileiras de piso + parede sul (com a entrada da antessala). */
 export const CEO_H = 16;
+/** Jardim da frente (tiles) entre a fachada sul e o calçadão, com o caminho curto até a entrada. */
+export const CEO_FRONT = 3;
 /** Porta de vidro entre a antessala e a sala: fileiras (locais) na coluna da divisória (x local 0 da sala). */
 const DOOR_LY = 8;
 /** Entrada da antessala: colunas (locais) na parede sul. */
@@ -56,25 +61,31 @@ export interface CeoSite {
   /** Antessala (a oeste) e sala do dono (a leste). */
   reception: TileRect;
   office: TileRect;
-  /** Tile do calçadão diante da entrada. */
+  /** Tile do caminho logo à frente da entrada (fora do prédio). */
   door: { x: number; y: number };
-  /** Caminhos no gramado: o calçadão da recreação estendido até a diretoria (fora de `campus.paths`). */
+  /**
+   * Caminhos no gramado (fora de `campus.paths`): [0] o calçadão da recreação estendido até passar a diretoria,
+   * [1] o caminho curto da entrada até ele.
+   */
   paths: TileRect[];
 }
 
 /**
- * Lugar da diretoria. `walkY`/`walkH` = o calçadão da recreação (a parede sul encosta nele); `walkEnd` = x
- * (exclusive) onde ele termina: daqui em diante ele segue até passar a diretoria.
+ * Lugar da diretoria. `walkY`/`walkH` = o calçadão da recreação (o jardim da frente fica entre ele e a fachada sul);
+ * `walkEnd` = x (exclusive) onde ele termina: daqui em diante ele segue até passar a diretoria.
  */
 export function ceoSite(walkY: number, walkH: number, walkEnd: number): CeoSite {
-  const y = walkY - CEO_H;
+  const y = walkY - CEO_FRONT - CEO_H;
   const rect: TileRect = { x: CEO_X, y, w: CEO_W, h: CEO_H };
   return {
     rect,
     reception: { x: CEO_X, y, w: RECEPTION_W, h: CEO_H },
     office: { x: CEO_X + RECEPTION_W, y, w: OFFICE_W, h: CEO_H },
-    door: { x: CEO_X + ENTRY_LX, y: walkY },
-    paths: [{ x: walkEnd, y: walkY, w: CEO_X + CEO_W + 2 - walkEnd, h: walkH }],
+    door: { x: CEO_X + ENTRY_LX, y: y + CEO_H },
+    paths: [
+      { x: walkEnd, y: walkY, w: CEO_X + CEO_W + 2 - walkEnd, h: walkH },
+      { x: CEO_X + ENTRY_LX, y: y + CEO_H, w: 2, h: CEO_FRONT },
+    ],
   };
 }
 
@@ -155,7 +166,8 @@ export function layoutCeoReception(site: CeoSite): AreaLayout {
   const a = new AreaBuilder(CEO_RECEPTION_ID, 'reception', site.reception);
   a.area.ceo = 'reception';
   a.area.edge = 'south';
-  a.area.signText = tr('Diretoria');
+  // a placa da fachada (sobre a parede sul, à direita da entrada) com o nome do prédio
+  a.area.signText = tr('Escritório executivo');
   const W = RECEPTION_W;
   const H = CEO_H;
   a.floor('marble', 0, 0, W, H, 1311);
@@ -169,7 +181,8 @@ export function layoutCeoReception(site: CeoSite): AreaLayout {
   // passadeira vermelha da entrada até a mesa da secretária e o tapete da espera
   a.rug(4.7, 8.6, 2.6, 6.4, '#7a2e3a', 1312);
   a.rug(0.6, 2.5, 4.8, 3.4, '#2f4a6b', 1313);
-  a.wall('sign', 6.5, undefined, { order: 0.9 });
+  a.wall('sign', 9.5, undefined, { ly: H, on: 'south', order: 0.9 });
+  a.wall('shelf_wall', 6.5, undefined, { order: 0.65 });
   a.wall('clock', 2.6, undefined, { order: 0.7 });
   a.wall('painting', 10.2, undefined, { order: 0.6 });
 
@@ -218,8 +231,8 @@ export function ceoSpots(spots: readonly SpotDef[], kind: SpotDef['kind']): Spot
 }
 
 /**
- * Jardim da diretoria: o calçadão estendido, um pátio de pedra diante da entrada com canteiros e cercas vivas
- * baixas, postes e árvores no gramado ao norte e a leste (longe das janelas e do caminho).
+ * Jardim da diretoria: o calçadão estendido, o caminho curto da entrada com canteiros floridos e arbustos dos dois
+ * lados, cerca viva ao pé da fachada, postes, e árvores no gramado ao norte e a oeste (longe das janelas e do caminho).
  */
 export function ceoGrounds(site: CeoSite): { floors: FloorPatch[]; props: ExteriorProp[]; keepOut: TileRect[] } {
   const px = (t: number) => t * TILE;
@@ -227,13 +240,25 @@ export function ceoGrounds(site: CeoSite): { floors: FloorPatch[]; props: Exteri
   const r = site.rect;
   const floors: FloorPatch[] = site.paths.map((p, i) => ({ kind: 'sidewalk', x: px(p.x), y: px(p.y), w: px(p.w), h: px(p.h), seed: 1320 + i }));
   const props: ExteriorProp[] = [];
-  const walk = site.paths[0];
+  const [walk, entry] = site.paths;
   const front = walk.y + walk.h;
-  // postes na beira sul do calçadão (o último da recreação fica em x 67) e canteiros na frente da entrada
+  // postes na beira sul do calçadão (o último da recreação fica em x 67)
   for (let x = walk.x + 4; x < walk.x + walk.w - 1; x += 8) props.push({ kind: 'lamp', x: px(x) + 8, y: px(front) + 10, seed: seed(x, 0) });
-  for (const dx of [-2, 3]) {
-    props.push({ kind: 'flowers', x: px(site.door.x + dx) + 8, y: px(walk.y) + 2, seed: seed(dx, 1) });
+  // jardim da frente: canteiros floridos colados no caminho da entrada, arbustos podados e um poste de cada lado,
+  // e a cerca viva baixa com flores ao longo do resto da fachada
+  const gy = r.y + r.h;
+  for (const [x, k] of [
+    [entry.x - 1, 'flowers'],
+    [entry.x + 2, 'flowers'],
+    [entry.x - 3, 'bush'],
+    [entry.x + 4, 'bush'],
+  ] as const) {
+    props.push({ kind: k, x: px(x) + 8, y: px(gy + 1) + 10, seed: seed(x, 6) });
   }
+  props.push({ kind: 'lamp', x: px(entry.x) - 4, y: px(gy + 2) + 12, seed: seed(1, 7) });
+  props.push({ kind: 'lamp', x: px(entry.x + 2) + 4, y: px(gy + 2) + 12, seed: seed(2, 7) });
+  for (let x = entry.x + 6; x < r.x + r.w - 1; x += 2) props.push({ kind: (x / 2) % 3 === 1 ? 'flowers' : 'hedge', x: px(x) + TILE, y: px(gy) + 12, seed: seed(x, 8) });
+  for (let x = r.x; x < entry.x - 4; x += 2) props.push({ kind: 'hedge', x: px(x) + TILE, y: px(gy) + 12, seed: seed(x, 9) });
   // cerca viva com flores ao pé da fachada norte (abaixo das janelas) e no lado leste
   for (let x = r.x + 1; x < r.x + r.w - 1; x += 2) props.push({ kind: (x / 2) % 3 === 1 ? 'flowers' : 'hedge', x: px(x) + TILE, y: px(r.y) - 2, seed: seed(x, 2) });
   for (let y = r.y + 2; y < r.y + r.h; y += 2) props.push({ kind: 'hedge', x: px(r.x + r.w) + 10, y: px(y) + 12, seed: seed(y, 3) });
@@ -245,6 +270,6 @@ export function ceoGrounds(site: CeoSite): { floors: FloorPatch[]; props: Exteri
   }
   props.push({ kind: 'bench', x: px(r.x + r.w + 3), y: px(r.y + 10), seed: seed(3, 4) });
   // onde a mata e os enfeites do gramado não podem ficar: o prédio (com a face norte e as copas acima) e o calçadão
-  const keepOut: TileRect[] = [{ x: r.x - 1, y: r.y - 2, w: r.w + 2, h: r.h + 2 }, ...site.paths.map((p) => ({ x: p.x, y: p.y - 1, w: p.w, h: p.h + 2 }))];
+  const keepOut: TileRect[] = [{ x: r.x - 1, y: r.y - 2, w: r.w + 2, h: r.h + 2 + CEO_FRONT }, ...site.paths.map((p) => ({ x: p.x, y: p.y - 1, w: p.w, h: p.h + 2 }))];
   return { floors, props, keepOut };
 }

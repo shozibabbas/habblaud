@@ -719,8 +719,16 @@ In Docker, put both in `.env` and use `http://host.docker.internal:<port>` for t
 
 #### Executive suite (combined office)
 
-Set `HABBLAUD_OWNER` on the computer that shows the combined office and the campus gets a small building of its own,
-east of the smoking area and just north of this computer's building, on the extended recreation promenade:
+Set yourself as the office owner in **Settings › Office owner** (your name, a title such as "CEO", the look, and
+optionally your secretary's name and look) on the computer that shows the combined office. The campus then gets a small
+executive building of its own on the lawn, east of the smoking area and just north of this computer's building, with a
+short path from the promenade, planters, a glass façade and an "Executive Office" sign. Saving an empty name, or
+**Remove the owner**, takes it away again. Only that computer's owner counts; the other computers' owners are ignored.
+
+The setting is saved in `owner.json` in the data folder and can only be changed from the computer itself (like renaming
+rooms). `GET`/`PUT`/`DELETE /api/owner` do the same from scripts, and `PUT` also takes the owner's and secretary's
+appearance (`parts`, the character editor's fields), which Settings keeps as they are. `HABBLAUD_OWNER` (the same JSON)
+is only a starting value until the owner is saved in Settings:
 
 ```bash
 HABBLAUD_OWNER='{"name":"Ana","title":"CEO","look":"f","parts":{"topStyle":"jacket"},"secretary":{"name":"Rafael","look":"m"}}'
@@ -732,10 +740,10 @@ HABBLAUD_OWNER='{"name":"Ana","title":"CEO","look":"f","parts":{"topStyle":"jack
   ergonomic mesh chair; a small meeting corner with an oval table and four leather chairs; a chai and coffee bar
   (espresso machine, a pan of doodh patti, cups, biscuits and samosas, steaming when in use); a leather sofa for
   guests and a credenza.
-- **The reception** — the secretary's desk (monitor, desk phone, document trays and a small printer), two visitor
-  chairs and a sign.
+- **The reception**, right inside the entrance — the secretary's desk (monitor, desk phone, document trays and a small printer), two visitor
+  chairs; the owner's office is behind it, through the glass door.
 - At night the windows stay lit and the desk lamp glows. Only the owner and the secretary use the suite; the agents
-  never go there. Without `HABBLAUD_OWNER`, or in a single-computer office, nothing changes.
+  never go there. Without an owner, or in a single-computer office, nothing changes.
 
 ## Accounts and usage (5-hour and weekly)
 
@@ -807,7 +815,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_PEERS` | — | Combined office: other Habblauds to show in this one, `id=http://host:port` separated by commas (ids: lowercase letters, digits and `-`). See [Combined office](#combined-office-preview). |
 | `HABBLAUD_MACHINE_NAME` | hostname | This computer's name in the combined office. |
 | `HABBLAUD_NAMES` | `br` | Name set for the characters: `br` (Brazilian) or `pk` (Pakistani). Characters that already had a name from the other set get a new one. `pk` also gives the characters a Pakistani look (skin, hair, eyes, beards, hairstyles and clothes); in a combined office each machine keeps its own. Try it with the mock: `?mock=1&names=pk`. |
-| `HABBLAUD_OWNER` | — | Combined office: you, as the office owner, in JSON: `name`, optional `title` (default `CEO`), `look` (`f` or `m`), optional `parts` (the same fields as the character editor) and an optional `secretary` with `name`, `look` and `parts`. With it the campus gets an [executive suite](#executive-suite-combined-office). Anything malformed ignores the whole value with a line in the log. Try it with the mock: `?mock=1&machines=4&owner=1`. |
+| `HABBLAUD_OWNER` | — | Optional starting value for the office owner, who is normally set in **Settings › Office owner** (see [Executive suite](#executive-suite-combined-office)). JSON: `name`, optional `title` (default `CEO`), `look` (`f` or `m`), optional `parts` (the same fields as the character editor) and an optional `secretary` with `name`, `look` and `parts`. Only used until the owner is saved or removed in Settings (`owner.json` in the data folder then wins). Anything malformed ignores the whole value with a line in the log. Try the suite with the mock: `?mock=1&machines=4&owner=1`. |
 | `HABBLAUD_TERMINAL` | on (local access only) | `0` turns off the terminal, answering and sending messages from the office, and the character editor. With the port exposed they're already off, with no way to turn them on. |
 | `HABBLAUD_PTY` | off | `1` turns on the interactive terminal (open, take over and end Claude Code sessions from the office; local access only and outside Docker) and **New agent** (also in Docker, through `npm run codex:bridge`). Read the warning in [Privacy and security](#privacy-and-security). |
 | `HABBLAUD_CLAUDE_BIN` | `claude` from PATH | The Claude Code executable that the interactive terminal and New agent run. |

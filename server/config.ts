@@ -48,7 +48,7 @@ export interface ServerConfig {
   machineName: string;
   /** Conjunto de nomes dos personagens (HABBLAUD_NAMES: br, o padrão, ou pk). */
   nameSet: NameSet;
-  /** Dono do escritório (HABBLAUD_OWNER, JSON; ver server/owner.ts): no campus, a sala da diretoria. */
+  /** Valor inicial do dono do escritório (HABBLAUD_OWNER, JSON; ver server/owner.ts) até haver um owner.json. */
   owner?: OwnerInfo;
   /** HABBLAUD_OWNER ignorado: o campo fora do formato (ou "JSON"), para o aviso na subida. */
   ownerInvalid?: string;

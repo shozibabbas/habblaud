@@ -3,7 +3,9 @@
 // da secretária), o vapor do bar e, à noite, a luminária da mesa acesa (halo no piso e o bulbo) e o brilho das telas.
 // Os estados vêm de Sim.furnStates (o comportamento liga e desliga); o bar também acende com Sim.machineUntil.
 import type { ArtModule, ScreenMode, Sprite } from '../../art/api';
+import { TILE } from '../../art/api';
 import { COFFEE_BAR_STEAM, execDeskLamp, execDeskScreen } from '../../art/furniture/ceo';
+import type { BuildingLayout } from '../layout/building';
 import { screenModeFor } from '../sim/behavior';
 import type { Sim } from '../sim/sim';
 import { reducedMotion } from './github-fx';
@@ -129,4 +131,83 @@ export function drawCeoGlows(ctx: CanvasRenderingContext2D, sim: Sim, areas: Ite
     }
   }
   ctx.globalAlpha = 1;
+}
+
+// =================================================================== fachada
+
+/** Linhas da parede sul (px a partir do topo do tile): tampa 0..5, face 6..13, rodapé 14..15. */
+const FACE_Y0 = 6;
+const FACE_Y1 = 14;
+
+/**
+ * Fachada do prédio executivo (por cima da parede sul, antes dos móveis e personagens): pele de vidro na sala do dono
+ * (azulada de dia, acesa e quente à noite), revestimento de pedra na antessala, pórtico de nogueira com a marquise
+ * escura na entrada.
+ */
+export function drawCeoFacade(ctx: CanvasRenderingContext2D, building: BuildingLayout, night: number): void {
+  const site = building.campus?.ceo;
+  if (!site) return;
+  const y = (site.rect.y + site.rect.h - 1) * TILE;
+  const fy = y + FACE_Y0;
+  const fh = FACE_Y1 - FACE_Y0;
+  // pele de vidro: painéis de 16 px entre montantes escuros, com um reflexo diagonal; à noite, a luz de dentro
+  const gx0 = site.office.x * TILE;
+  const gx1 = (site.office.x + site.office.w) * TILE - TILE / 2;
+  const lit = Math.min(1, Math.max(0, (night - 0.2) / 0.5));
+  ctx.fillStyle = lit > 0 ? mixCss([126, 172, 206], [255, 214, 150], lit) : 'rgb(126,172,206)';
+  ctx.fillRect(gx0, fy, gx1 - gx0, fh);
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.fillRect(gx0, fy, gx1 - gx0, 1);
+  for (let x = gx0; x < gx1; x += TILE) {
+    for (let i = 0; i < fh; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${0.32 * (1 - lit * 0.7)})`;
+      ctx.fillRect(x + 10 - i, fy + i, 1, 1);
+      ctx.fillRect(x + 12 - i, fy + i, 1, 1);
+    }
+    ctx.fillStyle = '#3a3f4b';
+    ctx.fillRect(x, fy, 1, fh);
+  }
+  ctx.fillStyle = '#3a3f4b';
+  ctx.fillRect(gx0, fy + 4, gx1 - gx0, 1);
+  // pedra (travertino) em fiadas desencontradas na antessala, fora da entrada
+  const sx0 = site.reception.x * TILE + TILE / 2;
+  const sx1 = site.office.x * TILE;
+  const dx0 = site.door.x * TILE;
+  const dx1 = dx0 + 2 * TILE;
+  for (const [a, b] of [
+    [sx0, dx0 - 3],
+    [dx1 + 3, sx1],
+  ] as const) {
+    ctx.fillStyle = '#d8ccb4';
+    ctx.fillRect(a, fy, b - a, fh);
+    ctx.fillStyle = 'rgba(120,100,70,0.35)';
+    for (let r = 0; r < 2; r++) {
+      ctx.fillRect(a, fy + 4 * r + 3, b - a, 1);
+      for (let x = a + (r ? 4 : 0); x < b; x += 9) ctx.fillRect(x, fy + 4 * r, 1, 3);
+    }
+  }
+  // pórtico: colunas de nogueira dos dois lados da porta e a marquise escura com o friso de latão
+  for (const x of [dx0 - 3, dx1]) {
+    ctx.fillStyle = '#6e4c37';
+    ctx.fillRect(x, y - 4, 3, FACE_Y1 + 4);
+    ctx.fillStyle = '#8a6448';
+    ctx.fillRect(x, y - 4, 1, FACE_Y1 + 4);
+    ctx.fillStyle = '#4f3627';
+    ctx.fillRect(x + 2, y - 4, 1, FACE_Y1 + 4);
+  }
+  ctx.fillStyle = '#2b2e36';
+  ctx.fillRect(dx0 - 6, y - 8, dx1 - dx0 + 12, 4);
+  ctx.fillStyle = '#c9a24e';
+  ctx.fillRect(dx0 - 6, y - 5, dx1 - dx0 + 12, 1);
+  ctx.fillStyle = 'rgba(30,34,52,0.25)';
+  ctx.fillRect(dx0 - 5, y - 4, dx1 - dx0 + 10, 1);
+  // à noite, os spots embaixo da marquise
+  if (lit > 0) {
+    ctx.fillStyle = `rgba(255,230,170,${0.9 * lit})`;
+    for (const x of [dx0 + 4, dx1 - 5]) ctx.fillRect(x, y - 4, 2, 1);
+  }
+}
+
+function mixCss(a: readonly number[], b: readonly number[], k: number): string {
+  return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * k)).join(',')})`;
 }

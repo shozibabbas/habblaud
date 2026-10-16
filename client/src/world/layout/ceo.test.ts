@@ -31,7 +31,7 @@ describe('diretoria no campus', () => {
       const campus = layoutCampus(machines(n), { ceo: true });
       const ceo = campus.ceo!;
       const local = campus.buildings.find((b) => b.local)!;
-      // ao norte do prédio da máquina local, com a parede sul encostada no calçadão da recreação
+      // ao norte do prédio da máquina local, com o jardim da frente entre a fachada e o calçadão da recreação
       expect(ceo.rect.y + ceo.rect.h).toBeLessThanOrEqual(local.rect.y);
       expect(ceo.rect.x).toBeGreaterThanOrEqual(local.rect.x);
       const solids: TileRect[] = [

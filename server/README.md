@@ -112,11 +112,13 @@ página olhando o par; ele informa a cada 10 s (ou quando muda) quantas páginas
 (`POST /api/federation/presence`), e o par desvia os pedidos de permissão do terminal se as páginas dele mais esses
 informes somarem alguém.
 
-Dono do escritório (`HABBLAUD_OWNER`, `owner.ts`): um JSON com `name`, `title` (opcional), `look` ('f'/'m', padrão 'm'),
-`parts` (as peças do editor, validadas por `parseAppearanceParts`) e `secretary` (`name`, `look`, `parts`). Os nomes e
-o cargo passam por `parseCharacterName`; qualquer campo fora do formato ignora o valor inteiro, com um aviso na subida
-que diz qual. Vai para `meta.owner` do snapshot (o combinado mantém o do computador que o mostra); no campus, o cliente
-monta a diretoria (`client/src/world/layout/ceo.ts`).
+Dono do escritório (`owner.ts`): `{name, title?, look ('f'/'m', padrão 'm'), parts?, secretary?: {name, look, parts?}}`,
+nomes e cargo por `parseCharacterName`, peças por `parseAppearanceParts`; qualquer campo fora do formato invalida o
+todo. Fica em `<dataDir>/owner.json` (`OwnerStore`), gravado pelas Configurações: `GET /api/owner` (livre) e
+`PUT`/`DELETE /api/owner` (a trava de renomear salas: bind local + Host local; nunca repassado a um par). No PUT, nome
+vazio tira o dono e a resposta 400 traz o `field`. `HABBLAUD_OWNER` (o mesmo JSON) é só o valor inicial enquanto o
+owner.json não existe (inválido: aviso na subida com o campo). Vai para `meta.owner` do snapshot e muda na hora; o
+combinado mantém só o do computador que o mostra. No campus, o cliente monta a diretoria (`client/src/world/layout/ceo.ts`).
 
 ## Versão nova
 

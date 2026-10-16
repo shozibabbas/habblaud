@@ -19,7 +19,7 @@ import type { RoomState } from '../sim/room-state';
 import { cobwebScale, hourglassIcon, HOURGLASS_FLIP_MS, STORM_LIFT } from '../sim/shell';
 import type { Sim } from '../sim/sim';
 import { buildAnim, furnitureScale, NO_ANIM, sweepDelay, type BuildAnim } from './anim';
-import { ceoFurnState, drawCeoFurniture } from './ceo';
+import { ceoFurnState, drawCeoFacade, drawCeoFurniture } from './ceo';
 import { daylightModeOf, parseHourParam } from './daylight';
 import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
@@ -437,6 +437,7 @@ export class Renderer {
       this.drawWalls(vis, anim, now, hour);
     }
     this.safe(() => this.mosque.drawSkyline(ctx, this.sim.building));
+    this.safe(() => drawCeoFacade(ctx, this.sim.building, this.night));
     const view = { x0: vx0, y0: vy0, x1: vx1, y1: vy1 };
     // alarme de CI: tom vermelho no piso (por baixo dos móveis e personagens)
     this.roomFx.drawFloor(ctx, this.sim, now, view);
