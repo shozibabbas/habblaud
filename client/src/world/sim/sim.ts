@@ -120,6 +120,8 @@ export class Sim {
    * (1 = em pé) e o bar de café dela (1 = em uso). Ver render/ceo.ts.
    */
   readonly furnStates = new Map<string, number>();
+  /** Deslocamento visual (px) de um móvel que o comportamento anima (ex.: a cadeira do dono puxada para a mesa). */
+  readonly furnShift = new Map<string, { dx: number; dy: number }>();
   /** Hora do ciclo dia/noite (0–24; render/lighting.ts atualiza): o dono fica até tarde à noite (sim/ceo.ts). */
   hour = 13.5;
   /** Vida social: rodas dos ociosos, personalidades e carteiras (social/social.ts). */

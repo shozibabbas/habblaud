@@ -6,7 +6,7 @@ import type { AgentInfo, MachineRef, MachineStatus, OfficeSnapshot, OwnerInfo, R
 import type { ArtModule, RoomTheme } from '../../art/api';
 import { appearanceFromSeed } from '../../art/character/appearance';
 import { DEFAULT_WORLD_OPTIONS, type WorldOptions } from '../api';
-import { bossAway, ceoChoices, CEO_NIGHT_WEIGHTS, forceCeo, inRect, isNight, pickWeighted, suiteOf, suiteRects, WEAR_HEADSET, type CeoState } from './ceo';
+import { bossAway, ceoChoices, CEO_NIGHT_WEIGHTS, forceCeo, inRect, isNight, LEAN_PX, pickWeighted, suiteOf, suiteRects, TUCK_PX, WEAR_HEADSET, type CeoState } from './ceo';
 import type { SecretaryState } from './secretary';
 import { WEAR_HEAD } from './prayer';
 import { sendAll } from './send-all';
@@ -266,6 +266,67 @@ describe('o dono: a rotina', () => {
       return () => ((i = (i * 9301 + 49297) % 233280) / 233280);
     })();
     for (let i = 0; i < 50; i++) expect(['desk', 'stand', 'phone', 'pace', 'video', 'chai', 'pray', 'tv', 'kitchen']).toContain(pickWeighted(rng, c));
+  });
+});
+
+describe('o dono junto da mesa', () => {
+  /** Sentado: puxa a cadeira; para sair, empurra a cadeira de volta e só então levanta. */
+  function tuckedAtDesk() {
+    const ctx = office([agent('ana'), agent('bia', { look: 'f' })]);
+    const { sim, clock } = ctx;
+    const ceo = ceoOf(sim);
+    const desk = spot(sim, 'ceo_desk');
+    forceCeo(sim.staff, 'desk');
+    expect(run(sim, clock, 30, () => ceo.atSpot === desk.id && ceo.pose === 'type')).toBe(true);
+    run(sim, clock, 1);
+    return { ...ctx, ceo, desk };
+  }
+
+  it('sentado, puxa a cadeira até a mesa: ele e a cadeira andam juntos, na frente da mesa', () => {
+    const { sim, ceo, desk } = tuckedAtDesk();
+    expect(ceoState(sim).tuck.v).toBe(1);
+    expect(ceo.y).toBeCloseTo(desk.y - TUCK_PX, 5);
+    expect(ceo.x).toBeCloseTo(desk.x, 5);
+    expect(ceo.depth()).toBe(desk.sortY);
+    expect(sim.furnShift.get(desk.furnitureId!)).toEqual({ dx: 0, dy: -TUCK_PX });
+  });
+
+  for (const how of ['plano dele', 'menu Atividades'] as const) {
+    it(`para levantar, empurra a cadeira antes (${how})`, () => {
+      const { sim, clock, ceo, desk } = tuckedAtDesk();
+      if (how === 'plano dele') forceCeo(sim.staff, 'pace');
+      else sendAll(sim, 'walk', clock.now);
+      let untuckedFirst = true;
+      let sawPushBack = false;
+      const ok = run(sim, clock, 10, () => {
+        const v = ceoState(sim).tuck.v;
+        if (ceo.atSpot === desk.id && ceo.seated && v > 0 && v < 1) sawPushBack = true;
+        // a saída do lugar (de pé, a caminho) só depois da cadeira de volta
+        if (ceo.atSpot === desk.id && ceo.step?.t === 'exit' && (v > 0 || sim.furnShift.has(desk.furnitureId!))) untuckedFirst = false;
+        return ceo.atSpot !== desk.id;
+      });
+      expect(ok).toBe(true);
+      expect(sawPushBack).toBe(true);
+      expect(untuckedFirst).toBe(true);
+      expect(sim.furnShift.has(desk.furnitureId!)).toBe(false);
+    });
+  }
+
+  it('em pé à mesa erguida, encostado no tampo e desenhado na frente dela; a cadeira não anda', () => {
+    const { sim, clock } = office([agent('ana')]);
+    const ceo = ceoOf(sim);
+    const desk = spot(sim, 'ceo_desk');
+    const stand = spot(sim, 'ceo_stand');
+    forceCeo(sim.staff, 'stand');
+    expect(run(sim, clock, 30, () => ceo.atSpot === stand.id && ceo.pose === 'type_stand')).toBe(true);
+    run(sim, clock, 1);
+    expect(ceo.y).toBeCloseTo(stand.y - LEAN_PX, 5);
+    expect(ceo.depth()).toBe(desk.sortY);
+    expect(sim.furnShift.has(desk.furnitureId!)).toBe(false);
+    // e volta a sentar: a mesa desce, ele senta e puxa a cadeira
+    forceCeo(sim.staff, 'desk');
+    expect(run(sim, clock, 30, () => ceo.atSpot === desk.id && ceoState(sim).tuck.v === 1)).toBe(true);
+    expect(sim.furnStates.get(desk.deskId!)).toBe(0);
   });
 });
 
