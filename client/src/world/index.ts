@@ -9,6 +9,7 @@ import { Camera, overviewFrame } from './camera';
 import { createDebug, type WorldDebug } from './debug';
 import { parseHijriParam } from './hijri';
 import { campusMockFrom, mockCampusSnapshot } from './campus-mock';
+import { availableActivities, sendAll } from './sim/send-all';
 import { inRect, rectPx } from './layout/geometry';
 import { attachInput, type Hit } from './input';
 import { rebaseSnapshot } from './playback';
@@ -391,6 +392,11 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
       return p;
     },
     social: (id) => sim.social.info(id),
+    activities: () => (playback ? [] : availableActivities(sim)),
+    sendAll: (activity) => {
+      if (playback || !availableActivities(sim).some((a) => a.id === activity)) return null;
+      return sendAll(sim, activity, Date.now());
+    },
     onRoomContextMenu: (cb) => {
       roomMenuCbs.add(cb);
       return () => void roomMenuCbs.delete(cb);

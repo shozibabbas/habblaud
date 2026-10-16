@@ -1228,6 +1228,27 @@ from both ends of the Commons corridor:
 - **Smoking area** — away from the entrances: a shelter with benches, ash bins and a sign. Smokers come alone (a few
   drags, standing or sitting) or in pairs to chat.
 
+### Activities menu (call everyone)
+
+The 📣 button in the top bar (key **A**) sends **everyone who is free** — idle or waiting on a shell — to the same
+activity at once: they drop what they're doing (a stroll, a hangout, a nap) and go from wherever they are. Agents
+working or needing you stay put, and a notice says how many went and how many stayed ("🕌 Call to prayer: 7 going to
+the mosque · 3 busy stayed").
+
+| | Activity | |
+| --- | --- | --- |
+| 🕌 | **Call to prayer** *(combined office)* | Everyone free goes to the mosque — men and women, each to their hall: shoes off, wudu (queueing when the taps are busy), topi or hijab, two rak'ahs in the saf rows from the front. The minaret lamps and the crescents glow for a few seconds; no sound. |
+| ☕ | **Chai break** | Kitchen chats, as many tables as needed. |
+| 📺 | **Lounge TV** | The couch and armchairs in front of the TV. |
+| 🏓 | **Table tennis** | Every table, doubles where four are free; the rest watch. |
+| 🎾 | **Tennis** *(combined office)* | The court, doubles with four; the rest watch from the benches. |
+| 😴 | **Nap in the pods** *(combined office)* | Fills the pods; the rest doze at their desks. |
+| 🚬 | **Smoke break** *(combined office)* | Smokers only; everyone else stays. |
+| 🚶 | **Stroll** | A walk along the paths and back. |
+| 💻 | **Back to desks** | Everyone returns now. A prayer in progress ends quickly with the sitting and the salam instead of being cut off. |
+
+The menu is off during the timelapse and with the demo agents, and hidden in compact embedded tiles.
+
 ### Personalities
 
 Each agent has 2 or 3 traits, drawn from its seed (it's always the same person, in any browser):

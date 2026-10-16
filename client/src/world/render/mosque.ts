@@ -244,6 +244,52 @@ export class MosqueRenderer {
   }
 }
 
+/** Quanto dura o brilho do chamado para a oração (ms). */
+export const CALL_GLOW_MS = 7_000;
+
+/**
+ * Chamado para a oração (menu Atividades): as lâmpadas dos minaretes e o alto das cúpulas brilham em verde e
+ * dourado por alguns segundos, de dia também. Sem som. Com movimento reduzido, o brilho fica parado (sem pulsar).
+ */
+export function drawCallToPrayer(ctx: CanvasRenderingContext2D, building: BuildingLayout, at: number, now: number, still: boolean): void {
+  const site = building.campus?.mosque;
+  const t = now - at;
+  if (!site || !at || t < 0 || t > CALL_GLOW_MS) return;
+  // entra em 0,6 s, fica e some no último 1,5 s
+  const env = Math.min(1, t / 600) * Math.min(1, (CALL_GLOW_MS - t) / 1_500);
+  const pulse = still ? 1 : 0.8 + 0.2 * Math.sin(t / 260);
+  const k = env * pulse;
+  const x0 = site.rect.x * TILE;
+  const y0 = site.rect.y * TILE;
+  const glow = (cx: number, cy: number, r: number, inner: string, outer: string) => {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, inner);
+    g.addColorStop(0.4, outer);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  };
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const dx of MINARET_DX) {
+    for (const [dy, r] of [[2 * TILE - 76, 18], [2 * TILE - 104, 16], [2 * TILE + MINARET_TOP - 23, 14]] as const) {
+      glow(x0 + dx, y0 + dy, r * 1.6, `rgba(200,255,210,${0.85 * k})`, `rgba(110,230,150,${0.35 * k})`);
+    }
+  }
+  // o crescente no alto das cúpulas
+  for (const d of [DOME, SMALL_DOME]) glow(x0 + d.cx, y0 - d.h - 10, d.rx * 0.9, `rgba(255,236,160,${0.9 * k})`, `rgba(255,200,90,${0.35 * k})`);
+  if (!still) {
+    // um anel de luz que se abre a partir da cúpula grande
+    const u = (t % 2_400) / 2_400;
+    ctx.strokeStyle = `rgba(255,226,140,${0.35 * env * (1 - u)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x0 + DOME.cx, y0 - DOME.h * 0.4, DOME.rx * (0.8 + u * 2.4), DOME.h * (0.5 + u * 1.4), 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function archPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
   ctx.beginPath();
   ctx.moveTo(x, y + h);

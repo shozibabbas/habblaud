@@ -102,6 +102,8 @@ export class Sim {
   readonly machineUntil = new Map<string, number>();
   /** Cabines ocupadas (furnitureId). */
   readonly stallBusy = new Set<string>();
+  /** Último "chamado para a oração" da interface (ms; 0 = nunca): os minaretes brilham por uns segundos. */
+  callToPrayerAt = 0;
   /** Campus: cápsulas de dormir ocupadas (furnitureId) — sim/recreation.ts. */
   readonly podBusy = new Set<string>();
   /** Vida social: rodas dos ociosos, personalidades e carteiras (social/social.ts). */

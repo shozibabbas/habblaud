@@ -200,6 +200,23 @@ export class Social {
     return g ? g.members.map((m) => this.sim.chars.get(m.id)?.info.name ?? m.id) : null;
   }
 
+  /**
+   * Começa uma roda já com estes participantes, de onde estiverem (ninguém precisa estar na mesa): o "chamar todo
+   * mundo" da interface (sim/send-all.ts). Quem chama já tirou todos do que faziam.
+   */
+  startWith(kind: GatherKind, host: Character, guests: Character[], now: number): boolean {
+    return this.start(kind, host, guests, now, false, guests.length, true);
+  }
+
+  /** Entra numa roda deste tipo que ainda tem lugar (a torcida de uma mesa, o sofá da TV, a copa). */
+  joinOpen(kind: GatherKind, ch: Character, now: number): boolean {
+    for (const g of this.gatherings) {
+      if (g.kind !== kind || (g.phase !== 'gather' && g.phase !== 'run')) continue;
+      if (this.openSpotFor(g, ch) !== undefined && this.join(g, ch, now)) return true;
+    }
+    return false;
+  }
+
   private start(kind: GatherKind, host: Character, cands: Character[], now: number, groupOnly: boolean, wantOverride?: number, forced = false): boolean {
     const info = KINDS[kind];
     // fumantes só chamam fumantes

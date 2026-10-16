@@ -3,6 +3,9 @@
 // Regra: mudanças aqui devem ser ADITIVAS.
 
 import { hijriTheme, hijriToday, type HijriDate } from './hijri';
+import type { SendActivity, SendActivityInfo, SendAllResult } from './sim/send-all';
+
+export type { SendActivity, SendActivityInfo, SendAllResult } from './sim/send-all';
 
 export type Selection = { type: 'agent'; id: string } | { type: 'room'; id: string } | null;
 
@@ -94,6 +97,16 @@ export interface WorldApi {
    * snapshot do store é aplicado como carga inicial.
    */
   setPlayback?(p: WorldPlayback | null): void;
+  /**
+   * (Opcional, aditivo) Atividades do menu "chamar todo mundo" que existem neste escritório (a mesquita, a quadra, as
+   * cápsulas e a área de fumantes só no campus). Vazio no timelapse.
+   */
+  activities?(): SendActivityInfo[];
+  /**
+   * (Opcional, aditivo) Manda todos os agentes livres (ociosos ou esperando um shell) para a atividade; quem trabalha
+   * ou precisa do usuário fica. null no timelapse ou se a atividade não existe aqui.
+   */
+  sendAll?(activity: SendActivity): SendAllResult | null;
   /** (Opcional, aditivo) Sons do ambiente: teclado de quem trabalha à vista, elevador, rodas. */
   onSound?(cb: (cue: SoundCue) => void): () => void;
   destroy(): void;

@@ -16,6 +16,7 @@ import { DayLauncher } from './daystats-launcher';
 import { RoomRenamer } from './roomrename';
 import { h } from './dom';
 import { Drawer } from './drawer';
+import { ActivitiesPopover } from './activities';
 import { EmbedBridge } from './embed';
 import { FeedPanel } from './feed';
 import { HelpDialog } from './help';
@@ -227,6 +228,10 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   const feed = new FeedPanel(ctx);
   const toasts = new Toasts(ctx);
   const updateToaster = new UpdateToaster(ctx, (n) => toasts.push(n));
+  // Atividades (megafone): manda todos os livres para a mesma atividade; o resultado vira um aviso.
+  let actSeq = 0;
+  const activities = new ActivitiesPopover(ctx, (text) => toasts.push({ id: `atividades:${++actSeq}`, level: 'success', text, at: Date.now() }));
+  topbar.panelGroup.prepend(activities.button);
   settings = new SettingsPopover(ctx, notifier, sound);
   help = new HelpDialog();
   const day = new DayLauncher(ctx, (el) => root.append(el));
@@ -244,7 +249,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   const scrim = h('div', { class: 'ui-scrim', attrs: { 'aria-hidden': 'true' }, on: { click: () => ctx.togglePanel('sidebar', false) } });
 
   root.classList.add('ui-root');
-  root.append(timelapse.vignette, topbar.el, sidebar.el, scrim, feed.el, drawer.el, terminal.el, pty.el, timelapse.el, timelapse.badge, toasts.el, banner.el, update.el, empty.el, tip.el, settings.el, history.el, deliveries.el, help.el, renamer.el, live, splash.el);
+  root.append(timelapse.vignette, topbar.el, sidebar.el, scrim, feed.el, drawer.el, terminal.el, pty.el, timelapse.el, timelapse.badge, toasts.el, banner.el, update.el, empty.el, tip.el, settings.el, history.el, deliveries.el, help.el, renamer.el, activities.el, live, splash.el);
   area = new FreeArea(world, { root, topbar: topbar.el, sidebar: sidebar.el, drawer: drawer.el, feed: feed.el }, () => ({
     sidebar: panels.sidebar && !compact,
     feed: panels.feed && !compact,
@@ -253,7 +258,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   }));
   drawer.onLayoutChange = () => applyLayout();
 
-  const components: UiComponent[] = [topbar, sidebar, drawer, terminal, pty, history, deliveries, feed, toasts, settings, empty, banner, tip, notifier, splash, timelapse, sound, day, updateToaster];
+  const components: UiComponent[] = [topbar, sidebar, drawer, terminal, pty, history, deliveries, feed, toasts, settings, empty, banner, tip, notifier, splash, timelapse, sound, day, updateToaster, activities];
 
   // ---------------------------------------------------------------- renderização agrupada por quadro
   let rafId = 0;
@@ -338,7 +343,7 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
   function onKey(e: KeyboardEvent): void {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === 'Escape') {
-      if (help.isOpen || settings.isOpen || history.isOpen) return; // diálogo/popover tratam o próprio Esc
+      if (help.isOpen || settings.isOpen || history.isOpen || activities.isOpen) return; // diálogo/popover tratam o próprio Esc
       // O terminal flutua sobre tudo: fecha primeiro (a busca dele, depois ele; a gaveta continua aberta).
       if (terminal.isOpen) {
         terminal.escape();
@@ -392,6 +397,13 @@ export function createUI(root: HTMLElement, store: OfficeStore, world: WorldApi,
       case 'O':
         e.preventDefault();
         ctx.camera('overview');
+        break;
+      case 'a':
+      case 'A':
+        // Atividades: chamar todo mundo (fora do modo compacto do embutido, onde a barra superior some)
+        if (compact) break;
+        e.preventDefault();
+        activities.toggle();
         break;
       case 'm':
       case 'M':

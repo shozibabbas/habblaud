@@ -5720,6 +5720,78 @@ button.ui-term__think:hover,
   color: var(--ui-muted);
 }
 
+/* Menu "Atividades" (ui/activities.ts): chamar todo mundo para a mesma atividade. */
+.ui-acts-btn.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-acts-btn.is-disabled:hover {
+  background: none;
+  color: var(--ui-muted);
+}
+
+.ui-acts {
+  width: 300px;
+}
+
+.ui-acts__hint {
+  padding: 0 16px 8px;
+  font-size: 11.5px;
+  color: var(--ui-muted);
+}
+
+.ui-acts__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 6px 4px;
+}
+
+.ui-acts__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 7px;
+  text-align: left;
+  color: var(--ui-text);
+  transition: background-color 0.12s;
+}
+
+.ui-acts__item:hover,
+.ui-acts__item:focus-visible {
+  background: var(--ui-bg-hover);
+}
+
+.ui-acts__item.is-prayer {
+  background: rgba(70, 170, 110, 0.12);
+}
+
+.ui-acts__item.is-prayer:hover,
+.ui-acts__item.is-prayer:focus-visible {
+  background: rgba(70, 170, 110, 0.24);
+}
+
+.ui-acts__icon {
+  flex: none;
+  width: 22px;
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
+}
+
+.ui-acts__label {
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .ui-acts {
+    width: auto;
+  }
+}
+
 /* Popover do histórico: cabeçalho e busca fixos, a lista rola por dentro. */
 .ui-hist {
   display: flex;

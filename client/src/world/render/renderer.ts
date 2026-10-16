@@ -22,7 +22,8 @@ import { buildAnim, furnitureScale, NO_ANIM, sweepDelay, type BuildAnim } from '
 import { daylightModeOf, parseHourParam } from './daylight';
 import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
-import { drawWuduWater, MosqueRenderer } from './mosque';
+import { reducedMotion } from './github-fx';
+import { drawCallToPrayer, drawWuduWater, MosqueRenderer } from './mosque';
 import { Particles } from './particles';
 import { carSprite, propSprite, shadowSprite } from './props';
 import { drawPodSleepers, drawRallies, drawScoreboard, drawSmoke, paintCourt } from './recreation';
@@ -547,6 +548,8 @@ export class Renderer {
     this.night = this.lighting.night;
     this.drawLighting(now, vx0, vy0, vx1, vy1);
     this.safe(() => this.mosque.drawNight(ctx, this.sim.building, this.areas, this.night, now));
+    // chamado para a oração (menu Atividades): minaretes e cúpulas brilham por uns segundos
+    if (this.sim.callToPrayerAt) this.safe(() => drawCallToPrayer(ctx, this.sim.building, this.sim.callToPrayerAt, now, reducedMotion()));
     if (this.theme !== 'none') {
       for (const vis of this.areas.values()) {
         if (vis.room && vis.room.phase !== 'ready') continue;
