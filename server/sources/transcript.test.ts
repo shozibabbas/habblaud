@@ -11,6 +11,7 @@ import {
   mergePrefix,
   parseLine,
   parseTaskNotification,
+  roomTitleOf,
   scanPrefix,
   titleOf,
   type LineResult,
@@ -245,6 +246,19 @@ describe('parseLine — sinais de subagentes', () => {
     expect(s.lastPrompt).toBe('Desenhe as poses novas');
     expect(s.pendingTools.has('toolu_fk')).toBe(false);
     expect(forkDirective('<fork-boilerplate>\nregras\n</fork-boilerplate>\n\nYour directive: Faça X')).toBe('Faça X');
+  });
+
+  it('título da sala de sessão: o primeiro pedido (o do prefixo, se houver), não o último', () => {
+    const s = createTranscriptState();
+    feed(s, [L.prompt('Revise os testes'), L.prompt('Agora publique')]);
+    expect(titleOf(s)).toBe('Agora publique');
+    expect(roomTitleOf(s)).toBe('Revise os testes');
+    const prefix = createTranscriptState();
+    feed(prefix, [L.prompt('I am making a product for training of sales')]);
+    mergePrefix(s, prefix);
+    expect(roomTitleOf(s)).toBe('I am making a product for training of sales');
+    s.customTitle = 'Training tool improvements';
+    expect(roomTitleOf(s)).toBe('Training tool improvements');
   });
 
   it('notificação enfileirada (queue-operation) também sinaliza, sem atividade', () => {

@@ -49,6 +49,8 @@ services:
       HABBLAUD_MACHINE_NAME: ${HABBLAUD_MACHINE_NAME:-}
       # Conjunto de nomes dos personagens: br (padrão) ou pk.
       HABBLAUD_NAMES: ${HABBLAUD_NAMES:-}
+      # Salas: folder (padrão, uma por pasta), auto (uma por sessão quando várias dividem a pasta) ou session.
+      HABBLAUD_ROOMS: ${HABBLAUD_ROOMS:-}
       # Dono do escritório (JSON: nome, cargo, look, peças e a secretária): só o valor inicial; depois valem as
       # Configurações (owner.json na pasta de dados). No campus, a diretoria.
       HABBLAUD_OWNER: ${HABBLAUD_OWNER:-}

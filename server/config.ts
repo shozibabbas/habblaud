@@ -13,6 +13,7 @@ import { parseOwner } from './owner';
 import { parseGithubRepo } from './updates/checker';
 import { tr } from '../shared/i18n';
 import { parseNameSet, type NameSet } from '../shared/names';
+import { ROOM_MODES, type RoomMode } from '../shared/rooms';
 import type { OwnerInfo } from '../shared/types';
 
 export interface ServerConfig {
@@ -48,6 +49,13 @@ export interface ServerConfig {
   machineName: string;
   /** Conjunto de nomes dos personagens (HABBLAUD_NAMES: br, o padrão, ou pk). */
   nameSet: NameSet;
+  /**
+   * Salas (HABBLAUD_ROOMS): `folder` (padrão) = uma por pasta; `auto` = uma por sessão quando duas ou mais sessões
+   * principais dividem a pasta; `session` = sempre uma por sessão (ver model/office.ts roomFor).
+   */
+  rooms: RoomMode;
+  /** HABBLAUD_ROOMS com valor desconhecido (vale `folder`), para o aviso na subida. */
+  roomsInvalid?: string;
   /** Valor inicial do dono do escritório (HABBLAUD_OWNER, JSON; ver server/owner.ts) até haver um owner.json. */
   owner?: OwnerInfo;
   /** HABBLAUD_OWNER ignorado: o campo fora do formato (ou "JSON"), para o aviso na subida. */
@@ -170,6 +178,13 @@ export function messagesOffReason(env: NodeJS.ProcessEnv, host: string, inDocker
   return terminal ? tr('mesma trava do terminal: {0}', [terminal]) : undefined;
 }
 
+/** HABBLAUD_ROOMS: folder (padrão, também vazio), auto ou session; outro valor vale folder e volta em `invalid`. */
+export function parseRoomMode(raw: string | undefined): { mode: RoomMode; invalid?: string } {
+  const v = raw?.trim().toLowerCase();
+  if (!v) return { mode: 'folder' };
+  return (ROOM_MODES as readonly string[]).includes(v) ? { mode: v as RoomMode } : { mode: 'folder', invalid: raw!.trim() };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] = process.argv): ServerConfig {
   const home = env.HOME || homedir();
   const inDocker = detectDocker(env);
@@ -181,6 +196,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
   const frame = parseFrameAncestors(env.HABBLAUD_FRAME_ANCESTORS);
   const peers = parsePeers(env.HABBLAUD_PEERS);
   const owner = parseOwner(env.HABBLAUD_OWNER);
+  const rooms = parseRoomMode(env.HABBLAUD_ROOMS);
   return {
     port: Number.isFinite(port) && port > 0 && port < 65536 ? port : 4747,
     host,
@@ -198,6 +214,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     peersInvalid: peers.invalid,
     machineName: machineName(env),
     nameSet: parseNameSet(env.HABBLAUD_NAMES),
+    rooms: rooms.mode,
+    ...(rooms.invalid ? { roomsInvalid: rooms.invalid } : {}),
     owner: owner.owner,
     ownerInvalid: owner.invalid,
     terminal: terminalOffReason(env, host, inDocker) === undefined,

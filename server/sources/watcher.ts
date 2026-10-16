@@ -34,6 +34,7 @@ import {
   createTranscriptState,
   mergePrefix,
   parseLine,
+  roomTitleOf,
   scanPrefix,
   titleOf,
   type LineResult,
@@ -526,6 +527,8 @@ export class ClaudeWatcher implements AgentSource {
     };
     const title = titleOf(s);
     if (title) summary.title = title;
+    const roomTitle = roomTitleOf(s);
+    if (roomTitle && roomTitle !== title) summary.roomTitle = roomTitle;
     if (s.model) summary.model = s.model;
     if (s.gitBranch) summary.gitBranch = s.gitBranch;
     if (s.permissionMode) summary.permissionMode = s.permissionMode;

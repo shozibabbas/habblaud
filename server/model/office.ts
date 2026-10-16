@@ -33,7 +33,8 @@ import { hash32 } from '../../shared/hash';
 import { appearanceProfileOf, type NameSet as NameSetId } from '../../shared/names';
 import { applyPermission } from '../permissions/registry';
 import type { NameStore, StoredCharacter } from './names';
-import { normalizeCwd, roomDisplayNames, SlotAllocator } from './rooms';
+import { normalizeCwd, roomDisplayNames, SlotAllocator, titleRoomName } from './rooms';
+import { roomFolderOf, sessionRoomId, type RoomMode } from '../../shared/rooms';
 import { tr } from '../../shared/i18n';
 
 export const OFFLINE_GRACE_MS = 20_000;
@@ -60,6 +61,12 @@ export interface OfficeDeps {
   nameSet?: NameSetId;
   /** Nome escolhido pelo usuário para a sala da pasta (model/room-aliases.ts), se houver. */
   roomAlias?: (path: string) => string | undefined;
+  /** Salas por pasta (padrão), por sessão quando a pasta tem várias (auto) ou sempre por sessão (HABBLAUD_ROOMS). */
+  rooms?: RoomMode;
+  /** Nome escolhido pelo usuário para uma sala de sessão (pelo id "<pasta>#<sessão>"), se houver. */
+  sessionRoomAlias?: (roomId: string) => string | undefined;
+  /** A sala de sessão `from` seguiu com a sessão nova do processo (/clear): o apelido vale também para `to`. */
+  followSessionRoom?: (from: string, to: string) => void;
   version: string;
   /** Build do cliente servido (ver OfficeSnapshot.meta.build); ausente no modo dev e nos testes. */
   build?: () => string | undefined;
@@ -90,6 +97,11 @@ export interface OfficeDeps {
 /** O que o transcript sabe sobre o agente (aplicado de uma vez). */
 export interface TranscriptSummary {
   title?: string;
+  /**
+   * Título que dá nome à sala de sessão (HABBLAUD_ROOMS): o do Claude Code ou o PRIMEIRO pedido, que não muda a cada
+   * pedido novo como o `title`. Ausente = o `title`.
+   */
+  roomTitle?: string;
   tasks: TaskItem[];
   stats: AgentStats;
   model?: string;
@@ -126,6 +138,8 @@ export interface SubInput {
 interface AgentRecord {
   info: AgentInfo;
   history: Activity[];
+  /** Título que dá nome à sala de sessão do agente principal (TranscriptSummary.roomTitle); fica até vir outro. */
+  roomTitle?: string;
   removeAt?: number;
   /** Início do turno atual (para "Concluiu em X"). */
   turnStart?: number;
@@ -196,13 +210,22 @@ class NameSet extends Set<string> {
   }
 }
 
+interface RoomRecord {
+  path: string;
+  createdAt: number;
+  session?: string;
+}
+
 const byStart = (a: ShellJob, b: ShellJob) => a.startedAt - b.startedAt || a.id.localeCompare(b.id);
 
 export class Office {
   private agents = new Map<string, AgentRecord>();
-  private rooms = new Map<string, { path: string; createdAt: number }>();
+  /** Salas presentes. `session` = sala de uma sessão (id "<pasta>#<sessão>"); `path` é sempre a pasta (cwd normalizado). */
+  private rooms = new Map<string, RoomRecord>();
   private slots = new SlotAllocator(SLOT_COOLDOWN_MS);
   private roomNames = new Map<string, string>();
+  /** Salas de sessão: o nome sem apelido (vai em RoomInfo.defaultName, para o "vazio volta a…" do renomear). */
+  private roomDefaults = new Map<string, string>();
   private feed: FeedItem[] = [];
   private pendingFeed: FeedItem[] = [];
   private pendingNotices: Notice[] = [];
@@ -300,7 +323,12 @@ export class Office {
   }
 
   roomName(roomId: string): string {
-    return this.roomNames.get(roomId) ?? roomId.split('/').filter(Boolean).pop() ?? roomId;
+    return this.roomNames.get(roomId) ?? roomFolderOf(roomId).split('/').filter(Boolean).pop() ?? roomId;
+  }
+
+  /** Sala de uma sessão (HABBLAUD_ROOMS=auto/session), não da pasta: renomear grava pelo id da sala. */
+  isSessionRoom(roomId: string): boolean {
+    return this.rooms.get(roomId)?.session !== undefined;
   }
 
   detail(id: string): AgentDetail | undefined {
@@ -329,8 +357,8 @@ export class Office {
       this.setStatus(p.id, p.status, p.waitingFor);
       return;
     }
-    const roomId = normalizeCwd(p.cwd);
-    this.ensureRoom(roomId, now);
+    const roomId = this.roomFor(p, now);
+    this.ensureRoom(roomId, normalizeCwd(p.cwd), now);
     const chosen = this.roomCharacter(roomId, p.id, p.sessionId);
     // A mesma sessão retomada noutro processo (ex.: "Assumir aqui") mantém o nome, mesmo com o processo antigo
     // ainda saindo do escritório.
@@ -376,11 +404,16 @@ export class Office {
     // Personagem do projeto: o nome escolhido não vira o nome sorteado da sessão nova, e a sessão nova vira a dona dele
     // (se outro agente da sala salvou por último, o dono é ele e fica como está).
     if (info.custom) {
-      const owner = this.deps.names.character(info.roomId)?.owner;
-      if (owner === undefined || owner === info.sessionId) this.deps.names.claimCharacter(info.roomId, sessionId);
+      const key = this.characterKey(info.roomId);
+      const owner = this.deps.names.character(key)?.owner;
+      if (owner === undefined || owner === info.sessionId) this.deps.names.claimCharacter(key, sessionId);
     } else {
       this.deps.names.remember(sessionId, { name: info.name, look: info.look });
     }
+    // A sala de sessão fica com o processo (o id não muda agora); depois de um reinício ela será a da sessão nova,
+    // então o apelido vai junto. O nome tirado do título fica até a sessão nova ter um.
+    const room = this.rooms.get(info.roomId);
+    if (room?.session !== undefined) this.deps.followSessionRoom?.(info.roomId, sessionRoomId(room.path, sessionId));
     info.sessionId = sessionId;
     info.tasks = [];
     info.stats = zeroStats();
@@ -678,6 +711,14 @@ export class Office {
       changed = true;
     };
     if (info.kind === 'main') set('title', t.title);
+    const roomTitle = info.kind === 'main' ? (t.roomTitle ?? t.title) : undefined;
+    if (roomTitle !== undefined && roomTitle !== rec.roomTitle) {
+      rec.roomTitle = roomTitle;
+      if (this.isSessionRoom(info.roomId)) {
+        this.recomputeRoomNames();
+        changed = true;
+      }
+    }
     set('tasks', t.tasks.map((x) => ({ ...x })));
     set('stats', { ...t.stats });
     set('model', t.model);
@@ -858,8 +899,9 @@ export class Office {
     const rec = this.editable(id);
     if (!rec) return 'not-found';
     const info = rec.info;
-    const owner = this.deps.names.character(info.roomId)?.owner;
-    if (owner === undefined || owner === info.sessionId) this.deps.names.clearCharacter(info.roomId);
+    const key = this.characterKey(info.roomId);
+    const owner = this.deps.names.character(key)?.owner;
+    if (owner === undefined || owner === info.sessionId) this.deps.names.clearCharacter(key);
     if (info.custom) {
       const person = this.deps.names.assign(info.sessionId, this.takenNames(id));
       info.name = person.name;
@@ -885,12 +927,24 @@ export class Office {
    * personagem de uma sessão no meio dela.
    */
   private roomCharacter(roomId: string, id: string, sessionId: string): StoredCharacter | undefined {
-    const c = this.deps.names.character(roomId);
+    const key = this.characterKey(roomId);
+    const c = this.deps.names.character(key);
     if (!c) return undefined;
     if (c.owner !== undefined && c.owner !== sessionId && this.deps.names.get(sessionId)) return undefined;
     if (this.nameConflict(c.name, id, roomId)) return undefined;
-    this.deps.names.claimCharacter(roomId, sessionId);
+    this.deps.names.claimCharacter(key, sessionId);
     return c;
+  }
+
+  /**
+   * Chave do personagem da sala em names.json: o id da sala (a pasta, ou "<pasta>#<sessão>" numa sala de sessão, onde
+   * o personagem salvo fica com aquela linha de trabalho). Sala de sessão sem personagem próprio usa o da pasta, que,
+   * como antes, vai para um agente por vez (o dono primeiro; o nome não se repete no escritório).
+   */
+  private characterKey(roomId: string): string {
+    const r = this.rooms.get(roomId);
+    if (r?.session === undefined || this.deps.names.character(roomId)) return roomId;
+    return this.deps.names.character(r.path) ? r.path : roomId;
   }
 
   /**
@@ -906,7 +960,9 @@ export class Office {
     for (const a of this.demoSnap?.agents ?? []) {
       if (nameKey(a.name) === key) return tr('{0} já está no escritório em {1}', [a.name, this.roomName(a.roomId)]);
     }
+    const own = this.characterKey(roomId);
     for (const [n, room] of this.deps.names.reservedNames(roomId)) {
+      if (room === own) continue;
       if (nameKey(n) === key) return tr('{0} já é o personagem de {1}', [n, this.roomName(room)]);
     }
     return undefined;
@@ -938,8 +994,7 @@ export class Office {
     // festa acabou / alarme expirou: o snapshot sai sem o efeito
     if (this.effects.prune(now)) this.markDirty();
     if (removed) {
-      const occupied = new Set([...this.agents.values()].map((r) => r.info.roomId));
-      for (const id of [...this.rooms.keys()]) if (!occupied.has(id)) this.rooms.delete(id);
+      this.pruneRooms();
       this.recomputeRoomNames();
       this.markDirty();
     }
@@ -966,14 +1021,22 @@ export class Office {
     for (const r of this.demoSnap?.rooms ?? []) entries.set(r.id, { path: r.path, createdAt: r.createdAt });
     this.slots.sync(entries.keys(), now);
     const rooms: RoomInfo[] = [...entries]
-      .map(([id, r]) => ({
-        id,
-        name: this.roomName(id),
-        path: r.path,
-        slot: this.slots.slotOf(id) ?? 0,
-        seed: hash32(id),
-        createdAt: r.createdAt,
-      }))
+      .map(([id, r]) => {
+        const room: RoomInfo = {
+          id,
+          name: this.roomName(id),
+          path: r.path,
+          slot: this.slots.slotOf(id) ?? 0,
+          seed: hash32(id),
+          createdAt: r.createdAt,
+        };
+        const session = this.rooms.get(id)?.session;
+        if (session !== undefined) {
+          room.sessionId = session;
+          room.defaultName = this.roomDefaults.get(id) ?? room.name;
+        }
+        return room;
+      })
       .sort((a, b) => a.slot - b.slot);
     // festa/alarme (eventos do GitHub): das salas reais ou do demo
     for (const room of rooms) {
@@ -1048,21 +1111,135 @@ export class Office {
     return out;
   }
 
-  private ensureRoom(roomId: string, now: number): void {
+  // ---------------------------------------------------------------- salas
+
+  /**
+   * Sala de um agente principal que chega, conforme HABBLAUD_ROOMS:
+   * - folder (padrão): a da pasta;
+   * - session: a da sessão, "<pasta>#<sessão>";
+   * - auto: a da pasta enquanto ele for o único principal presente nela. Se já houver outro (de outra sessão), cada um
+   *   vai para a sua sala de sessão, e quem estava na sala da pasta se muda para a dele (uma vez só, ao dividir).
+   *   Quando sobra um, ele fica na sala dele até a sessão acabar, sem voltar para a da pasta: abrir e fechar sessões não
+   *   faz salas trocarem de lugar nem de nome. Quem chega numa pasta que ainda tem alguém ganha a sua; numa pasta vazia,
+   *   volta a ser a sala da pasta.
+   * O id da sala de sessão usa a sessão de quando ela foi criada e não muda com /clear (a sala é do processo).
+   */
+  private roomFor(p: MainInput, now: number): string {
+    const folder = normalizeCwd(p.cwd);
+    const mode = this.deps.rooms ?? 'folder';
+    if (mode === 'folder') return folder;
+    const own = sessionRoomId(folder, p.sessionId);
+    if (mode === 'session') return own;
+    const others = [...this.agents.values()].filter(
+      (r) => r.info.kind === 'main' && r.removeAt === undefined && r.info.sessionId !== p.sessionId && this.rooms.get(r.info.roomId)?.path === folder,
+    );
+    // Sozinho: a sala da pasta, ou a da própria sessão se ela ainda está aí (a mesma sessão reaberta noutro processo).
+    if (!others.length) return this.rooms.has(own) ? own : folder;
+    for (const r of others) if (r.info.roomId === folder) this.moveToSessionRoom(r, now);
+    return own;
+  }
+
+  /** O principal (e os subagentes dele) sai da sala da pasta para a sala da sessão dele (modo auto, ao dividir). */
+  private moveToSessionRoom(rec: AgentRecord, now: number): void {
+    const folder = this.rooms.get(rec.info.roomId)?.path ?? rec.info.roomId;
+    const from = rec.info.roomId;
+    const to = sessionRoomId(folder, rec.info.sessionId);
+    const moved = new Set([rec.info.id, ...this.descendants(rec.info.id).map((r) => r.info.id)]);
+    for (const id of moved) this.agents.get(id)!.info.roomId = to;
+    // Muda antes de criar a sala: o nome (e o aviso "Nova sala") já sai com o título dele.
+    this.ensureRoom(to, folder, now);
+    if (this.pruneRooms()) this.recomputeRoomNames();
+    // As linhas do feed dele vão junto, para levarem o nome da sala nova (e os próximos, ver recomputeRoomNames).
+    const name = this.roomName(to);
+    for (const f of [...this.feed, ...this.bootFeed]) {
+      if (f.roomId !== from || !moved.has(f.agentId)) continue;
+      f.roomId = to;
+      f.roomName = name;
+    }
+    this.markDirty();
+  }
+
+  /** Tira as salas sem ninguém. Devolve true se alguma saiu. */
+  private pruneRooms(): boolean {
+    const occupied = new Set([...this.agents.values()].map((r) => r.info.roomId));
+    let pruned = false;
+    for (const id of [...this.rooms.keys()]) {
+      if (occupied.has(id)) continue;
+      this.rooms.delete(id);
+      pruned = true;
+    }
+    return pruned;
+  }
+
+  /** `folder` = cwd normalizado; um id diferente dele é uma sala de sessão. */
+  private ensureRoom(roomId: string, folder: string, now: number): void {
     if (this.rooms.has(roomId)) return;
-    this.rooms.set(roomId, { path: roomId, createdAt: now });
+    const rec: RoomRecord = { path: folder, createdAt: now };
+    if (roomId !== folder) rec.session = roomId.slice(folder.length + 1);
+    this.rooms.set(roomId, rec);
     this.recomputeRoomNames();
     this.notice('room', roomId, 'info', tr('🏗️ Nova sala: {0}', [this.roomName(roomId)]), roomId);
   }
 
-  private recomputeRoomNames(): void {
-    const paths = new Map([...this.rooms].map(([id, r]) => [id, r.path]));
-    for (const r of this.demoSnap?.rooms ?? []) paths.set(r.id, r.path);
-    this.roomNames = roomDisplayNames(paths);
-    for (const [id, path] of paths) {
-      const alias = this.deps.roomAlias?.(path);
-      if (alias) this.roomNames.set(id, alias);
+  /** Título que dá nome à sala de sessão: o do principal presente nela (o que está saindo, se for o único). */
+  private sessionRoomTitle(roomId: string): string | undefined {
+    let best: AgentRecord | undefined;
+    for (const r of this.agents.values()) {
+      if (r.info.kind !== 'main' || r.info.roomId !== roomId) continue;
+      const better = !best || (best.removeAt !== undefined && r.removeAt === undefined) || ((best.removeAt === undefined) === (r.removeAt === undefined) && r.info.startedAt < best.info.startedAt);
+      if (better) best = r;
     }
+    return best ? (best.roomTitle ?? best.info.title) : undefined;
+  }
+
+  /**
+   * Nomes das salas. As de pasta, como sempre: o basename desambiguado (model/rooms.ts roomDisplayNames) ou o apelido
+   * da pasta. As de sessão: o apelido da sala, senão o título da sessão encurtado (titleRoomName), senão o nome da
+   * pasta; nome repetido (entre todas as salas) ganha " 2", " 3"… na ordem de chegada ("srv", "srv 2"), e quem já
+   * tinha o nome fica com ele.
+   */
+  private recomputeRoomNames(): void {
+    const all = new Map<string, RoomRecord>(this.rooms);
+    for (const r of this.demoSnap?.rooms ?? []) all.set(r.id, { path: r.path, createdAt: r.createdAt });
+    const folders = new Map([...all.values()].map((r) => [r.path, r.path]));
+    const folderNames = roomDisplayNames(folders);
+    for (const path of folders.keys()) {
+      const alias = this.deps.roomAlias?.(path);
+      if (alias) folderNames.set(path, alias);
+    }
+    const names = new Map<string, string>();
+    const defaults = new Map<string, string>();
+    const sessions: [string, RoomRecord][] = [];
+    for (const [id, r] of all) {
+      if (r.session === undefined) names.set(id, folderNames.get(r.path) ?? r.path);
+      else sessions.push([id, r]);
+    }
+    const taken = new Set([...names.values()].map((n) => n.toLocaleLowerCase()));
+    const unique = (base: string) => {
+      let name = base;
+      for (let n = 2; taken.has(name.toLocaleLowerCase()); n++) name = `${base} ${n}`;
+      taken.add(name.toLocaleLowerCase());
+      return name;
+    };
+    const wanted = sessions.map(([id, r]) => {
+      const auto = titleRoomName(this.sessionRoomTitle(id)) ?? folderNames.get(r.path) ?? r.path;
+      const alias = this.deps.sessionRoomAlias?.(id);
+      return { id, r, auto, alias, base: alias ?? auto };
+    });
+    // Quem continua com o nome que já tinha passa na frente: renomear (ou o título de) uma sala nunca muda o de outra.
+    const keeps = (w: (typeof wanted)[number]) => this.roomNames.get(w.id) === w.base;
+    wanted.sort((a, b) => Number(keeps(b)) - Number(keeps(a)) || a.r.createdAt - b.r.createdAt || a.id.localeCompare(b.id));
+    for (const w of wanted) {
+      const name = unique(w.base);
+      names.set(w.id, name);
+      defaults.set(w.id, w.alias ? w.auto : name);
+      // O título costuma chegar logo depois das primeiras atividades: as linhas do feed ainda guardadas (e as que vão
+      // no próximo commit, que são os mesmos objetos) passam a ter o nome novo.
+      const before = this.roomNames.get(w.id);
+      if (before !== undefined && before !== name) for (const f of [...this.feed, ...this.bootFeed]) if (f.roomId === w.id) f.roomName = name;
+    }
+    this.roomNames = names;
+    this.roomDefaults = defaults;
   }
 
   /** Um nome de sala mudou (renomear): recalcula e transmite. */

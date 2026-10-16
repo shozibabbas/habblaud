@@ -305,11 +305,38 @@ snapshot e em `messages` no `/api/health`.
 Qualquer processo local consegue chamar essas rotas (como as de permissão): ligar as mensagens é aceitar que um
 programa da própria máquina possa digitar nas sessões que têm o plugin.
 
+## Salas
+
+Cada sala é uma pasta (`RoomInfo.id` = cwd normalizado, `model/rooms.ts`). Com `HABBLAUD_ROOMS` (`model/office.ts`
+`roomFor`), um agente principal pode ganhar a sala da sua sessão, com o id `<cwd>#<sessionId>` (`shared/rooms.ts`) e
+`RoomInfo.path` ainda o cwd; a sala leva `sessionId` e `defaultName` (o nome sem apelido). Os subagentes ficam na sala
+do pai.
+
+- `folder` (padrão): como sempre, uma sala por pasta.
+- `session`: sempre uma sala por sessão.
+- `auto`: a sala da pasta enquanto o principal for o único presente nela; quando chega outro (de outra sessão), cada um
+  vai para a sua sala de sessão, e quem estava na da pasta se muda uma vez. Quem sobra sozinho fica na sala dele até a
+  sessão acabar (sem voltar para a da pasta, para as salas não trocarem de lugar a cada sessão aberta ou fechada); numa
+  pasta vazia, a próxima sessão volta para a sala da pasta. A mesma sessão reaberta noutro processo volta para a sala
+  dela.
+- O id usa a sessão de quando a sala foi criada e não muda com `/clear` (a sala é do processo); depois de um reinício,
+  é o da sessão atual, e o apelido vai junto (`RoomAliases.followSession`).
+- Nome: o apelido (renomear), senão o título da sessão encurtado (`titleRoomName`: o título do Claude Code ou o
+  primeiro pedido, sem "I am making a"/"can you"/"please"/artigos, em Title Case, até ~26 caracteres numa fronteira
+  de palavra; só no servidor), senão o nome da pasta. Repetidos ganham " 2", " 3" na ordem de chegada, e quem já tinha
+  o nome fica com ele.
+- Renomear (`POST /api/rooms/rename`): sala de sessão grava pelo id em `rooms.json` › `sessions`
+  (`{name, at}`), ao lado de `aliases` (por pasta); sem uso há 60 dias some, como os nomes. No escritório combinado o
+  id chega como `<par>~<cwd>#<sessão>` e vai ao par sem o prefixo.
+- Meu dia e a linha do tempo gravam o id da sala: cada sala de sessão é uma linha própria em "por projeto", com o nome
+  que tinha.
+
 ## Personagem do projeto
 
 `PUT /api/agents/:id/character` (`http/app.ts`, regras em `Office.setCharacter`) escolhe o nome e a aparência do agente
-principal `:id` e grava como o personagem da sala dele (o cwd normalizado), em `names.json` › `rooms`:
-`{name, look, seed, parts?, owner?, at}`.
+principal `:id` e grava como o personagem da sala dele (o id da sala: o cwd normalizado, ou `<cwd>#<sessão>` numa sala
+de sessão), em `names.json` › `rooms`: `{name, look, seed, parts?, owner?, at}`. Uma sala de sessão sem personagem
+próprio usa o da pasta (chave = o cwd), com as mesmas regras de dono e de nome livre.
 
 O corpo tem três campos:
 
@@ -389,6 +416,7 @@ do Codex levam `provider: 'codex'` (ausente = Claude Code). Ids: `<conta>:<threa
 | `HABBLAUD_MENSAGENS` | ligado (com o terminal) | `0`, `false`, `off` ou `no` desligam só as mensagens pelo escritório |
 | `HABBLAUD_CLAUDE_DIRS` | — | config dirs separados por vírgula; substitui a detecção (`~/.claude*` com `projects/` ou `sessions/` + `CLAUDE_CONFIG_DIR`) |
 | `HABBLAUD_DATA_DIR` | `~/.habblaud` (Docker: `/data`) | estado do Habblaud (nomes e personagens dos projetos persistidos em `names.json`, linha do tempo em `timeline/`, estatísticas do Meu dia em `stats/`, última verificação de versão em `updates.json`) |
+| `HABBLAUD_ROOMS` | `folder` | salas: `folder` (uma por pasta), `auto` (uma por sessão quando duas ou mais sessões principais dividem a pasta) ou `session` (sempre uma por sessão); ver "Salas" abaixo |
 | `HABBLAUD_TIMELINE` | ligado | `0` desliga a gravação da linha do tempo do timelapse |
 | `HABBLAUD_UPDATE_CHECK` | ligado | `0` desliga a verificação de versão nova (releases do repositório do `package.json` no GitHub, a cada 6 h) |
 | `HABBLAUD_LANG` | idioma do sistema (`LC_ALL`/`LANG`/Intl) | idioma dos textos montados pelo servidor: `pt-BR` ou `fr` (shared/i18n.ts) |

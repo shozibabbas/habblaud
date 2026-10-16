@@ -112,6 +112,8 @@ export interface TranscriptState {
   agentName?: string;
   aiTitle?: string;
   lastPrompt?: string;
+  /** Primeiro pedido visto (o do começo do arquivo, quando o prefixo é mesclado): nome da sala de sessão. */
+  firstPrompt?: string;
   tasks: TaskItem[];
   /** TaskCreate aguardando o id real (tool_use id -> id provisório). */
   pendingTaskCreates: Map<string, string>;
@@ -368,6 +370,7 @@ class LineParser {
     const value = str(v)?.trim();
     if (!value || this.s[key] === value) return;
     this.s[key] = value;
+    if (key === 'lastPrompt') this.s.firstPrompt ??= value;
     this.changed();
   }
 
@@ -732,6 +735,15 @@ export function titleOf(state: TranscriptState): string | undefined {
   return t ? truncate(t, 90) : undefined;
 }
 
+/**
+ * Título que dá nome à sala de sessão (HABBLAUD_ROOMS): como titleOf, mas com o PRIMEIRO pedido no lugar do último,
+ * para o nome da sala não mudar a cada pedido.
+ */
+export function roomTitleOf(state: TranscriptState): string | undefined {
+  const t = state.customTitle ?? state.agentName ?? state.aiTitle ?? state.firstPrompt ?? state.lastPrompt;
+  return t ? truncate(t, 90) : undefined;
+}
+
 // ------------------------------------------------------------------ prefixo do arquivo
 
 // Linhas que importam para títulos/tarefas/estatísticas anteriores à janela lida no boot.
@@ -828,6 +840,8 @@ export function mergePrefix(state: TranscriptState, prefix: TranscriptState): vo
   state.agentName ??= prefix.agentName;
   state.aiTitle ??= prefix.aiTitle;
   state.lastPrompt ??= prefix.lastPrompt;
+  // O prefixo vem antes da janela no arquivo: o primeiro pedido dele é o primeiro da sessão.
+  if (prefix.firstPrompt) state.firstPrompt = prefix.firstPrompt;
   state.model ??= prefix.model;
   state.gitBranch ??= prefix.gitBranch;
   state.permissionMode ??= prefix.permissionMode;

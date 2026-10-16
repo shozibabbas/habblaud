@@ -198,9 +198,12 @@ export interface AgentInfo {
 }
 
 export interface RoomInfo {
-  /** Chave estável: cwd normalizado do projeto. */
+  /**
+   * Chave estável: cwd normalizado do projeto. Com HABBLAUD_ROOMS=auto/session, a sala de uma sessão é
+   * "<cwd>#<id da sessão>" (shared/rooms.ts); no escritório combinado, com o prefixo "<par>~".
+   */
   id: string;
-  /** Nome exibido (basename do cwd, desambiguado se repetido). */
+  /** Nome exibido (basename do cwd, desambiguado se repetido; numa sala de sessão, o título da sessão encurtado). */
   name: string;
   /** Caminho completo do projeto. */
   path: string;
@@ -220,6 +223,10 @@ export interface RoomInfo {
   machine?: MachineRef;
   /** Escritório combinado: o nome da sala sem a etiqueta da máquina (o `name` vem como "máquina · sala"). */
   baseName?: string;
+  /** Sala de uma sessão (HABBLAUD_ROOMS=auto/session): a sessão dela. Ausente nas salas de pasta. */
+  sessionId?: string;
+  /** Sala de sessão: o nome sem apelido (o título encurtado ou "pasta N"), ao qual renomear com vazio volta. */
+  defaultName?: string;
 }
 
 /**

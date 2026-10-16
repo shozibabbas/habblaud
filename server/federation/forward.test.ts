@@ -243,11 +243,14 @@ describe('federation: ações repassadas ao par dono', () => {
       ['POST', '/api/rooms/rename', '{"id":"/srv/api","name":"API"}'],
       ['POST', '/api/agents/.claude%3A1/stop', '{}'],
     ]);
+    // Sala de sessão do par (HABBLAUD_ROOMS=auto): o id vai com o '#' da sessão, sem o prefixo.
+    expect((await raw(env.base, '/api/rooms/rename', { method: 'POST', headers: { Host: 'localhost' }, body: { id: 'srv~/srv#3f2a', name: 'Vendas' } })).status).toBe(204);
+    expect(peer.seen.at(-1)).toMatchObject({ method: 'POST', path: '/api/rooms/rename', body: '{"id":"/srv#3f2a","name":"Vendas"}' });
     // Assumir a sessão de outra máquina não dá; a sala local é renomeada aqui.
     expect((await raw(env.base, '/api/agents/srv~.claude:1/takeover', { method: 'POST', headers: { Host: 'localhost' }, body: {} })).status).toBe(400);
     expect((await raw(env.base, '/api/rooms/rename', { method: 'POST', headers: { Host: 'localhost' }, body: { id: '/p/loja', name: 'Loja' } })).body).toEqual({ name: 'Loja' });
     expect(env.renamed).toEqual(['/p/loja']);
-    expect(peer.seen).toHaveLength(4);
+    expect(peer.seen).toHaveLength(5);
   });
 
   it('terminal: o stream do par passa evento a evento, com o agentId do init prefixado, e fecha junto', async () => {
