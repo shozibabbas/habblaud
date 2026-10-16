@@ -10,6 +10,7 @@ import { parseAllowedHosts } from './http/guard';
 import { parseRemoteConfig, type RemoteConfig } from './http/remote';
 import { parseFrameAncestors } from './http/static';
 import { parseOwner } from './owner';
+import { parsePrayerStyle, type PrayerStyle } from '../shared/mosque';
 import { parseGithubRepo } from './updates/checker';
 import { tr } from '../shared/i18n';
 import { parseNameSet, type NameSet } from '../shared/names';
@@ -60,6 +61,8 @@ export interface ServerConfig {
   owner?: OwnerInfo;
   /** HABBLAUD_OWNER ignorado: o campo fora do formato (ou "JSON"), para o aviso na subida. */
   ownerInvalid?: string;
+  /** Estilo inicial da oração na mesquita do campus (HABBLAUD_PRAYER_STYLE: sunni | shia) até haver um mosque.json. */
+  prayerStyle?: PrayerStyle;
   /**
    * Terminal (GET /api/agents/:id/terminal) ligado: só com bind local, isto é, com o Habblaud acessível apenas
    * pelo próprio computador (ver terminalOffReason). É a trava de tudo o que mostra ou age sobre as sessões.
@@ -218,6 +221,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     ...(rooms.invalid ? { roomsInvalid: rooms.invalid } : {}),
     owner: owner.owner,
     ownerInvalid: owner.invalid,
+    ...(parsePrayerStyle(env.HABBLAUD_PRAYER_STYLE) ? { prayerStyle: parsePrayerStyle(env.HABBLAUD_PRAYER_STYLE) } : {}),
     terminal: terminalOffReason(env, host, inDocker) === undefined,
     messages: messagesOffReason(env, host, inDocker) === undefined,
     timeline: !env.HABBLAUD_TIMELINE?.trim() || isTruthy(env.HABBLAUD_TIMELINE),

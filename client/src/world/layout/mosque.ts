@@ -46,7 +46,15 @@ export function sectionArea(section: MosqueSection): string {
 }
 
 /** Colunas (x local) das filas e fileiras (y local na ala) de cada seção. */
-export const SAF_X: Readonly<Record<MosqueSection, readonly number[]>> = { m: [5, 8, 11, 14], f: [4, 7, 10] };
+// (a primeira fila fica 3 tiles atrás do lugar do imam: o imam se prostra sem encostar em ninguém)
+export const SAF_X: Readonly<Record<MosqueSection, readonly number[]>> = { m: [6, 9, 12, 15], f: [6, 9, 12] };
+
+/** Lugares dos religiosos (spots 'staff'; sim/cleric.ts): o imam diante do mihrab, o minbar, reflexão, recepção. */
+export const CLERIC_IMAM = 'cleric:imam';
+export const CLERIC_MINBAR = 'cleric:minbar';
+export const CLERIC_SIT = 'cleric:reflexao';
+export const CLERIC_GREET = 'cleric:recepcao';
+export const clericGroup = (base: string, section: MosqueSection) => `${base}:${section}`;
 const SAF_ROWS: Readonly<Record<MosqueSection, readonly [number, number]>> = { m: [3, 11], f: [3, 10] };
 
 export interface MosqueSite {
@@ -128,6 +136,23 @@ function wudu(a: AreaBuilder, lx: number, ly0: number, ly1: number, section: Mos
 }
 
 /** Jali (treliça) norte-sul na coluna `lx`, de ly0 até a ponta em `end` (a abertura fica abaixo). */
+/**
+ * Lugares do religioso de uma ala: o do imam (diante do mihrab, à frente da primeira fila), o assento no alto do minbar
+ * (só a ala masculina; quem fala olha para leste, para quem escuta), um canto para o tasbih e a passagem para o salão.
+ */
+function cleric(a: AreaBuilder, section: MosqueSection): void {
+  a.spot('staff', 3, 7, 'left', { group: clericGroup(CLERIC_IMAM, section) });
+  if (section === 'm') {
+    // no patamar do minbar (degraus a leste): os joelhos sobre o patamar, um pouco acima do piso
+    a.spot('staff', 3, 3, 'right', { group: clericGroup(CLERIC_MINBAR, section), seated: true, x: a.px(1) + 6, y: a.py(3) - 9, sortY: a.py(4) + 0.5 });
+    a.spot('staff', 16, 10, 'left', { group: clericGroup(CLERIC_SIT, section) });
+    a.spot('staff', 17, 11, 'right', { group: clericGroup(CLERIC_GREET, section) });
+  } else {
+    a.spot('staff', 13, 9, 'left', { group: clericGroup(CLERIC_SIT, section) });
+    a.spot('staff', 13, 10, 'right', { group: clericGroup(CLERIC_GREET, section) });
+  }
+}
+
 function jali(a: AreaBuilder, lx: number, ly0: number, end: number): void {
   for (let ly = ly0; ly < end; ly++) a.furn('jali_screen', lx, ly, 'v', { order: 0.15 });
   a.furn('jali_screen', lx, end, 'end', { order: 0.16 });
@@ -157,8 +182,9 @@ export function layoutMenHall(site: MosqueSite): AreaLayout {
   a.furn('mihrab', 1, 6, undefined, { order: 0.2 });
   a.furn('minbar', 1, 3, undefined, { order: 0.25 });
   for (const lx of [3.5, 8, 12.5]) a.wall('arch_window', lx, undefined, { order: 0.3 });
-  a.furn('quran_shelf', 15, 2, undefined, { order: 0.3 });
-  a.spot('shelf', 15, 3, 'up', { dx: 8, dy: -2 });
+  a.furn('quran_shelf', 16, 2, undefined, { order: 0.3 });
+  a.spot('shelf', 16, 3, 'up', { dx: 8, dy: -2 });
+  cleric(a, 'm');
   safs(a, 'm');
   jali(a, 18, 2, 9);
 
@@ -167,6 +193,8 @@ export function layoutMenHall(site: MosqueSite): AreaLayout {
   a.furn('topi_shelf', 20, 2, undefined, { order: 0.31 });
   useSpot(a, 'headwear', 19, 3, 'm');
   useSpot(a, 'headwear', 20, 3, 'm');
+  // estilo shia: a caixinha das turbahs ao lado dos topis (pega-se na mesma parada)
+  a.furn('turbah_box', 21, 2, undefined, { order: 0.32 });
   a.wall('prayer_times', 22.5, undefined, { order: 0.6 });
   a.wall('clock', 24.5, undefined, { order: 0.7 });
   a.furn('shoe_rack', 25, 2, 'm', { order: 0.35 });
@@ -195,8 +223,9 @@ export function layoutWomenHall(site: MosqueSite): AreaLayout {
 
   a.wall('prayer_times', 4, undefined, { order: 0.6 });
   a.wall('clock', 8.5, undefined, { order: 0.7 });
-  a.furn('quran_shelf', 11, 2, undefined, { order: 0.3 });
-  a.spot('shelf', 11, 3, 'up', { dx: 8, dy: -2 });
+  a.furn('quran_shelf', 10, 2, undefined, { order: 0.3 });
+  a.spot('shelf', 10, 3, 'up', { dx: 8, dy: -2 });
+  cleric(a, 'f');
   safs(a, 'f');
   jali(a, 14, 2, 8);
 
@@ -204,6 +233,7 @@ export function layoutWomenHall(site: MosqueSite): AreaLayout {
   a.furn('hijab_rack', 15, 2, undefined, { order: 0.3 });
   useSpot(a, 'headwear', 15, 3, 'f');
   useSpot(a, 'headwear', 16, 3, 'f');
+  a.furn('turbah_box', 17, 2, undefined, { order: 0.32 });
   wudu(a, 17, 4, 8, 'f');
   a.furn('shoe_rack', 20, 9, 'f', { order: 0.35 });
   a.furn('shoe_rack', 27, 9, 'f', { order: 0.36 });

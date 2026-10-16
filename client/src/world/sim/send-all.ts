@@ -11,6 +11,9 @@
 import type { GatherKind } from '../social/gathering';
 import type { TileRect } from '../layout/types';
 import { planPrayerVisit } from './prayer';
+import { currentPrayer, startJamaat } from './jamaat';
+import { methodFor } from '../../../../shared/mosque';
+import { prayersOn, type PrayerName } from '../../../../shared/prayer-times';
 import { isSmoker, planNap, planSmoke } from './recreation';
 import type { Character } from './character';
 import { isStaff } from './staff';
@@ -99,7 +102,7 @@ function result(activity: SendActivity): SendAllResult {
 }
 
 /** Manda todos os livres para `activity`. Retorna quem foi e quem ficou (e por quê). */
-export function sendAll(sim: Sim, activity: SendActivity, now: number): SendAllResult {
+export function sendAll(sim: Sim, activity: SendActivity, now: number, opts: { prayer?: PrayerName } = {}): SendAllResult {
   const r = result(activity);
   if (activity === 'desk') return recallToDesks(sim, r, now);
   const free: Character[] = [];
@@ -122,6 +125,10 @@ export function sendAll(sim: Sim, activity: SendActivity, now: number): SendAllR
     case 'prayer':
       sim.callToPrayerAt = now;
       {
+        // uma congregação por ala, liderada pelo religioso (sim/jamaat.ts): a oração do horário (ou a da hora atual)
+        const m = sim.mosque;
+        startJamaat(sim, now, opts.prayer ?? currentPrayer(prayersOn(now, m.lat, m.lon, methodFor(m.style)), now), m.style, m.combine);
+        for (const c of sim.staff.members.values()) if (c.role === 'cleric' && !c.leaving) sim.interrupt(c.ch);
         // mais gente que torneiras: quem chega depois espera a vez da ablução (cada um num tile)
         const queue = new Set<number>();
         for (const ch of go) place(r, ch, planPrayerVisit(sim, ch, now, { queue }));

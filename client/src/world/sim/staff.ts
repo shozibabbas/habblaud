@@ -91,6 +91,8 @@ export interface StaffRoleDef<S = unknown> {
   think(m: StaffMember<S>, crew: StaffCrew, now: number): boolean;
   /** Carga inicial ou volta de uma aba oculta: põe a pessoa num lugar natural (sem andar). */
   settle(m: StaffMember<S>, crew: StaffCrew, now: number): void;
+  /** (Opcional) Rótulo da pessoa no cartão, quando muda de pessoa para pessoa (ex.: "Aalim" / "Aalima"). */
+  labelOf?(m: StaffMember<S>): string;
   /** O que está fazendo agora (2ª linha do cartão), ou null. */
   doing?(m: StaffMember<S>, crew: StaffCrew): string | null;
   /** Peças do kit que o mundo desenha (carrinho, balde, placa). */
@@ -402,7 +404,7 @@ export class StaffCrew {
     const m = this.members.get(id);
     if (!m) return null;
     const def = roleOf(m.role);
-    return { name: m.ch.info.name, role: def?.label() ?? m.ch.info.role, doing: def?.doing?.(m, this) ?? null, color: m.ch.appearance.top };
+    return { name: m.ch.info.name, role: def?.labelOf?.(m) ?? def?.label() ?? m.ch.info.role, doing: def?.doing?.(m, this) ?? null, color: m.ch.appearance.top };
   }
 
   // ------------------------------------------------------------------ base (canto da limpeza)

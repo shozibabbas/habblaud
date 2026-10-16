@@ -5,6 +5,7 @@ import { h, iconButton, setAttr, setHidden, setText } from './dom';
 import { ICONS } from './icons';
 import { notificationState, type Notifier } from './notify';
 import type { UiPrefs } from './prefs';
+import { MosqueSettingsGroup } from './settings-mosque';
 import { OwnerSettingsGroup } from './settings-owner';
 import { SoundSettingsGroup } from './settings-sound';
 import type { SoundControl } from './sound';
@@ -92,6 +93,8 @@ export class SettingsPopover implements UiComponent {
   private soundGroup: SoundSettingsGroup;
   /** Dono do escritório (a diretoria do campus): settings-owner.ts. */
   private ownerGroup: OwnerSettingsGroup;
+  /** Mesquita do campus (estilo, cidade, chamado nos horários): settings-mosque.ts. */
+  private mosqueGroup: MosqueSettingsGroup;
   private demoGroup: HTMLElement;
   /** Só na página do celular (porta remota com login): sair deste aparelho. */
   private remoteGroup: HTMLElement;
@@ -155,6 +158,7 @@ export class SettingsPopover implements UiComponent {
     this.theme.row.append(h('span', { class: 'ui-set__hint', text: tr('Automático: segue o calendário hijri (hora local): Ramadã o mês inteiro, Eid al-Fitr de 1 a 3 de Shawwal e Eid al-Adha de 10 a 13 de Dhu al-Hijjah; no resto do ano, o visual original. Nenhum: sempre o original.') }));
     this.soundGroup = new SoundSettingsGroup(ctx, sound);
     this.ownerGroup = new OwnerSettingsGroup(ctx);
+    this.mosqueGroup = new MosqueSettingsGroup(ctx);
 
     // Nomes dos idiomas sempre na própria língua, para quem não entende o idioma atual achar o seu.
     this.language = segmented<LanguageChoice>(
@@ -217,6 +221,7 @@ export class SettingsPopover implements UiComponent {
       ),
       this.soundGroup.el,
       this.ownerGroup.el,
+      this.mosqueGroup.el,
       h('div', { class: 'ui-set-group' }, h('h3', { text: tr('Idioma') }), this.language.row),
       this.demoGroup,
       this.remoteGroup,
@@ -227,6 +232,7 @@ export class SettingsPopover implements UiComponent {
       this.syncRootClass();
       if (this.isOpen) {
         this.ownerGroup.load();
+        this.mosqueGroup.load();
         this.render();
       }
     });
@@ -295,6 +301,7 @@ export class SettingsPopover implements UiComponent {
     this.language.set(savedLanguage());
     this.soundGroup.render();
     this.ownerGroup.render();
+    this.mosqueGroup.render();
     setHidden(this.demoGroup, this.ctx.store.mock || access().remote);
     setHidden(this.remoteGroup, !access().remote);
     this.about.render();

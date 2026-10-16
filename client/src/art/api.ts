@@ -74,7 +74,11 @@ export type Pose =
   | 'vacuum' // o mesmo vaivém com o aspirador vertical (carpete) (4)
   | 'push' // andando e empurrando o carrinho de limpeza (o carrinho é desenhado pelo mundo) (4)
   | 'scrub' // escova de vaso subindo e descendo (normalmente dir 'up', na porta da cabine) (4)
-  | 'wipe'; // pano na mão indo e voltando (pia, espelho, torneira) (4)
+  | 'wipe' // pano na mão indo e voltando (pia, espelho, torneira) (4)
+  // --- mesquita, estilo shia e os religiosos (aditivo; character/prayer.ts)
+  | 'sadl' // qiyam com as mãos ao lado do corpo (estilo shia) (1)
+  | 'qunoot' // em pé, as duas mãos erguidas diante do rosto com as palmas para cima (2ª rak'ah, antes do ruku) (1)
+  | 'dars' // ajoelhado falando para quem escuta: uma mão gesticulando e a boca mexendo (majlis/dars) (2)
 
 export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book' | 'box' | 'paddle' | 'popcorn'
   // --- vida social (aditivo)
@@ -90,7 +94,9 @@ export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book
   | 'cigarette' // cigarro aceso entre os dedos (pose 'drink' leva à boca; 'stand'/'sit' segura ao lado). A fumaça é do mundo
   // --- equipe de limpeza (aditivo): carregados em pé ao lado do corpo ('stand'/'walk'/'run')
   | 'mop'
-  | 'vacuum';
+  | 'vacuum'
+  // --- mesquita (aditivo; character/cleric.ts)
+  | 'tasbih'; // terço de contas pendurado na mão (também nas posturas ajoelhadas da oração)
 
 export type HairStyle =
   | 'short' | 'buzz' | 'spiky' | 'side_part' | 'curly' | 'afro' | 'bob' | 'long' | 'ponytail' | 'bun' | 'pigtails'
@@ -103,14 +109,18 @@ export type TopStyle = 'tshirt' | 'hoodie' | 'shirt_tie' | 'sweater' | 'jacket' 
   | 'shalwar_kameez' // kameez com barrado bordado e dupatta nos ombros, ambos em topAccent
   | 'kurta_waistcoat' // kurta (top) com colete sem mangas por cima (topAccent)
   // --- (aditivo)
-  | 'suit'; // terno: paletó (top) com lapelas sobre camisa clara e gravata (topAccent); a cor da camisa sai da gravata
+  | 'suit' // terno: paletó (top) com lapelas sobre camisa clara e gravata (topAccent); a cor da camisa sai da gravata
+  // --- religiosos da mesquita (aditivo; character/cleric.ts)
+  | 'qaba_aba' // qaba (casaco longo, em topAccent) sob a aba aberta (capa, em top), até o tornozelo
+  | 'abaya'; // túnica longa até os pés (em top), com filete discreto (topAccent)
 
 export type Accessory = 'none' | 'glasses' | 'sunglasses' | 'headphones' | 'cap' | 'beanie' | 'earrings' | 'bow'
   // --- (aditivo)
   | 'dupatta' // lenço solto sobre a cabeça e os ombros (o cabelo da frente aparece)
   | 'hijab' // cobre cabelo, orelhas e pescoço, emoldurando o rosto (o cabelo não é desenhado)
   | 'topi' // gorrinho redondo no alto da cabeça (de oração ou karakul)
-  | 'headset'; // fone de ouvido acolchoado com microfone de haste diante da boca (atendimento, ligações)
+  | 'headset' // fone de ouvido acolchoado com microfone de haste diante da boca (atendimento, ligações)
+  | 'amama'; // (aditivo) turbante enrolado dos religiosos (preto: sayyid; branco), cobrindo o alto da cabeça
 
 export interface Appearance {
   skin: string;
@@ -259,7 +269,9 @@ export type FurnitureKind =
   | 'award_wall' // (parede) 2 tiles. Prateleira de prêmios: diplomas emoldurados, troféu e placa de cristal
   // --- canto da limpeza (aditivo; furniture/cleaning.ts)
   | 'janitor_shelf' // 1x1 estante alta de metal com produtos de limpeza, rolos de papel e panos dobrados.
-  | 'mop_sink'; // 1x1 tanque baixo de serviço com torneira e um mop escorrendo ao lado.
+  | 'mop_sink' // 1x1 tanque baixo de serviço com torneira e um mop escorrendo ao lado.
+  // --- mesquita, estilo shia (aditivo)
+  | 'turbah_box'; // 1x1 caixinha de madeira com as turbahs (tabletes de barro) para a prostração
 
 export interface FurnitureDef {
   mount: 'floor' | 'wall';
@@ -363,6 +375,7 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   award_wall: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
   janitor_shelf: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
   mop_sink: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  turbah_box: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
 };
 
 export type FloorKind =

@@ -9,6 +9,7 @@ import { setQuiet } from '../log';
 import { NameStore } from '../model/names';
 import { Office, type OfficeDeps } from '../model/office';
 import { OwnerStore } from '../owner';
+import { MosqueStore } from '../mosque';
 import { tempDir } from '../test/fixtures';
 import { createApiHandler, type ApiDeps } from './app';
 import { createRequestGuard, hostAllowed, hostnameOf, isLoopbackHost, originAllowed, parseAllowedHosts } from './guard';
@@ -524,5 +525,57 @@ describe('guarda de Host/Origin', () => {
     expect(originAllowed('http://1.2.3.4', 'localhost:4747', allowed)).toBe(false);
     expect(originAllowed('null', 'localhost:4747', allowed)).toBe(false);
     expect(originAllowed('file://', 'localhost:4747', allowed)).toBe(false);
+  });
+});
+
+describe('mesquita do campus (GET/PUT /api/mosque)', () => {
+  let env: Awaited<ReturnType<typeof start>>;
+  let store: MosqueStore;
+  const boot = async (terminal: boolean) => {
+    store = new MosqueStore(null, 'sunni');
+    const late: { office?: Office } = {};
+    env = await start(
+      {
+        terminal,
+        mosque: {
+          get: () => store.get(),
+          source: () => store.source(),
+          update: (b) => {
+            const r = store.update(b);
+            late.office?.markDirty();
+            return r;
+          },
+        },
+      },
+      { mosque: () => store.get() },
+    );
+    late.office = env.office;
+  };
+  afterEach(async () => {
+    await env.close();
+    env.cleanup();
+  });
+  const url = () => `${env.base}/api/mosque`;
+  const put = (body: unknown) => fetch(url(), { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(body) });
+
+  it('o padrão vai no snapshot; o PUT parcial grava e o snapshot muda junto; 400 com o campo fora do formato', async () => {
+    await boot(true);
+    expect(await (await fetch(url())).json()).toMatchObject({ mosque: { style: 'sunni', city: 'Islamabad', call: true }, source: 'env' });
+    expect((await snapshotOf(env.base)).meta.mosque).toMatchObject({ style: 'sunni' });
+    const res = await put({ style: 'shia', city: 'Lahore', lat: 31.5204, lon: 74.3587 });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ mosque: { style: 'shia', city: 'Lahore' }, source: 'settings' });
+    await vi.waitFor(async () => expect((await snapshotOf(env.base)).meta.mosque).toMatchObject({ style: 'shia', lat: 31.5204 }));
+    const bad = await put({ lat: 200 });
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { field: string }).field).toBe('lat');
+    expect(store.get().lat).toBe(31.5204);
+  });
+
+  it('PUT só pelo próprio computador e com a trava do terminal; GET é livre', async () => {
+    await boot(false);
+    expect((await put({ style: 'shia' })).status).toBe(403);
+    expect((await fetch(url())).status).toBe(200);
+    expect(store.get().style).toBe('sunni');
   });
 });

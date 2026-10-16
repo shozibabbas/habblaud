@@ -362,3 +362,18 @@ export function drawWuduWater(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.fillRect(x - 1 - sp, y + 10, 1, 1);
   ctx.fillRect(x + 1 + sp, y + 10, 1, 1);
 }
+
+/** Turbahs (tabletes redondos de barro) no carpete, diante de quem reza no estilo shia: onde a testa encosta. */
+export function drawTurbahs(ctx: CanvasRenderingContext2D, at: Iterable<{ x: number; y: number }>): void {
+  for (const t of at) {
+    ctx.fillStyle = 'rgba(28,32,52,0.25)';
+    ctx.fillRect(t.x - 2, t.y + 1, 6, 1);
+    ctx.fillStyle = '#8f8374';
+    ctx.fillRect(t.x - 3, t.y - 1, 6, 2);
+    ctx.fillRect(t.x - 2, t.y - 2, 4, 1);
+    ctx.fillStyle = '#b3a797';
+    ctx.fillRect(t.x - 2, t.y - 2, 3, 1);
+    ctx.fillStyle = '#6f6557';
+    ctx.fillRect(t.x - 2, t.y, 4, 1);
+  }
+}

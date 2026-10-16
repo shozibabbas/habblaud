@@ -3,6 +3,7 @@
 // etiqueta "máquina · sala" e `baseName`, os agentes herdam a máquina da sala e `meta.machines` lista
 // todas. `offline=N` deixa a N-ésima máquina (1 = a primeira depois da local) desconectada e `owner=1` inventa um
 // dono (meta.owner, como HABBLAUD_OWNER), para a diretoria aparecer. Puro.
+import { DEFAULT_MOSQUE, parsePrayerStyle, type MosqueSettings } from '../../../shared/mosque';
 import { hash32 } from '../../../shared/hash';
 import type { MachineRef, MachineStatus, OfficeSnapshot, OwnerInfo } from '../../../shared/types';
 
@@ -13,6 +14,18 @@ export interface CampusMockOptions {
   offline?: number;
   /** Inventa um dono (a diretoria aparece no campus). */
   owner?: boolean;
+  /** Mesquita (`prayer=shia`, `combine=1`, `call=0`): o mesmo formato de meta.mosque. */
+  mosque?: MosqueSettings;
+}
+
+/** Configuração da mesquita pedida na URL do mock (null = a padrão). */
+export function mockMosqueFrom(search: string): MosqueSettings | null {
+  const p = new URLSearchParams(search);
+  const style = parsePrayerStyle(p.get('prayer'));
+  const combine = p.get('combine');
+  const call = p.get('call');
+  if (!style && combine === null && call === null) return null;
+  return { ...DEFAULT_MOSQUE, ...(style ? { style } : {}), ...(combine !== null ? { combine: combine !== '0' } : {}), ...(call !== null ? { call: call !== '0' } : {}) };
 }
 
 /** Dono de mentira do mock (`owner=1`). */
@@ -29,6 +42,7 @@ export function campusMockFrom(search: string): CampusMockOptions | null {
     machines: Math.min(NAMES.length, Math.floor(n)),
     ...(Number.isFinite(off) && off >= 1 ? { offline: Math.floor(off) } : {}),
     ...(owner && owner !== '0' ? { owner: true } : {}),
+    ...(mockMosqueFrom(search) ? { mosque: mockMosqueFrom(search)! } : {}),
   };
 }
 
@@ -48,6 +62,6 @@ export function mockCampusSnapshot(snap: OfficeSnapshot, opts: CampusMockOptions
       return { ...r, name: `${m.name} · ${r.name}`, baseName: r.name, machine: m };
     }),
     agents: snap.agents.map((a) => ({ ...a, machine: byRoom.get(a.roomId) ?? ms[0] })),
-    meta: { ...snap.meta, machines: status, ...(opts.owner ? { owner: MOCK_OWNER } : {}) },
+    meta: { ...snap.meta, machines: status, ...(opts.owner ? { owner: MOCK_OWNER } : {}), ...(opts.mosque ? { mosque: opts.mosque } : {}) },
   };
 }

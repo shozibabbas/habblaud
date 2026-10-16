@@ -24,7 +24,8 @@ import { daylightModeOf, parseHourParam } from './daylight';
 import { RoomFxRenderer } from './github-fx';
 import { Lighting } from './lighting';
 import { reducedMotion } from './github-fx';
-import { drawCallToPrayer, drawWuduWater, MosqueRenderer } from './mosque';
+import { drawCallToPrayer, drawTurbahs, drawWuduWater, MosqueRenderer } from './mosque';
+import { turbahsOf } from '../sim/jamaat';
 import { Particles } from './particles';
 import { CAR_VARIANTS, carSprite, propSprite, shadowSprite } from './props';
 import { drawPodSleepers, drawRallies, drawScoreboard, drawSmoke, paintCourt } from './recreation';
@@ -435,6 +436,8 @@ export class Renderer {
       this.drawFloor(vis, anim);
     }
     this.safe(() => this.mosque.drawFloor(ctx, this.sim.building));
+    // estilo shia: a turbah no carpete diante de cada um que reza (sim/jamaat.ts)
+    this.safe(() => drawTurbahs(ctx, turbahsOf(this.sim)));
     for (const vis of this.areas.values()) {
       const p = vis.px;
       if (!visible(p.x, p.y - WALL_MARGIN, p.w, p.h + WALL_MARGIN)) continue;
@@ -827,6 +830,8 @@ export class Renderer {
   }
 
   private drawFurniture(f: FurnVis, area: AreaVis, scale: number, front: boolean, now: number): void {
+    // a caixinha das turbahs só no estilo shia
+    if (f.kind === 'turbah_box' && this.sim.mosque.style !== 'shia') return;
     const { ctx } = this;
     const state = this.furnState(f, now);
     const fs = furnitureSprites(this.art, f, state);

@@ -4,6 +4,8 @@
 // o popover, o aviso com o resultado ("🕌 Chamado para a oração: 7 a caminho da mesquita · 3 ocupados ficaram") e as
 // regras de quando o menu vale (fora do timelapse e da demonstração). O texto do aviso e a disponibilidade são puros
 // e testados em ui/activities.test.ts.
+import type { PrayerName } from '../../../shared/prayer-times';
+import { prayerLabel } from './settings-mosque';
 import type { SendActivity, SendActivityInfo, SendAllResult } from '../world/api';
 import type { UiComponent, UiContext } from './context';
 import { h, iconButton, setAttr, setTitle } from './dom';
@@ -59,6 +61,13 @@ export function activitiesBlocked(s: { hasApi: boolean; replay: boolean; demo: b
   return null;
 }
 
+/** Aviso do horário de uma oração; diz quando a aba estava oculta (e se o chamado ainda foi feito). Puro. */
+export function prayerTimeNotice(e: { name: PrayerName; called: boolean; hidden: boolean }): string {
+  const name = prayerLabel(e.name);
+  if (!e.hidden) return tr('🕌 {0} — hora da oração', [name]);
+  return e.called ? tr('🕌 {0} — hora da oração (a aba estava oculta no horário)', [name]) : tr('🕌 {0} — foi a hora da oração enquanto a aba estava oculta', [name]);
+}
+
 // ---------------------------------------------------------------- popover
 
 export class ActivitiesPopover implements UiComponent {
@@ -89,6 +98,12 @@ export class ActivitiesPopover implements UiComponent {
       h('p', { class: 'ui-acts__hint', text: tr('Quem está livre larga o que faz e vai junto; quem trabalha ou precisa de você fica.') }),
       this.listEl,
     );
+    // horário de uma oração (chamado automático no campus): o aviso ("🕌 Dhuhr — hora da oração")
+    ctx.world.onPrayerTime?.((e) => {
+      const text = prayerTimeNotice(e);
+      this.toast(text);
+      this.ctx.announce(text);
+    });
     this.el.addEventListener('toggle', () => {
       setAttr(this.button, 'aria-expanded', String(this.isOpen));
       this.button.classList.toggle('is-on', this.isOpen);

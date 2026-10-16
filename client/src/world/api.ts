@@ -2,6 +2,7 @@
 // Implementação: client/src/world/index.ts -> createWorld().
 // Regra: mudanças aqui devem ser ADITIVAS.
 
+import type { PrayerName } from '../../../shared/prayer-times';
 import { hijriTheme, hijriToday, type HijriDate } from './hijri';
 import type { SendActivity, SendActivityInfo, SendAllResult } from './sim/send-all';
 
@@ -129,6 +130,11 @@ export interface WorldApi {
    * ou precisa do usuário fica. null no timelapse ou se a atividade não existe aqui.
    */
   sendAll?(activity: SendActivity): SendAllResult | null;
+  /**
+   * (Opcional, aditivo) Chegou o horário de uma oração (campus, com a mesquita; sim/prayer-clock.ts): `called` = o
+   * chamado foi feito (todos os livres foram para a mesquita); `hidden` = a aba estava oculta no horário.
+   */
+  onPrayerTime?(cb: (e: { name: PrayerName; at: number; called: boolean; hidden: boolean; sent: number }) => void): () => void;
   /** (Opcional, aditivo) Sons do ambiente: teclado de quem trabalha à vista, elevador, rodas. */
   onSound?(cb: (cue: SoundCue) => void): () => void;
   destroy(): void;

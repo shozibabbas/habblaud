@@ -1,6 +1,8 @@
 // API de depuração do mundo (console: `habblaud.world.debug`), usada em testes visuais para
 // forçar cenários: sessões simuladas chegando/saindo, salas fechando, hora do dia, câmera e a
 // espera de shell (shells rodando, envelhecer a espera, terminar com sucesso/falha).
+import type { PrayerName } from '../../../shared/prayer-times';
+import { sendAll } from './sim/send-all';
 import type { Activity, AgentInfo, AgentStatus, RoomInfo, ShellJob } from '../../../shared/types';
 import { SPECIAL, type ShellOutcome } from '../../../shared/activity';
 import { hash32 } from '../../../shared/hash';
@@ -67,6 +69,8 @@ export interface WorldDebug {
   wanderNow(): void;
   /** Campus: manda agentes ociosos rezar na mesquita agora (todos os que rezam, ou só `ids`). Retorna quem foi. */
   pray(ids?: string[]): string[];
+  /** Campus: força o horário de uma oração agora (o chamado com a congregação, como no horário de verdade). */
+  prayerTime(name?: PrayerName): number;
   /**
    * Começa uma roda agora com quem estiver ocioso/esperando shell (ou com `ids`): todos voltam à mesa
    * na hora e saem juntos. Retorna os nomes dos participantes ou null.
@@ -356,6 +360,8 @@ export function createDebug(sim: Sim, renderer: Renderer, camera: Camera, onCame
     wanderNow: () => {
       for (const c of sim.chars.values()) c.nextOutingAt = 1;
     },
+
+    prayerTime: (name) => sendAll(sim, 'prayer', now(), name ? { prayer: name } : {}).sent.length,
 
     pray: (ids) => {
       const t = now();
