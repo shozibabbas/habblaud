@@ -33,7 +33,7 @@ const EAST_LINK_X = COMMONS_W + 3;
 const WEST_LINK_X = -6;
 
 /** Pavilhão (salão de jogos + descanso), logo ao norte do calçadão, alinhado com o Commons. */
-const PAV_H = 14;
+const PAV_H = 19;
 const PAV_Y = REC_WALK_Y - PAV_H;
 const HALL_W = 32;
 const REST_W = 16;
@@ -77,6 +77,7 @@ const TABLES: readonly (readonly [number, number])[] = [
   [21, 4],
   [6, 9],
   [21, 9],
+  [13, 14],
 ];
 
 export function layoutGamesHall(): AreaLayout {
@@ -109,7 +110,7 @@ export function layoutGamesHall(): AreaLayout {
   a.wall('poster', 19.5, 'rocket', { order: 0.5 });
   a.wall('poster', 1.5, 'ship_it', { order: 0.51 });
 
-  // as quatro mesas: duplas nas pontas (oeste/leste, dois por lado) e torcida ao norte e ao sul
+  // as cinco mesas: duplas nas pontas (oeste/leste, dois por lado) e torcida ao norte e ao sul
   TABLES.forEach(([lx, ly], k) => {
     const group = `pingpong:salao:${k}`;
     a.rug(lx - 2.4, ly - 1.4, 7.8, 4.8, k % 2 ? '#3f6f9a' : '#3f7d5c', 820 + k);
@@ -145,9 +146,9 @@ export function layoutGamesHall(): AreaLayout {
   (['blue', 'yellow'] as const).forEach((c, i) => a.seat('beanbag', 'beanbag', 13 + i * 3, 6, 'down', c, { order: 0.6 + i * 0.01 }));
   a.spot('talk', 14, 9, 'right', { group: 'talk:jogos', dx: -1 });
   a.spot('talk', 15, 9, 'left', { group: 'talk:jogos', dx: 1 });
-  a.furn('plant_tall', 1, 12, 'ficus', { order: 0.22 });
-  a.furn('plant_tall', 30, 12, 'bonsai', { order: 0.23 });
-  a.furn('trash_bin', 11, 12, undefined, { order: 0.6 });
+  a.furn('plant_tall', 1, PAV_H - 2, 'ficus', { order: 0.22 });
+  a.furn('plant_tall', 30, PAV_H - 2, 'bonsai', { order: 0.23 });
+  a.furn('trash_bin', 27, PAV_H - 2, undefined, { order: 0.6 });
   return a.build();
 }
 
@@ -188,8 +189,8 @@ export function layoutRestRoom(): AreaLayout {
   });
   a.furn('floor_lamp', 7, 8, undefined, { order: 0.35 });
   a.furn('plant_small', 8, 8, 'fern', { order: 0.36 });
-  a.furn('plant_tall', 1, 12, 'monstera', { order: 0.2 });
-  a.furn('plant_tall', 14, 12, 'palm', { order: 0.21 });
+  a.furn('plant_tall', 1, PAV_H - 2, 'monstera', { order: 0.2 });
+  a.furn('plant_tall', 14, PAV_H - 2, 'palm', { order: 0.21 });
   return a.build();
 }
 

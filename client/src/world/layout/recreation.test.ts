@@ -32,7 +32,7 @@ describe('faixa de recreação do campus', () => {
     const rec = layoutRecreation();
     const spots = rec.areas.flatMap((a) => a.spots);
     const tables = new Set(spots.filter((s) => s.kind === 'pingpong' && s.areaId === GAMES_ID).map((s) => s.group));
-    expect(tables.size).toBe(4);
+    expect(tables.size).toBe(5);
     for (const g of tables) expect(spots.filter((s) => s.group === g)).toHaveLength(4);
     expect(spots.filter((s) => s.kind === 'pod' && s.areaId === REST_ID).length).toBeGreaterThanOrEqual(8);
     expect(spots.filter((s) => s.kind === 'tennis' && s.areaId === COURT_ID)).toHaveLength(4);
