@@ -10,6 +10,7 @@
 // dois concordam sobre onde o dia começa e termina.
 import type { AgentInfo, AgentStatus } from './types';
 import { tr } from './i18n';
+import { roomFolderOf } from './rooms';
 
 export const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -776,8 +777,10 @@ function aggOf(map: Map<string, Agg>, key: string): Agg {
   return a;
 }
 
+/** Nome de reserva da sala (sem o nome gravado): o da pasta; numa sala de sessão, sem o "#<sessão>" (shared/rooms.ts). */
 function basename(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+  const folder = roomFolderOf(path);
+  return folder.split(/[\\/]/).filter(Boolean).pop() ?? folder;
 }
 
 /**

@@ -10,6 +10,13 @@ do meio (0.**3**.0).
 
 ## [Não lançado]
 
+### Adicionado
+
+- `HABBLAUD_ROOMS=auto`: quando várias sessões dividem a mesma pasta (o Remote Control abre todas na mesma), cada uma
+  ganha a sua sala, com o nome tirado do título da sessão ("Product: Training of Sales"). `session` dá sempre uma sala
+  por sessão; `folder`, o padrão, continua como antes. Renomear, personagem e escritório combinado valem para essas
+  salas também.
+
 ## [0.11.0] - 2026-10-13
 
 Para atualizar: `git pull` e `npm run docker:up` (ele também atualiza o mod do Habblaud nas contas). O acesso pelo

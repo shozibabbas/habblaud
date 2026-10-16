@@ -163,6 +163,30 @@ describe('federation: escritório combinado', () => {
     fed.stop();
   });
 
+  it('salas de sessão do par (HABBLAUD_ROOMS): id com prefixo, etiqueta da máquina, vaga própria e dono para renomear', async () => {
+    const peer = fakePeer();
+    const fed = new Federation({ machineName: 'Mac', peers: [{ id: 'srv1', name: 'srv1', url: 'http://p:1' }], request: peer.request });
+    fed.start();
+    await tick();
+    const split = (id: string, slot: number, name: string): RoomInfo => ({ ...room(id, slot, name), path: '/srv', sessionId: id.split('#')[1], defaultName: name });
+    peer.send(
+      'snapshot',
+      snap([split('/srv#s1', 0, 'Product: Training of Sales'), split('/srv#s2', 1, 'Kimai VA Check-In')], [agent('.claude:1', '/srv#s1'), agent('.claude:2', '/srv#s2')]),
+    );
+    await tick();
+    const m = fed.merge(snap([room('/Users/me/app', 0)], []), true);
+    expect(m.snapshot.rooms.map((r) => [r.id, r.name, r.baseName, r.path, r.slot])).toEqual([
+      ['/Users/me/app', 'Mac · app', 'app', '/Users/me/app', 0],
+      ['srv1~/srv#s1', 'srv1 · Product: Training of Sales', 'Product: Training of Sales', '/srv', 1],
+      ['srv1~/srv#s2', 'srv1 · Kimai VA Check-In', 'Kimai VA Check-In', '/srv', 2],
+    ]);
+    expect(m.snapshot.rooms[1]).toMatchObject({ sessionId: 's1', defaultName: 'Product: Training of Sales' });
+    expect(m.snapshot.agents.map((a) => a.roomId)).toEqual(['srv1~/srv#s1', 'srv1~/srv#s2']);
+    // Renomear separa no primeiro '~': o '#' fica no id que volta ao par.
+    expect(fed.owner('srv1~/srv#s2')).toMatchObject({ peer: { id: 'srv1' }, id: '/srv#s2' });
+    fed.stop();
+  });
+
   it('feed sem repetir o que a reconexão reenvia; avisos com a máquina', async () => {
     const peer = fakePeer();
     const fed = new Federation({ machineName: 'Mac', peers: [{ id: 'srv', name: 'srv', url: 'http://p:1' }], request: peer.request });

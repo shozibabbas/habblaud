@@ -57,7 +57,8 @@ external calls.
 
 **Overview.** The building has a lobby with elevators, a kitchen, restrooms and a lounge; each project with an open
 session gets its own room along the hallway. At the top, the counters and each account's usage; on the left, the rooms
-and agents; at the bottom, the activity feed.
+and agents; at the bottom, the activity feed. When several sessions share one folder (Remote Control starts them all in
+the same one), `HABBLAUD_ROOMS=auto` gives each of them its own room, named after the session's title.
 
 ![Habblaud overview: building with lobby, kitchen, restrooms, lounge and project rooms; sidebar with rooms and agents; account usage at the top; activity feed at the bottom](docs/screenshots/overview.png)
 
@@ -577,7 +578,8 @@ agent's details and click the pencil next to the name (**Edit character**). In t
 - **Randomize:** brings up another look.
 - **Pieces:** skin, hair, beard, eyes, top, bottom, shoes and accessory, with a preview next to them.
 - **Save:** applies to the project (the room). The next session opened in it arrives as this character. With two sessions
-  at the same time in the same room, the second one gets a random character.
+  at the same time in the same room, the second one gets a random character. With `HABBLAUD_ROOMS=auto` or `session`, a
+  session's own room keeps the character it saved, and uses the folder's character when it has none.
 - **Back to random:** undoes the choice.
 
 The choice is stored in `~/.habblaud/names.json` and goes away after 60 days without the project being used. The editor has the same safeguard as the
@@ -815,6 +817,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_PEERS` | — | Combined office: other Habblauds to show in this one, `id=http://host:port` separated by commas (ids: lowercase letters, digits and `-`). See [Combined office](#combined-office-preview). |
 | `HABBLAUD_MACHINE_NAME` | hostname | This computer's name in the combined office. |
 | `HABBLAUD_NAMES` | `br` | Name set for the characters: `br` (Brazilian) or `pk` (Pakistani). Characters that already had a name from the other set get a new one. `pk` also gives the characters a Pakistani look (skin, hair, eyes, beards, hairstyles and clothes); in a combined office each machine keeps its own. Try it with the mock: `?mock=1&names=pk`. |
+| `HABBLAUD_ROOMS` | `folder` | How rooms are made: `folder` (one room per project folder), `auto` (when two or more sessions share a folder, each session gets its own room, named from its title, e.g. "Product: Training of Sales"; a folder with a single session keeps its folder room) or `session` (always one room per session). Subagents stay in their parent's room. In `auto`, a session that is left alone keeps its room until it ends, so rooms don't move every time a session opens or closes. The name comes from the session's title (Claude Code's or its first prompt, shortened on this computer; nothing is sent anywhere), otherwise the folder name plus a number ("srv 2"). Renaming a session room keeps that name while the session lives (`rooms.json`); a character saved in it stays with that room, and a session room with no character of its own uses the folder's. In My day, each session room is its own line. |
 | `HABBLAUD_OWNER` | — | Optional starting value for the office owner, who is normally set in **Settings › Office owner** (see [Executive suite](#executive-suite-combined-office)). JSON: `name`, optional `title` (default `CEO`), `look` (`f` or `m`), optional `parts` (the same fields as the character editor) and an optional `secretary` with `name`, `look` and `parts`. Only used until the owner is saved or removed in Settings (`owner.json` in the data folder then wins). Anything malformed ignores the whole value with a line in the log. Try the suite with the mock: `?mock=1&machines=4&owner=1`. |
 | `HABBLAUD_TERMINAL` | on (local access only) | `0` turns off the terminal, answering and sending messages from the office, and the character editor. With the port exposed they're already off, with no way to turn them on. |
 | `HABBLAUD_PTY` | off | `1` turns on the interactive terminal (open, take over and end Claude Code sessions from the office; local access only and outside Docker) and **New agent** (also in Docker, through `npm run codex:bridge`). Read the warning in [Privacy and security](#privacy-and-security). |
@@ -828,7 +831,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_LANG` | system language (except English), otherwise `pt-BR` | Language of the texts the server builds (activities, notices, logs): `pt-BR`, `en`, `es` or `fr`. The interface follows the browser or the choice in Settings › Language. See [Languages](#languages). |
 | `HABBLAUD_ACCOUNTS` | — | JSON to customize name, letter or color, matched by the account folder name. E.g. `[{"id":".claude-conta2","name":"Trabalho","short":"T","color":"#5cc97b"}]`. |
 
-**In Docker**, `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_FRAME_ANCESTORS`, `HABBLAUD_PEERS`, `HABBLAUD_MACHINE_NAME`, `HABBLAUD_NAMES`, `HABBLAUD_OWNER`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
+**In Docker**, `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_FRAME_ANCESTORS`, `HABBLAUD_PEERS`, `HABBLAUD_MACHINE_NAME`, `HABBLAUD_NAMES`, `HABBLAUD_ROOMS`, `HABBLAUD_OWNER`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
 `HABBLAUD_MENSAGENS`, `HABBLAUD_CODEX`, `HABBLAUD_UPDATE_CHECK`, `HABBLAUD_LANG`, `HABBLAUD_PTY` and the
 `HABBLAUD_REMOTE_*` apply (in `.env` or in the environment), as do `HABBLAUD_CLAUDE_DIRS`, `HABBLAUD_CODEX_DIRS`, `HABBLAUD_USAGE_DIR` and
 `HABBLAUD_ACCOUNTS` (read by `docker:up` on the host); the rest are fixed inside the container. Options: `npm run docker:up -- --no-build` (starts without rebuilding),
@@ -887,7 +890,7 @@ mod/      o mod do Habblaud e os plugins de permissões e de mensagens (plugins 
 | `GET /api/timeline/:dia` | A day's timeline (`AAAA-MM-DD`), in JSONL (gzipped). |
 | `GET /api/health` | Health: version, demo, Docker, terminal, answering and sending messages from the office, sources and usage status of each account. |
 | `POST /api/demo` | `{"enabled": true \| false}` turns the simulated agents on or off. |
-| `POST /api/rooms/rename` | `{"id": sala, "name": nome}` renames the room (empty goes back to the folder name); the name is stored in `rooms.json`, in the data folder. Local access only. |
+| `POST /api/rooms/rename` | `{"id": sala, "name": nome}` renames the room (empty goes back to the folder name, or to the title-based name for a session room); the name is stored in `rooms.json`, in the data folder (by folder, or by room id for a session room, forgotten after 60 days unused). Local access only. |
 | `GET /api/mod/summary` | For the Claude Code mod: version, how many agents, how many are working and who needs you (without the demo and, with `?account=&session=`, without its own session). |
 | `/api/permissions…` | Answering from the office: the permission hook registers the request (permission or question) and waits; the page fetches the details and decides or answers. Local access only. |
 | `/api/messages…` and `/api/mod/inbox…` | Sending messages: the page puts the message in the queue and follows its delivery; the `habblaud-mensagens` plugin fetches it, delivers it to the session and confirms. Local access only. |

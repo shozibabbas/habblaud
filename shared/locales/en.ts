@@ -2675,6 +2675,10 @@ export const EN: Readonly<Record<string, string>> = {
   "dono do escritório: campo \"{0}\" fora do formato": "office owner: field \"{0}\" is malformed",
   "campo \"{0}\" fora do formato": "field \"{0}\" is malformed",
   "owner.json ilegível ({0}); vale o HABBLAUD_OWNER, se houver.": "owner.json is unreadable ({0}); HABBLAUD_OWNER applies, if set.",
+  "   HABBLAUD_ROOMS: \"{0}\" ignorado (use folder, auto ou session); salas por pasta.": "   HABBLAUD_ROOMS: \"{0}\" ignored (use folder, auto or session); one room per folder.",
+  "   Salas: {0} (HABBLAUD_ROOMS).": "   Rooms: {0} (HABBLAUD_ROOMS).",
+  "uma por sessão quando várias dividem a pasta": "one per session when several share a folder",
+  "uma por sessão": "one per session",
   "   HABBLAUD_OWNER ignorado: campo \"{0}\" fora do formato (veja Configuração no README).": "   HABBLAUD_OWNER ignored: field \"{0}\" is malformed (see Configuration in the README).",
   "   Diretoria: {0} ({1}), no campus do escritório combinado.": "   Executive suite: {0} ({1}), on the combined office campus.",
   // menu Atividades (chamar todo mundo)

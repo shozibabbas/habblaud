@@ -70,7 +70,8 @@ export class RoomRenamer {
     // No escritório combinado o nome vem com a etiqueta da máquina ("Mac · repo"): renomeia-se só a sala.
     this.original = room.baseName ?? room.name;
     this.input.value = this.original;
-    setText(this.hint, tr('Enter salva · Esc cancela · vazio volta a “{0}”', [room.path.split(/[\\/]/).filter(Boolean).pop() ?? room.path]));
+    // Sala de sessão (HABBLAUD_ROOMS): vazio volta ao nome automático dela, não ao da pasta.
+    setText(this.hint, tr('Enter salva · Esc cancela · vazio volta a “{0}”', [room.defaultName ?? room.path.split(/[\\/]/).filter(Boolean).pop() ?? room.path]));
     this.hint.classList.remove('is-error');
     this.el.hidden = false;
     const w = this.el.offsetWidth || 260;

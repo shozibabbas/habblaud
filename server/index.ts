@@ -100,6 +100,9 @@ const office = new Office({
   nameSet: config.nameSet,
   owner: () => owner.get(),
   roomAlias: (path) => roomAliases.get(path),
+  rooms: config.rooms,
+  sessionRoomAlias: (id) => roomAliases.getSession(id),
+  followSessionRoom: (from, to) => roomAliases.followSession(from, to),
   version: config.version,
   // No modo dev o Vite serve o cliente direto do código-fonte: não há build para comparar.
   build: config.dev ? undefined : createBuildReader(config.rootDir),
@@ -307,7 +310,9 @@ const api = createApiHandler({
   renameRoom: (id, name) => {
     const path = office.roomPath(id);
     if (!path) return undefined;
-    roomAliases.set(path, name);
+    // Sala de sessão (HABBLAUD_ROOMS=auto/session): o nome é dela, pelo id; a sala da pasta continua com o da pasta.
+    if (office.isSessionRoom(id)) roomAliases.setSession(id, name);
+    else roomAliases.set(path, name);
     office.refreshRoomNames();
     return office.roomName(id);
   },
@@ -479,6 +484,8 @@ server.listen(config.port, config.host, () => {
   for (const item of config.frameAncestorsInvalid) log.warn(tr('   HABBLAUD_FRAME_ANCESTORS: "{0}" ignorado (use http(s)://host[:porta], sem caminho nem *).', [item]));
   if (config.frameAncestors.length) log.info(tr('   Pode ser embutido em: {0}.', [config.frameAncestors.join(' ')]));
   for (const item of config.peersInvalid) log.warn(tr('   HABBLAUD_PEERS: "{0}" ignorado (use id=http://host:porta; id com letras minúsculas, números e -).', [item]));
+  if (config.roomsInvalid) log.warn(tr('   HABBLAUD_ROOMS: "{0}" ignorado (use folder, auto ou session); salas por pasta.', [config.roomsInvalid]));
+  if (config.rooms !== 'folder') log.info(tr('   Salas: {0} (HABBLAUD_ROOMS).', [config.rooms === 'auto' ? tr('uma por sessão quando várias dividem a pasta') : tr('uma por sessão')]));
   if (config.ownerInvalid) log.warn(tr('   HABBLAUD_OWNER ignorado: campo "{0}" fora do formato (veja Configuração no README).', [config.ownerInvalid]));
   const boss = owner.get();
   if (boss) log.info(tr('   Diretoria: {0} ({1}), no campus do escritório combinado.', [boss.name, boss.title ?? 'CEO']));

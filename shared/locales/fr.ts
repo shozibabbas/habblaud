@@ -2691,6 +2691,10 @@ export const FR: Readonly<Record<string, string>> = {
   "dono do escritório: campo \"{0}\" fora do formato": "propriétaire du bureau : le champ \"{0}\" n'est pas au bon format",
   "campo \"{0}\" fora do formato": "le champ \"{0}\" n'est pas au bon format",
   "owner.json ilegível ({0}); vale o HABBLAUD_OWNER, se houver.": "owner.json illisible ({0}) ; HABBLAUD_OWNER s'applique, s'il est défini.",
+  "   HABBLAUD_ROOMS: \"{0}\" ignorado (use folder, auto ou session); salas por pasta.": "   HABBLAUD_ROOMS : \"{0}\" ignoré (utilisez folder, auto ou session) ; une salle par dossier.",
+  "   Salas: {0} (HABBLAUD_ROOMS).": "   Salles : {0} (HABBLAUD_ROOMS).",
+  "uma por sessão quando várias dividem a pasta": "une par session quand plusieurs partagent le dossier",
+  "uma por sessão": "une par session",
   "   HABBLAUD_OWNER ignorado: campo \"{0}\" fora do formato (veja Configuração no README).": "   HABBLAUD_OWNER ignoré : le champ \"{0}\" n'est pas au bon format (voir Configuration dans le README).",
   "   Diretoria: {0} ({1}), no campus do escritório combinado.": "   Direction : {0} ({1}), sur le campus du bureau combiné.",
   // menu Atividades (chamar todo mundo)
