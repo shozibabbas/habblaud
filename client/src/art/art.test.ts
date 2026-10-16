@@ -3,9 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import { ACCESSORIES, BOTTOM_STYLES, FACIAL_HAIR, HAIR_STYLES, PART_KEYS, TOP_STYLES } from '../../../shared/appearance';
 import { FURNITURE, TILE, type Accessory, type Appearance, type Dir, type FloorKind, type FurnitureKind, type HairStyle, type HeldItem, type Pose, type ScreenMode, type TopStyle, type WallPattern } from './api';
-import { appearanceFromSeed, appearanceKey, editorConflict, editorOptions, fitToOptions } from './character/appearance';
+import { appearanceFromSeed, appearanceKey, editorConflict, editorOptions, fitToOptions, suitShirt } from './character/appearance';
 import { HAIR, HEAD_BASE } from './character/hair';
-import { CHAR_AX, CHAR_AY, CHAR_H, CHAR_W, POSE_DURATION, POSE_FRAMES, isSeated, renderCharacter } from './character/render';
+import { CHAR_AX, CHAR_AY, CHAR_H, CHAR_W, POSE_DURATION, POSE_FRAMES, SEAT_DROP, isSeated, renderCharacter } from './character/render';
 import { ramp, shade } from './core/color';
 import { isPrayerPose, PRAYER_AX, PRAYER_W } from './character/prayer';
 import { PixelBuf } from './core/pixbuf';
@@ -1022,5 +1022,131 @@ describe('roupas do sul da Ásia, hijab, topi, dupatta e trança', () => {
       expect(a.hairStyle).not.toBe('braid');
       expect(a.bottomStyle).not.toBe('shalwar');
     }
+  });
+});
+
+describe('terno, headset e ligações', () => {
+  const base = appearanceFromSeed(9, { look: 'm' });
+  const suit: Appearance = {
+    ...base, skin: '#bd8560', hairStyle: 'side_part', hair: '#2b2530', facialHair: 'beard', topStyle: 'suit', top: '#3d4352',
+    topAccent: '#c0392b', bottom: '#3d4352', bottomStyle: 'pants', accessory: 'glasses', accessoryColor: '#2b2b33', lanyard: null,
+  };
+  const headset: Appearance = { ...suit, accessory: 'headset', accessoryColor: '#aeb4bd' };
+  const BOOM = '#8f96a3';
+  const RIM = '#9ba4b6';
+  const NEW_POSES: Pose[] = ['phone', 'phone_walk', 'type_stand'];
+  const draw = (a: Appearance, pose: Pose, dir: Dir, frame = 0, seated = false) => renderCharacter({ appearance: a, dir, pose, frame, seated }).buf;
+
+  it('renderizam em todas as poses × direções × quadros, em pé e sentado', () => {
+    for (const a of [suit, headset, { ...headset, topStyle: 'suit' as const, bottomStyle: 'skirt' as const, look: 'f' as const, hairStyle: 'long' as const }]) {
+      for (const pose of POSES) {
+        for (const dir of DIRS) {
+          for (let frame = 0; frame < POSE_FRAMES[pose]; frame++) {
+            for (const seated of [false, true]) {
+              const s = renderCharacter({ appearance: a, dir, pose, frame, seated });
+              expect(s.buf.countOpaque(), `${a.accessory}/${pose}/${dir}`).toBeGreaterThan(150);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('terno: camisa clara (da cor da gravata) e gravata no V do paletó, de frente e de perfil; de costas, a gola da camisa', () => {
+    expect(suitShirt('#c0392b')).toBe('#d3e3f4');
+    expect(suitShirt('#d9a42e')).toBe('#f4f4f0');
+    // De perfil o braço cobre metade do colarinho: sobra o tom claro da camisa.
+    for (const [dir, shirt] of [['down', '#d3e3f4'], ['left', ramp('#d3e3f4', 0.06).hi]] as const) {
+      const b = draw(suit, 'stand', dir);
+      expect(countColor(b, shirt), dir).toBeGreaterThan(0);
+      expect(countColor(b, '#c0392b'), dir).toBeGreaterThan(0);
+    }
+    expect(countColor(draw(suit, 'stand', 'up'), '#c0392b')).toBe(0);
+    // Mesmo tronco que a camisa com gravata não tem: o paletó cobre o peito.
+    const shirt = draw({ ...suit, topStyle: 'shirt_tie', top: '#d3e3f4' }, 'stand', 'down');
+    expect(digest(shirt.data)).not.toBe(digest(draw(suit, 'stand', 'down').data));
+  });
+
+  it('headset: diferente do fone comum, com a haste do microfone de frente e de perfil', () => {
+    for (const dir of DIRS) {
+      const h = draw(headset, 'stand', dir);
+      expect(digest(h.data), dir).not.toBe(digest(draw({ ...headset, accessory: 'headphones' }, 'stand', dir).data));
+      expect(countColor(h, BOOM), dir).toBeGreaterThan(dir === 'up' ? 0 : 3);
+    }
+    // A haste chega perto da boca (de frente, abaixo dos olhos e à esquerda do centro).
+    expect(countColor(draw(headset, 'stand', 'down').crop(5, 15, 5, 2), BOOM)).toBeGreaterThan(0);
+  });
+
+  it("frames e durações; 'phone' senta quando pedido, 'phone_walk' e 'type_stand' são sempre em pé", () => {
+    expect(POSE_FRAMES.phone).toBe(3);
+    expect(POSE_FRAMES.phone_walk).toBe(4);
+    expect(POSE_FRAMES.type_stand).toBe(4);
+    for (const pose of NEW_POSES) expect(POSE_DURATION[pose]).toBeGreaterThan(100);
+    expect(isSeated('phone', true)).toBe(true);
+    expect(isSeated('phone', false)).toBe(false);
+    expect(isSeated('phone_walk', true)).toBe(false);
+    expect(isSeated('type_stand', true)).toBe(false);
+  });
+
+  it('animam (quadros diferentes) e são determinísticas', () => {
+    for (const pose of NEW_POSES) {
+      for (const dir of DIRS) {
+        const frames = Array.from({ length: POSE_FRAMES[pose] }, (_, f) => digest(draw(suit, pose, dir, f).data));
+        expect(new Set(frames).size, `${pose}/${dir}`).toBeGreaterThan(1);
+        expect(digest(draw(suit, pose, dir, 1).data)).toBe(frames[1]);
+      }
+    }
+  });
+
+  it('ao celular: aparelho na orelha (acima do queixo) em todas as direções, em pé, sentado e andando', () => {
+    for (const dir of DIRS) {
+      for (const [pose, seated] of [['phone', false], ['phone', true], ['phone_walk', false]] as const) {
+        for (let f = 0; f < POSE_FRAMES[pose]; f++) {
+          const b = draw(suit, pose, dir, f, seated);
+          expect(countColor(b.crop(0, 0, CHAR_W, 15 + (seated ? SEAT_DROP : 0)), RIM), `${pose}/${dir}/${f}/${seated}`).toBeGreaterThan(1);
+        }
+      }
+      // Um item na mão não muda a pose (o celular já está na orelha).
+      expect(renderCharacter({ appearance: suit, dir, pose: 'phone', frame: 0, held: 'coffee' }).buf.data).toEqual(draw(suit, 'phone', dir, 0).data);
+    }
+  });
+
+  it("'type_stand': em pé (cabeça na altura de 'stand') com os braços de 'type'", () => {
+    for (const dir of DIRS) {
+      const top = (b: PixelBuf) => b.bounds()!.y;
+      expect(top(draw(suit, 'type_stand', dir)), dir).toBe(top(draw(suit, 'stand', dir)));
+      expect(top(draw(suit, 'type', dir)), dir).toBeGreaterThan(top(draw(suit, 'type_stand', dir)));
+    }
+  });
+
+  it('peso 0 no padrão; no perfil pk, alguns homens de terno (calça da cor do paletó) e ninguém de headset', () => {
+    for (let i = 0; i < 3000; i++) {
+      const a = appearanceFromSeed(i);
+      expect(a.topStyle).not.toBe('suit');
+      expect(a.accessory).not.toBe('headset');
+    }
+    const men = Array.from({ length: 4000 }, (_, i) => appearanceFromSeed(i, { look: 'm', profile: 'pk' }));
+    const suits = men.filter((a) => a.topStyle === 'suit');
+    expect(suits.length / men.length).toBeGreaterThan(0.01);
+    expect(suits.length / men.length).toBeLessThan(0.06);
+    for (const a of suits) {
+      expect(a.bottomStyle).toBe('pants');
+      expect(a.bottom).toBe(a.top);
+      const o = editorOptions(a);
+      for (const k of PART_KEYS) expect(o[k], k).toContain(a[k]);
+    }
+    expect(men.some((a) => a.accessory === 'headset')).toBe(false);
+    const women = Array.from({ length: 4000 }, (_, i) => appearanceFromSeed(i, { look: 'f', profile: 'pk' }));
+    expect(women.some((a) => a.topStyle === 'suit' || a.accessory === 'headset')).toBe(false);
+  });
+
+  it('editor: paletas do terno e do headset, sem conflito com cabelo', () => {
+    const o = editorOptions(suit);
+    expect(o.top).toContain('#3d4352');
+    expect(o.topAccent).toEqual(['#c0392b', '#7b2d44', '#2f4c7d', '#d9a42e', '#2e7d4f']);
+    for (const c of o.top) expect(o.bottom).toContain(c);
+    expect(editorOptions(headset).accessoryColor).toEqual(['#2b2b33', '#aeb4bd', '#f1efe9']);
+    expect(editorConflict({ ...suit, hairStyle: 'afro' }, 'accessory', 'headset')).toBeUndefined();
+    expect(fitToOptions({ ...suit, topAccent: '#e2604f' }).topAccent).toBe('#c0392b');
   });
 });

@@ -6,12 +6,12 @@ export const HAIR_STYLES = [
   'short', 'buzz', 'spiky', 'side_part', 'curly', 'afro', 'bob', 'long', 'ponytail', 'bun', 'pigtails', 'mohawk', 'bald', 'wavy', 'braid',
 ] as const;
 export const TOP_STYLES = [
-  'tshirt', 'hoodie', 'shirt_tie', 'sweater', 'jacket', 'blouse', 'polo', 'kurta', 'shalwar_kameez', 'kurta_waistcoat',
+  'tshirt', 'hoodie', 'shirt_tie', 'sweater', 'jacket', 'blouse', 'polo', 'kurta', 'shalwar_kameez', 'kurta_waistcoat', 'suit',
 ] as const;
 export const ACCESSORIES = [
-  'none', 'glasses', 'sunglasses', 'headphones', 'cap', 'beanie', 'earrings', 'bow', 'dupatta', 'hijab', 'topi',
+  'none', 'glasses', 'sunglasses', 'headphones', 'cap', 'beanie', 'earrings', 'bow', 'dupatta', 'hijab', 'topi', 'headset',
 ] as const;
-export const FACIAL_HAIR = ['none', 'stubble', 'beard', 'mustache', 'goatee'] as const;
+export const FACIAL_HAIR = ['none', 'stubble', 'beard', 'mustache', 'goatee', 'short_beard'] as const;
 export const BOTTOM_STYLES = ['pants', 'shorts', 'skirt', 'shalwar'] as const;
 
 /** Peças escolhidas no editor, aplicadas por cima da aparência sorteada pela `seed`. Cores em `#rrggbb`. */

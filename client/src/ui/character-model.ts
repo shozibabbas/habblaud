@@ -86,13 +86,17 @@ const STYLE_LABELS: Partial<Record<PartKey, Readonly<Record<string, string>>>> =
   topStyle: {
     tshirt: tr('Camiseta'), hoodie: tr('Moletom'), shirt_tie: tr('Camisa e gravata'), sweater: tr('Suéter'), jacket: tr('Jaqueta'),
     blouse: tr('Blusa'), polo: 'Polo', kurta: 'Kurta', shalwar_kameez: 'Shalwar kameez', kurta_waistcoat: tr('Kurta e colete'),
+    suit: tr('Terno'),
   },
   bottomStyle: { pants: tr('Calça'), shorts: tr('Bermuda'), skirt: tr('Saia'), shalwar: 'Shalwar' },
   accessory: {
     none: tr('Nenhum'), glasses: tr('Óculos'), sunglasses: tr('Óculos escuros'), headphones: tr('Fone'), cap: tr('Boné'), beanie: tr('Gorro'),
     earrings: tr('Brincos'), bow: tr('Laço'), dupatta: 'Dupatta', hijab: 'Hijab', topi: 'Topi',
+    headset: tr('Headset com microfone'),
   },
-  facialHair: { none: tr('Sem barba'), stubble: tr('Por fazer'), beard: tr('Barba'), mustache: tr('Bigode'), goatee: tr('Cavanhaque') },
+  facialHair: { none: tr('Sem barba'), stubble: tr('Por fazer'), beard: tr('Barba'), mustache: tr('Bigode'), goatee: tr('Cavanhaque'),
+    short_beard: tr('Barba curta'),
+  },
 };
 
 /** Rótulo em português de um estilo (cabelo, roupa, acessório...). */

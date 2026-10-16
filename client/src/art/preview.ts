@@ -26,13 +26,14 @@ const DIRS: readonly Dir[] = ['down', 'left', 'up', 'right'];
 const DIR_PT: Record<Dir, string> = { down: 'baixo', left: 'esquerda', up: 'cima', right: 'direita' };
 const POSES: readonly Pose[] = [
   'stand', 'walk', 'run', 'sit', 'type', 'sleep', 'drink', 'use', 'raise_hand', 'talk', 'stretch', 'read', 'play', 'wait',
-  'cheer', 'laugh', 'game', 'rps', 'groom', 'sulk',
+  'cheer', 'laugh', 'game', 'rps', 'groom', 'sulk', 'phone', 'phone_walk', 'type_stand',
 ];
 const POSE_PT: Record<Pose, string> = {
   stand: 'parado', walk: 'andando', run: 'correndo', sit: 'sentado', type: 'digitando', sleep: 'cochilando', drink: 'bebendo',
   use: 'usando máquina', raise_hand: 'mão levantada', talk: 'conversando', stretch: 'espreguiçando', read: 'lendo', play: 'ping-pong',
   wait: 'esperando', cheer: 'comemorando', laugh: 'gargalhando', game: 'videogame', rps: 'jokenpô', groom: 'no espelho', sulk: 'chateado',
   takbir: 'takbir', qiyam: 'qiyam', ruku: 'ruku', sujood: 'sujood', jalsa: 'jalsa', salam: 'salam', wudu: 'ablução',
+  phone: 'ao celular', phone_walk: 'andando ao celular', type_stand: 'digitando em pé',
 };
 /** Poses que sempre são sentadas (as demais podem ser em pé ou sentadas). */
 const SEATED_POSES: readonly Pose[] = ['sit', 'type', 'sleep', 'wait'];
@@ -616,6 +617,41 @@ function southAsian(): void {
   }, '#dfe3e8');
 }
 
+function suitAndCalls(): void {
+  const s = section('terno', 'Terno, headset e ligações', 'Terno (paletó, camisa clara que sai da gravata, gravata de bolinhas) em várias cores; headset com microfone de haste; ao celular em pé, sentado e andando; digitando em pé na mesa alta (de costas, como em type).');
+  const looks: { seed: number; look: 'f' | 'm'; parts: AppearanceParts }[] = [
+    { seed: 21, look: 'm', parts: { topStyle: 'suit', top: '#3d4352', topAccent: '#c0392b', bottom: '#3d4352', skin: '#bd8560', hairStyle: 'side_part', hair: '#2b2530', facialHair: 'short_beard', accessory: 'glasses', accessoryColor: '#2b2b33' } },
+    { seed: 22, look: 'm', parts: { topStyle: 'suit', top: '#3d4352', topAccent: '#c0392b', bottom: '#3d4352', skin: '#bd8560', hairStyle: 'side_part', hair: '#2b2530', facialHair: 'short_beard', accessory: 'headset', accessoryColor: '#2b2b33' } },
+    { seed: 23, look: 'm', parts: { topStyle: 'suit', top: '#2e3e5e', topAccent: '#d9a42e', bottom: '#2e3e5e', skin: '#d69f78', hairStyle: 'short', facialHair: 'mustache', accessory: 'none' } },
+    { seed: 24, look: 'f', parts: { topStyle: 'suit', top: '#6d7480', topAccent: '#7b2d44', bottom: '#6d7480', bottomStyle: 'skirt', skin: '#eab894', hairStyle: 'bun', accessory: 'headset', accessoryColor: '#aeb4bd' } },
+    { seed: 25, look: 'f', parts: { topStyle: 'polo', accessory: 'headset', accessoryColor: '#f1efe9', hairStyle: 'long', skin: '#9a6444' } },
+  ];
+  const cw = 30;
+  const ch = 42;
+  const cols: { pose: Pose; seated?: boolean }[] = [
+    { pose: 'stand' }, { pose: 'phone' }, { pose: 'phone_walk' }, { pose: 'phone', seated: true }, { pose: 'type_stand' },
+  ];
+  canvas(s, cw * (DIRS.length * 2 + 4) + 8, ch * looks.length, (ctx, t) => {
+    looks.forEach((l, row) => {
+      const a = art.appearanceFromSeed(l.seed, { look: l.look, parts: l.parts });
+      const y = row * ch + 36;
+      DIRS.forEach((dir, k) => blit(ctx, art.characterSprite({ appearance: a, dir, pose: 'walk', frame: frameOf('walk', t, row * 70) }), k * cw + cw / 2, y));
+      cols.forEach((c, j) => {
+        const x = (DIRS.length + j) * cw + cw / 2;
+        const dir: Dir = c.pose === 'type_stand' ? 'up' : (['down', 'left', 'down', 'down', 'up'] as const)[j];
+        const frame = frameOf(c.pose, t, row * 90);
+        if (c.seated) {
+          const f = art.furnitureSprites('office_chair_front', 'black');
+          blit(ctx, f.base, x, y);
+          blit(ctx, art.characterSprite({ appearance: a, dir, pose: c.pose, frame, seated: true }), x, y - SEAT_FOOT_DY);
+        } else blit(ctx, art.characterSprite({ appearance: a, dir, pose: c.pose, frame }), x, y);
+      });
+      const av = art.avatarCanvas(l.seed, { look: l.look, parts: l.parts, scale: 1 });
+      ctx.drawImage(av, (DIRS.length + cols.length) * cw + 4, row * ch + 8);
+    });
+  }, '#dfe3e8');
+}
+
 function poses(): void {
   const s = section('poses', 'Poses × direções', 'Todas as poses do contrato, animadas. Poses sentadas sobre cadeira de escritório (de costas) e cadeira frontal (de frente), como o mundo posiciona.');
   const cw = 30;
@@ -637,6 +673,7 @@ function poses(): void {
     { pose: 'sulk', seated: true },
     { pose: 'read', seated: false, held: 'phone' },
     { pose: 'sit', seated: true, held: 'phone' },
+    { pose: 'phone', seated: true },
   ];
   const a = art.appearanceFromSeed(2024, { look: 'f', sub: true });
   const b = art.appearanceFromSeed(77, { look: 'm' });
@@ -936,6 +973,7 @@ socialLife();
 characters();
 characters('pk');
 southAsian();
+suitAndCalls();
 poses();
 heldItems();
 furniture();

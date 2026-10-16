@@ -5,7 +5,7 @@ import type { Appearance, CharacterFrameRequest, HeldItem, Pose } from '../api';
 import { luminance, mix, ramp, shade, type Ramp } from '../core/color';
 import { PixelBuf, type Palette } from '../core/pixbuf';
 import type { BufSprite } from '../core/sprite';
-import { LONG_TOPS } from './appearance';
+import { LONG_TOPS, suitShirt } from './appearance';
 import { HAIR, HEAD_BASE, TEXTURED, type HeadView, type Tpl } from './hair';
 import { isPrayerPose, renderPrayer } from './prayer';
 
@@ -22,19 +22,20 @@ export const SEAT_DROP = 4;
 export const POSE_FRAMES: Readonly<Record<Pose, number>> = {
   stand: 2, walk: 4, run: 4, sit: 2, type: 4, sleep: 2, drink: 2, use: 2, raise_hand: 2, talk: 2, stretch: 2,
   read: 2, play: 2, wait: 2, cheer: 2, laugh: 2, game: 2, rps: 2, groom: 2, sulk: 2,
-  takbir: 1, qiyam: 1, ruku: 1, sujood: 1, jalsa: 1, salam: 2, wudu: 2,
+  takbir: 1, qiyam: 1, ruku: 1, sujood: 1, jalsa: 1, salam: 2, wudu: 2, phone: 3, phone_walk: 4, type_stand: 4,
 };
 
 export const POSE_DURATION: Readonly<Record<Pose, number>> = {
   stand: 650, walk: 140, run: 95, sit: 800, type: 120, sleep: 1000, drink: 700, use: 380, raise_hand: 320, talk: 280,
   stretch: 800, read: 1100, play: 200, wait: 480, cheer: 260, laugh: 190, game: 150, rps: 300, groom: 420, sulk: 1300,
-  takbir: 1000, qiyam: 1000, ruku: 1000, sujood: 1000, jalsa: 1000, salam: 1300, wudu: 700,
+  takbir: 1000, qiyam: 1000, ruku: 1000, sujood: 1000, jalsa: 1000, salam: 1300, wudu: 700, phone: 420, phone_walk: 170,
+  type_stand: 120,
 };
 
 const SEATED_ONLY: ReadonlySet<Pose> = new Set<Pose>(['sit', 'type', 'sleep', 'wait']);
-const NEVER_SEATED: ReadonlySet<Pose> = new Set<Pose>(['walk', 'run', 'stretch', 'play', 'groom']);
+const NEVER_SEATED: ReadonlySet<Pose> = new Set<Pose>(['walk', 'run', 'stretch', 'play', 'groom', 'phone_walk', 'type_stand']);
 /** Poses que posicionam as mãos (e o item) por conta própria: a lógica genérica de itens não mexe nelas. */
-const OWN_HANDS: ReadonlySet<Pose> = new Set<Pose>(['play', 'drink', 'raise_hand', 'stretch', 'cheer', 'laugh', 'game', 'rps', 'groom', 'sulk']);
+const OWN_HANDS: ReadonlySet<Pose> = new Set<Pose>(['play', 'drink', 'raise_hand', 'stretch', 'cheer', 'laugh', 'game', 'rps', 'groom', 'sulk', 'phone', 'phone_walk']);
 /** Gestos do jokenpô (a mão vira pedra, papel ou tesoura). */
 const GESTURES: ReadonlySet<HeldItem> = new Set<HeldItem>(['rock', 'paper', 'scissors']);
 
@@ -135,6 +136,8 @@ interface Rig {
   kernelAt: Pt | null;
   /** De frente: braços cruzados desenhados à mão (ver drawCrossedArms); 1 = dedos levantados. */
   crossFront: 0 | 1 | null;
+  /** Celular encostado na orelha (poses 'phone' e 'phone_walk'): desenhado depois da cabeça, sob a mão do braço B. */
+  earPhone: boolean;
 }
 
 /** Braços retos ao lado do corpo (frente/costas). */
@@ -173,6 +176,7 @@ function makeRig(req: CharacterFrameRequest, view: HeadView): Rig {
     tapAt: null,
     kernelAt: null,
     crossFront: null,
+    earPhone: false,
   };
   const side = view === 'side';
 
@@ -183,7 +187,8 @@ function makeRig(req: CharacterFrameRequest, view: HeadView): Rig {
       if (f === 1) rig.hd = 1;
       break;
     case 'walk':
-    case 'run': {
+    case 'run':
+    case 'phone_walk': {
       const run = pose === 'run';
       const amp = run ? 2 : 1;
       if (f === 1 || f === 3) rig.ub -= 1;
@@ -202,9 +207,15 @@ function makeRig(req: CharacterFrameRequest, view: HeadView): Rig {
         rig.armA = arm([6, 18], [6 - (run ? 1 : 0), 22 + sA]);
         rig.armB = arm([16, 18], [16 + (run ? 1 : 0), 22 - sA]);
       }
+      // Ao celular: os passos de 'walk' com a mão do braço B na orelha (o outro braço continua balançando).
+      if (pose === 'phone_walk') phoneRig(rig, view, f, false);
       break;
     }
-    case 'type': {
+    case 'phone':
+      phoneRig(rig, view, f, true);
+      break;
+    case 'type':
+    case 'type_stand': {
       const up = f % 2 === 0;
       if (view === 'up') {
         rig.armA = arm([7, 19], [5, 21], [6, 18 + (up ? -1 : 0)]);
@@ -551,6 +562,51 @@ function sulkRig(rig: Rig, view: HeadView, f: number): void {
 }
 
 /**
+ * Ao celular ('phone' e, sem gestos, 'phone_walk'): a mão do braço B segura o aparelho na orelha, com o cotovelo para
+ * fora (de frente/costas) ou dobrado à frente do peito (perfil). Em 'phone' (3 quadros) a outra mão gesticula: solta
+ * e falando (0), aberta para o lado (1) e de volta, ouvindo com um aceno de cabeça (2). Em 'phone_walk' o braço A
+ * continua balançando com os passos e a boca mexe nos quadros pares.
+ */
+function phoneRig(rig: Rig, view: HeadView, f: number, gesture: boolean): void {
+  rig.held = 'none';
+  rig.earPhone = true;
+  rig.itemBehind = false;
+  if (view === 'side') rig.armB = arm([10, 18], [8, 17], [11, 14]);
+  else if (view === 'down') rig.armB = arm([16, 18], [19, 17], [17, 14]);
+  else rig.armB = arm([16, 18], [20, 16], [18, 14]);
+  if (!gesture) {
+    if (view !== 'up') rig.mouth = f % 2 === 0 ? 'open' : 'none';
+    return;
+  }
+  if (view !== 'up') rig.mouth = f === 0 ? 'open' : 'none';
+  if (f === 2) rig.hd = 1;
+  if (view === 'side') {
+    rig.armA = f === 1 ? arm([12, 18], [11, 21], [7, 19]) : f === 2 ? arm([12, 18], [12, 21], [9, 21]) : arm([12, 18], [12, 22]);
+  } else if (f === 1) {
+    rig.armA = arm([6, 18], [4, 20], [3, 18]);
+  } else if (f === 2) {
+    rig.armA = arm([6, 18], [5, 21], [5, 21]);
+  } else {
+    rig.armA = arm([6, 18], [6, 22]);
+  }
+}
+
+/**
+ * Celular encostado na orelha (o rig põe a mão do braço B por cima da parte de baixo dele): verso escuro com a borda
+ * de metal clara do lado de fora, para não sumir no cabelo preto.
+ */
+function drawEarPhone(dc: Dc): void {
+  const { b, r } = dc;
+  const y = r.ub;
+  const lx = r.lean;
+  const x = r.view === 'side' ? 13 + lx : 18;
+  b.rect(x, 10 + y, 2, 5, PHONE_PAL.d);
+  b.vline(x + 1, 10 + y, 14 + y, EAR_PHONE_RIM);
+  b.set(x, 10 + y, PHONE_PAL.D);
+  b.set(x + 1, 10 + y, '#d5dbe6');
+}
+
+/**
  * Braços cruzados de frente (pixel a pixel: com mangas compridas o pincel 2x2 some na blusa).
  * O antebraço direito da tela passa por cima (linha clara + base), o outro aparece por baixo
  * (linha escura); a mão de cima segura o braço esquerdo e bate os dedos; a de baixo espia à direita.
@@ -707,6 +763,23 @@ function drawFacialHair(dc: Dc): void {
         put(5, 12, p.hair.dk);
         put(8, 12, p.hair.dk);
       }
+    } else if (style === 'short_beard') {
+      // Aparada: costeleta fina, contorno do maxilar, bigode e a linha do queixo; as bochechas ficam à mostra.
+      const soft = mix(p.skin.base, p.hair.base, 0.55);
+      put(1, 11, cd);
+      put(12, 11, cd);
+      put(1, 12, c);
+      put(2, 12, soft);
+      put(11, 12, soft);
+      put(12, 12, cd);
+      for (let cx = 5; cx <= 8; cx++) put(cx, 12, cx === 8 ? cd : c);
+      put(2, 13, c);
+      put(3, 13, soft);
+      put(10, 13, soft);
+      put(11, 13, cd);
+      for (let cx = 4; cx <= 9; cx++) put(cx, 14, cx > 7 ? cd : c);
+      put(3, 14, soft);
+      put(10, 14, soft);
     } else if (style === 'mustache') {
       for (let cx = 5; cx <= 8; cx++) put(cx, 12, cx === 8 ? cd : c);
     } else if (style === 'goatee') {
@@ -720,6 +793,17 @@ function drawFacialHair(dc: Dc): void {
       for (let cx = 1; cx <= 8; cx++) put(cx, 12, c);
       for (let cx = 1; cx <= 8; cx++) if (cx !== 2) put(cx, 13, cx > 5 ? cd : c);
       for (let cx = 2; cx <= 8; cx++) put(cx, 14, cd);
+    } else if (style === 'short_beard') {
+      const soft = mix(p.skin.base, p.hair.base, 0.55);
+      put(7, 11, cd);
+      put(1, 12, c);
+      put(2, 12, c);
+      put(3, 12, cd);
+      put(7, 12, cd);
+      put(6, 13, soft);
+      put(7, 13, cd);
+      put(1, 14, soft);
+      for (let cx = 2; cx <= 7; cx++) put(cx, 14, cx > 5 ? cd : c);
     } else if (style === 'mustache') {
       put(1, 12, c);
       put(2, 12, c);
@@ -816,6 +900,57 @@ function drawAccessory(dc: Dc): void {
           put(1, cy, cy === 9 ? it.lt : it.base);
           put(12, cy, it.dk);
           put(13, cy, it.dk);
+        }
+      }
+      break;
+    }
+    case 'headset': {
+      // Fone acolchoado: arco largo com almofada, conchas grandes com aro claro e, de frente/perfil, a haste de metal
+      // do microfone descendo da concha até o canto da boca (espuma escura na ponta).
+      const pad = shade(it.base, luminance(it.base) > 0.5 ? -0.28 : 0.1);
+      const boom = '#8f96a3';
+      // Fone escuro ganha aro de metal nas conchas (senão some no cabelo preto).
+      const ring = luminance(it.base) < 0.3 ? boom : it.lt;
+      const foam = '#1d1f26';
+      if (v === 'side') {
+        for (let cx = 5; cx <= 9; cx++) put(cx, 1, cx === 6 ? it.hi : cx < 8 ? it.lt : it.base);
+        put(4, 2, it.base);
+        put(10, 2, it.dk);
+        for (let cx = 5; cx <= 9; cx++) put(cx, 2, pad);
+        for (let cy = 3; cy <= 7; cy++) put(8, cy, cy < 5 ? it.dk : boom);
+        const cup = ['.hhho', 'hHooo', 'hoood', 'hoood', '.oddd'];
+        b.stamp(cup, ox + 6, oy + 8, { o: it.base, h: ring, H: it.hi, d: it.dk });
+        put(7, 13, boom);
+        put(6, 13, boom);
+        put(5, 13, boom);
+        put(4, 13, boom);
+        put(3, 13, foam);
+        put(3, 12, shade(foam, 0.25));
+      } else {
+        for (let cx = 3; cx <= 10; cx++) put(cx, 0, cx === 4 ? it.hi : cx < 7 ? it.lt : it.base);
+        put(2, 1, it.lt);
+        put(11, 1, it.dk);
+        for (let cx = 3; cx <= 10; cx++) put(cx, 1, pad);
+        for (let cy = 2; cy <= 7; cy++) {
+          put(1, cy, cy < 4 ? it.base : boom);
+          put(12, cy, cy < 4 ? it.dk : shade(boom, -0.12));
+        }
+        const cupL = ['.hho', 'hHoo', 'hood', 'hood', '.odd'];
+        const cupR = ['ohd.', 'oodd', 'oodd', 'oodd', 'ddd.'];
+        const cpal = { o: it.base, h: ring, H: it.hi, d: it.dk };
+        b.stamp(cupL, ox - 1, oy + 8, cpal);
+        b.stamp(cupR, ox + 11, oy + 8, cpal);
+        if (v === 'down') {
+          // Haste saindo da concha da esquerda (tela) até o canto da boca.
+          put(1, 13, boom);
+          put(2, 13, boom);
+          put(3, 13, boom);
+          put(4, 13, foam);
+          put(5, 13, foam);
+          put(4, 12, shade(foam, 0.25));
+        } else {
+          put(13, 13, boom);
+          put(14, 13, boom);
         }
       }
       break;
@@ -1319,6 +1454,19 @@ function drawTorso(dc: Dc): void {
       case 'tshirt':
         b.set(9 + lx, y + 2, ac.base);
         break;
+      case 'suit': {
+        // Colarinho e gravata na frente do pescoço; a lapela desce até o botão.
+        const sh = ramp(suitShirt(a.topAccent), 0.06);
+        b.set(9 + lx, y, sh.hi);
+        b.set(10 + lx, y, sh.base);
+        b.set(9 + lx, y + 1, ac.base);
+        b.set(9 + lx, y + 2, ac.dk);
+        b.set(10 + lx, y + 1, t.hi);
+        b.set(10 + lx, y + 2, t.lt);
+        b.set(9 + lx, y + 3, t.lt);
+        b.set(9 + lx, y + 4, t.dd);
+        break;
+      }
     }
     drawLanyard(dc);
     return;
@@ -1416,8 +1564,61 @@ function drawTorso(dc: Dc): void {
         b.set(11, y + 2, ac.lt);
       } else b.rect(9, y, 6, 1, ac.base);
       break;
+    case 'suit':
+      drawSuitFront(dc, front);
+      break;
   }
   drawLanyard(dc);
+}
+
+/**
+ * Paletó de frente: decote em V com o colarinho da camisa clara e o nó da gravata (de bolinhas), lapelas marcadas,
+ * fechamento com um botão, lenço no bolso do peito e a abertura embaixo. De costas: gola do paletó com a camisa
+ * aparecendo e a costura do meio com a fenda.
+ */
+function drawSuitFront(dc: Dc, front: boolean): void {
+  const { b, p, r, a } = dc;
+  const y = 18 + r.ub;
+  const t = p.top;
+  const tie = p.acc;
+  const sh = ramp(suitShirt(a.topAccent), 0.06);
+  if (!front) {
+    b.hline(10, 13, y, sh.dk);
+    b.hline(9, 14, y + 1, t.dk);
+    b.vline(12, y + 2, y + 5, t.dd);
+    b.set(11, y + 5, t.dk);
+    return;
+  }
+  // Camisa no V (2 linhas) e a gravata descendo até o fechamento.
+  b.set(10, y, sh.hi);
+  b.set(13, y, sh.base);
+  b.set(10, y + 1, sh.base);
+  b.set(13, y + 1, sh.dk);
+  b.set(11, y, tie.lt);
+  b.set(12, y, tie.base);
+  b.set(11, y + 1, tie.base);
+  b.set(12, y + 1, tie.dk);
+  b.set(11, y + 2, tie.base);
+  b.set(12, y + 2, tie.dk);
+  // Bolinhas da gravata: um ponto claro alternado (some nas gravatas claras, que já têm contraste).
+  const dot = mix(tie.base, '#f4f2ee', 0.45);
+  b.set(12, y + 1, dot);
+  b.set(11, y + 2, shade(dot, -0.08));
+  // Lapelas: a da esquerda pega luz, a da direita fica na sombra; elas se encontram no botão.
+  b.set(9, y, t.hi);
+  b.set(9, y + 1, t.lt);
+  b.set(10, y + 2, t.lt);
+  b.set(11, y + 3, t.lt);
+  b.set(14, y, t.dk);
+  b.set(14, y + 1, t.dd);
+  b.set(13, y + 2, t.dd);
+  b.set(12, y + 3, t.dd);
+  b.vline(12, y + 4, y + 5, t.dd);
+  b.set(11, y + 4, shade(t.base, luminance(t.base) > 0.3 ? -0.3 : 0.3)); // botão
+  // Lenço no bolso do peito e as abas dos bolsos de baixo.
+  b.set(14, y + 2, '#f4f2ee');
+  b.set(9, y + 4, t.dk);
+  b.set(14, y + 4, t.dd);
 }
 
 /**
@@ -1744,6 +1945,8 @@ const CONTROLLER_PAL: Palette = { L: '#4c5263', h: '#737b8f', d: '#1d2029', r: '
 const PHONE: readonly string[] = ['dDd', 'dBd', 'dbd', 'dbd', 'ddd'];
 const PHONE_SIDE: readonly string[] = ['dB', 'db', 'db', 'dd'];
 const PHONE_PAL: Palette = { d: '#2b2f3a', D: '#5a6172', b: '#6fbdf0', B: '#c8eaff' };
+/** Borda de metal do celular na orelha (pose 'phone'). */
+const EAR_PHONE_RIM = '#9ba4b6';
 
 /**
  * Gestos do jokenpô em pele (L = luz, s = base, S = sombra), relativos à mão (canto do pincel 2x2).
@@ -1940,10 +2143,11 @@ export function renderCharacter(req: CharacterFrameRequest): BufSprite {
     drawHair(dc, 'front');
     drawAccessory(dc);
     if (ip && !r.itemBehind) drawItem(dc, ip[0], ip[1]);
+    if (r.earPhone) drawEarPhone(dc);
     drawArm(dc, r.armB, sr, sleeve, 0, true);
   } else {
     drawLegs(dc);
-    const armsBehindHead = r.view === 'up' && (req.pose === 'type' || req.pose === 'use' || req.pose === 'drink');
+    const armsBehindHead = r.view === 'up' && (req.pose === 'type' || req.pose === 'type_stand' || req.pose === 'use' || req.pose === 'drink');
     drawTorso(dc);
     if (armsBehindHead) {
       drawArm(dc, r.armA, sr, sleeve);
@@ -1958,6 +2162,7 @@ export function renderCharacter(req: CharacterFrameRequest): BufSprite {
     drawFacialHair(dc);
     drawHair(dc, 'front');
     drawAccessory(dc);
+    if (r.earPhone) drawEarPhone(dc);
     // Braços cruzados por cima do cabelo comprido que cai no peito (a mão que bate fica visível).
     if (r.crossFront !== null) drawCrossedArms(dc, sr, sleeve, r.crossFront === 1);
     if (ip && !r.itemBehind) {

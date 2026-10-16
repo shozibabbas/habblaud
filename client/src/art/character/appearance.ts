@@ -35,6 +35,8 @@ const LIGHT_ACCENTS = ['#f4f4f0', '#e8e3d6', '#dfe7ef', '#f6e7c8', '#c9ced6'] as
 const BOTTOMS = [
   ['#3f5f8c', 5], ['#2e3e5e', 4], ['#2c2c35', 4], ['#b49c72', 2], ['#6d7480', 2], ['#6e4c38', 1.5],
   ['#5f6845', 1.2], ['#2c3655', 2], ['#7f9cc4', 1.5], ['#e2ded5', 0.5], ['#9b3b3b', 0.4],
+  // Peso 0 (no fim, para não mudar o sorteio): só aparece como calça do terno grafite ou escolhida no editor.
+  ['#3d4352', 0],
 ] as const;
 const SHOES = [
   ['#2b2b33', 5], ['#6b4630', 3], ['#ececec', 3], ['#d04848', 1], ['#3f63a8', 1], ['#b88752', 1.5], ['#7d8592', 1],
@@ -53,6 +55,7 @@ const ACC_COLORS: Record<Accessory, readonly string[]> = {
   hijab: ['#26272e', '#2c3a5c', '#ede3cc', '#7a2f3a', '#d8c6dd', '#cfe0ef', '#e7cbc4', '#8a96a3', '#5a3e2b'],
   // Branco/creme (gorro de oração) e cinza/preto (karakul).
   topi: ['#f4f2ee', '#ede3cc', '#9a9ea6', '#4a4d55', '#26272e'],
+  headset: ['#2b2b33', '#aeb4bd', '#f1efe9'],
 };
 // Roupas do sul da Ásia (shalwar kameez, kurta, colete): brancos, cremes, pastéis e tons escuros sóbrios na kurta;
 // cores mais vivas no kameez e na dupatta; coletes escuros.
@@ -74,6 +77,20 @@ const SHALWAR_OF_PANTS: Readonly<Record<string, string>> = {
   '#3f5f8c': '#2c3a5c', '#2e3e5e': '#2c3a5c', '#2c2c35': '#26272e', '#b49c72': '#d9c7a3', '#6d7480': '#8a96a3', '#6e4c38': '#6b4a35',
   '#5f6845': '#6b7346', '#2c3655': '#2c3a5c', '#7f9cc4': '#cfe0ef', '#e2ded5': '#ede3cc', '#9b3b3b': '#7a2f3a',
 };
+/**
+ * Terno: paletó grafite, marinho, preto, cinza ou marrom-escuro (as mesmas cores da calça, que sai igual ao paletó) e
+ * gravata vermelha, vinho, marinho, dourada ou verde.
+ */
+const SUIT_COLORS = ['#3d4352', '#2e3e5e', '#2c2c35', '#6d7480', '#6e4c38'] as const;
+const SUIT_TIES = ['#c0392b', '#7b2d44', '#2f4c7d', '#d9a42e', '#2e7d4f'] as const;
+/** Gravatas que pedem camisa branca; as demais vão com a camisa azul-clara. */
+const WHITE_SHIRT_TIES: readonly string[] = ['#d9a42e', '#2e7d4f'];
+
+/** Camisa por baixo do paletó: sai da cor da gravata (sem sorteio a mais e sem peça a mais no editor). */
+export function suitShirt(tie: string): string {
+  return WHITE_SHIRT_TIES.includes(tie) ? SHIRT_COLORS[0] : SHIRT_COLORS[1];
+}
+
 /** Batas até o joelho: cobrem o quadril e as coxas (render.ts). */
 export const LONG_TOPS: ReadonlySet<TopStyle> = new Set<TopStyle>(['kurta', 'shalwar_kameez', 'kurta_waistcoat']);
 
@@ -99,16 +116,16 @@ const HAIR_W: Record<'f' | 'm', Weights<HairStyle>> = {
 // Os estilos com peso 0 (no fim de cada tabela, para não mudar o sorteio de nenhuma semente) só aparecem quando
 // escolhidos no editor.
 const TOP_W: Record<'f' | 'm', Weights<TopStyle>> = {
-  m: { tshirt: 20, hoodie: 16, shirt_tie: 10, sweater: 13, jacket: 13, blouse: 2, polo: 14, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0 },
-  f: { tshirt: 17, hoodie: 14, shirt_tie: 5, sweater: 14, jacket: 12, blouse: 20, polo: 8, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0 },
+  m: { tshirt: 20, hoodie: 16, shirt_tie: 10, sweater: 13, jacket: 13, blouse: 2, polo: 14, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0, suit: 0 },
+  f: { tshirt: 17, hoodie: 14, shirt_tie: 5, sweater: 14, jacket: 12, blouse: 20, polo: 8, kurta: 0, shalwar_kameez: 0, kurta_waistcoat: 0, suit: 0 },
 };
 
 const ACC_W: Record<'f' | 'm', Weights<Accessory>> = {
-  m: { none: 40, glasses: 18, sunglasses: 4, headphones: 13, cap: 7, beanie: 6, earrings: 2, bow: 0.3, dupatta: 0, hijab: 0, topi: 0 },
-  f: { none: 36, glasses: 16, sunglasses: 4, headphones: 11, cap: 4, beanie: 5, earrings: 13, bow: 7, dupatta: 0, hijab: 0, topi: 0 },
+  m: { none: 40, glasses: 18, sunglasses: 4, headphones: 13, cap: 7, beanie: 6, earrings: 2, bow: 0.3, dupatta: 0, hijab: 0, topi: 0, headset: 0 },
+  f: { none: 36, glasses: 16, sunglasses: 4, headphones: 11, cap: 4, beanie: 5, earrings: 13, bow: 7, dupatta: 0, hijab: 0, topi: 0, headset: 0 },
 };
 
-const FACIAL_W: Weights<FacialHair> = { none: 62, stubble: 12, beard: 13, mustache: 7, goatee: 6 };
+const FACIAL_W: Weights<FacialHair> = { none: 62, stubble: 12, beard: 13, mustache: 7, goatee: 6, short_beard: 0 };
 const BOTTOM_W: Record<'f' | 'm', Weights<BottomStyle>> = {
   m: { pants: 88, shorts: 12, skirt: 0, shalwar: 0 },
   f: { pants: 62, shorts: 10, skirt: 28, shalwar: 0 },
@@ -203,6 +220,10 @@ export function appearanceFromSeed(
       top = pick(KAMEEZ_COLORS);
       topAccent = pick(ACC_COLORS.dupatta);
       break;
+    case 'suit':
+      top = pick(SUIT_COLORS);
+      topAccent = pick(SUIT_TIES);
+      break;
     default:
       top = pick(TOP_COLORS);
       topAccent = pick(TOP_COLORS);
@@ -229,6 +250,12 @@ export function appearanceFromSeed(
     if (topStyle === 'shalwar_kameez') bottomStyle = 'shalwar';
     else if (!LONG_TOPS.has(topStyle) && bottomStyle === 'shalwar') bottomStyle = 'pants';
     else if (LONG_TOPS.has(topStyle) && bottomStyle === 'skirt') bottomStyle = 'shalwar';
+  }
+  // Terno é um conjunto: calça (ou saia) da cor do paletó, nunca bermuda nem shalwar. Sem sorteio a mais (no padrão o
+  // terno tem peso 0).
+  if (topStyle === 'suit') {
+    if (bottomStyle === 'shorts' || bottomStyle === 'shalwar') bottomStyle = 'pants';
+    bottom = top;
   }
   // Cabelos raros e grisalhos pedem menos careca/raspado em looks femininos.
   if (look === 'f' && hairStyle === 'bald') hairStyle = 'buzz';
@@ -288,6 +315,8 @@ function topPalettes(style: TopStyle): { top: readonly string[]; topAccent: read
       return { top: KURTA_COLORS, topAccent: WAISTCOAT_COLORS };
     case 'shalwar_kameez':
       return { top: KAMEEZ_COLORS, topAccent: ACC_COLORS.dupatta };
+    case 'suit':
+      return { top: SUIT_COLORS, topAccent: SUIT_TIES };
     default:
       return { top: TOP_COLORS, topAccent: ACCENTS };
   }

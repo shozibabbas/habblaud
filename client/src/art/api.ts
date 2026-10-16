@@ -64,7 +64,11 @@ export type Pose =
   | 'sujood' // prostrado: ajoelhado, testa e mãos no chão (1)
   | 'jalsa' // ajoelhado sentado sobre os calcanhares, mãos nas coxas (jalsa/tashahhud) (1)
   | 'salam' // ajoelhado, cabeça virada à direita (quadro 0) e depois à esquerda (1) (2)
-  | 'wudu'; // ablução: sentado no banquinho diante da torneira, mãos na água (0) e no rosto (1) (2)
+  | 'wudu' // ablução: sentado no banquinho diante da torneira, mãos na água (0) e no rosto (1) (2)
+  // --- ligações e mesa alta (aditivo)
+  | 'phone' // falando ao celular: aparelho na orelha, a outra mão gesticulando e a boca mexendo (3). Em pé ou sentado (opts.seated); held é ignorado
+  | 'phone_walk' // andando de um lado para o outro ao celular: passos de 'walk' com o aparelho na orelha (4). Sempre em pé
+  | 'type_stand'; // em pé diante da mesa alta, digitando — normalmente dir 'up', de costas, braços alternando como em 'type' (4). Sempre em pé
 
 export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book' | 'box' | 'paddle' | 'popcorn'
   // --- vida social (aditivo)
@@ -88,13 +92,16 @@ export type TopStyle = 'tshirt' | 'hoodie' | 'shirt_tie' | 'sweater' | 'jacket' 
   // --- roupas do sul da Ásia (aditivo): batas até o joelho, desenhadas por cima da parte de baixo
   | 'kurta' // bata solta com gola curta, carcela e fendas laterais; topAccent = gola/botões
   | 'shalwar_kameez' // kameez com barrado bordado e dupatta nos ombros, ambos em topAccent
-  | 'kurta_waistcoat'; // kurta (top) com colete sem mangas por cima (topAccent)
+  | 'kurta_waistcoat' // kurta (top) com colete sem mangas por cima (topAccent)
+  // --- (aditivo)
+  | 'suit'; // terno: paletó (top) com lapelas sobre camisa clara e gravata (topAccent); a cor da camisa sai da gravata
 
 export type Accessory = 'none' | 'glasses' | 'sunglasses' | 'headphones' | 'cap' | 'beanie' | 'earrings' | 'bow'
   // --- (aditivo)
   | 'dupatta' // lenço solto sobre a cabeça e os ombros (o cabelo da frente aparece)
   | 'hijab' // cobre cabelo, orelhas e pescoço, emoldurando o rosto (o cabelo não é desenhado)
-  | 'topi'; // gorrinho redondo no alto da cabeça (de oração ou karakul)
+  | 'topi' // gorrinho redondo no alto da cabeça (de oração ou karakul)
+  | 'headset'; // fone de ouvido acolchoado com microfone de haste diante da boca (atendimento, ligações)
 
 export interface Appearance {
   skin: string;
@@ -112,7 +119,7 @@ export interface Appearance {
   lanyard: string | null;
   look: 'f' | 'm';
   /** (Opcional, aditivo) Barba/bigode — só sorteado para look 'm'. Ausente = sem pelos faciais. */
-  facialHair?: 'none' | 'stubble' | 'beard' | 'mustache' | 'goatee';
+  facialHair?: 'none' | 'stubble' | 'beard' | 'mustache' | 'goatee' | 'short_beard'; // short_beard (aditivo): barba aparada rente ao queixo, com bigode
   /** (Opcional, aditivo) Parte de baixo da roupa. Ausente = calça. */
   bottomStyle?: 'pants' | 'shorts' | 'skirt' | 'shalwar';
 }

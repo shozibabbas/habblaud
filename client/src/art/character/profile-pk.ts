@@ -42,16 +42,17 @@ export const PROFILE_PK: ProfileTables = {
   },
   topStyle: {
     // Roupa de escritório no Paquistão: ~1/3 dos homens de kurta (às vezes com colete) e mais da metade das mulheres de
-    // shalwar kameez ou kurta; o resto em camisa, polo, suéter e jaqueta.
-    m: { tshirt: 10, hoodie: 5, shirt_tie: 15, sweater: 12, jacket: 12, blouse: 0, polo: 14, kurta: 24, shalwar_kameez: 0, kurta_waistcoat: 12 },
-    f: { tshirt: 5, hoodie: 3, shirt_tie: 2, sweater: 9, jacket: 8, blouse: 14, polo: 3, kurta: 12, shalwar_kameez: 60, kurta_waistcoat: 0 },
+    // shalwar kameez ou kurta; o resto em camisa, polo, suéter e jaqueta. Uns poucos de terno: o peso dele saiu do fim do
+    // colete (o último antes dele), então só quem vestia kurta com colete pode trocar de roupa; os demais continuam iguais.
+    m: { tshirt: 10, hoodie: 5, shirt_tie: 15, sweater: 12, jacket: 12, blouse: 0, polo: 14, kurta: 24, shalwar_kameez: 0, kurta_waistcoat: 9, suit: 3 },
+    f: { tshirt: 5, hoodie: 3, shirt_tie: 2, sweater: 9, jacket: 8, blouse: 14, polo: 3, kurta: 12, shalwar_kameez: 60, kurta_waistcoat: 0, suit: 0 },
   },
   accessory: {
-    m: { none: 44, glasses: 24, sunglasses: 4, headphones: 12, cap: 3, beanie: 2, earrings: 0, bow: 0, dupatta: 0, hijab: 0, topi: 3 },
-    f: { none: 28, glasses: 16, sunglasses: 2, headphones: 6, cap: 0.5, beanie: 1, earrings: 16, bow: 1, dupatta: 18, hijab: 12, topi: 0 },
+    m: { none: 44, glasses: 24, sunglasses: 4, headphones: 12, cap: 3, beanie: 2, earrings: 0, bow: 0, dupatta: 0, hijab: 0, topi: 3, headset: 0 },
+    f: { none: 28, glasses: 16, sunglasses: 2, headphones: 6, cap: 0.5, beanie: 1, earrings: 16, bow: 1, dupatta: 18, hijab: 12, topi: 0, headset: 0 },
   },
   // ~65% com barba ou bigode (só vale para o look 'm').
-  facialHair: { none: 35, stubble: 20, beard: 26, mustache: 12, goatee: 7 },
+  facialHair: { none: 35, stubble: 20, beard: 26, mustache: 12, goatee: 7, short_beard: 0 },
   bottomStyle: {
     // Com kurta, metade de shalwar e metade de calça; shalwar kameez sempre de shalwar (ver appearanceFromSeed).
     m: { pants: 50, shorts: 0, skirt: 0, shalwar: 50 },
