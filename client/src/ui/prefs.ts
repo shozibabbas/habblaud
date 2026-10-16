@@ -13,6 +13,8 @@ export interface UiPrefs {
   /** Ciclo dia/noite: automático (hora local), sempre dia ou sempre noite. */
   daylight: DaylightMode;
   theme: NonNullable<WorldOptions['theme']>;
+  /** Equipe de limpeza no escritório (personagens que não são agentes). */
+  staff: boolean;
   /** Sons sintetizados (interruptor geral; desligado por padrão). */
   sound: boolean;
   /** Volume mestre e categorias dos sons. */
@@ -31,6 +33,7 @@ export const DEFAULT_PREFS: UiPrefs = {
   liveliness: DEFAULT_WORLD_OPTIONS.liveliness,
   daylight: 'auto',
   theme: 'auto',
+  staff: true,
   sound: false,
   sounds: DEFAULT_SOUND_SETTINGS,
   browserNotifications: false,
@@ -57,6 +60,7 @@ export function sanitizePrefs(raw: unknown): UiPrefs {
     daylight: oneOf(o.daylight, ['auto', 'day', 'night'] as const, o.dayNight === false ? 'day' : d.daylight),
     // temas que deixaram de existir (Natal, Halloween) voltam ao automático
     theme: oneOf(o.theme, ['auto', 'none', 'ramadan', 'eid_fitr', 'eid_adha'] as const, d.theme),
+    staff: bool(o.staff, d.staff),
     sound: bool(o.sound, d.sound),
     sounds: sanitizeSoundSettings(o.sounds),
     browserNotifications: bool(o.browserNotifications, d.browserNotifications),
@@ -87,7 +91,7 @@ export function savePrefs(storage: StorageLike | null, prefs: UiPrefs): void {
 
 /** Parte das preferências que o mundo (canvas) consome. */
 export function worldOptionsFrom(p: UiPrefs): Partial<WorldOptions> {
-  return { showNames: p.showNames, bubbles: p.bubbles, liveliness: p.liveliness, dayNight: p.daylight !== 'day', daylight: p.daylight, theme: p.theme };
+  return { showNames: p.showNames, bubbles: p.bubbles, liveliness: p.liveliness, dayNight: p.daylight !== 'day', daylight: p.daylight, theme: p.theme, staff: p.staff };
 }
 
 /** localStorage com proteção contra navegadores que lançam exceção ao acessá-lo. */

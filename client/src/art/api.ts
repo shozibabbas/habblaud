@@ -64,7 +64,11 @@ export type Pose =
   | 'sujood' // prostrado: ajoelhado, testa e mãos no chão (1)
   | 'jalsa' // ajoelhado sentado sobre os calcanhares, mãos nas coxas (jalsa/tashahhud) (1)
   | 'salam' // ajoelhado, cabeça virada à direita (quadro 0) e depois à esquerda (1) (2)
-  | 'wudu'; // ablução: sentado no banquinho diante da torneira, mãos na água (0) e no rosto (1) (2)
+  | 'wudu' // ablução: sentado no banquinho diante da torneira, mãos na água (0) e no rosto (1) (2)
+  // --- equipe de limpeza (aditivo; character/cleaning.ts): sempre em pé
+  | 'mop' // passando o mop: as duas mãos no cabo, a ponta indo e voltando no chão à frente (4)
+  | 'vacuum' // o mesmo vaivém com o aspirador vertical (carpete) (4)
+  | 'push'; // andando e empurrando o carrinho de limpeza (o carrinho é desenhado pelo mundo) (4)
 
 export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book' | 'box' | 'paddle' | 'popcorn'
   // --- vida social (aditivo)
@@ -77,7 +81,10 @@ export type HeldItem = 'none' | 'coffee' | 'water' | 'papers' | 'laptop' | 'book
   | 'comb' // pente (pose 'groom')
   // --- recreação do campus (aditivo)
   | 'racket' // raquete de tênis (pose 'play': a mesma rotina da raquete de ping-pong, cabo mais longo e aro com cordas)
-  | 'cigarette'; // cigarro aceso entre os dedos (pose 'drink' leva à boca; 'stand'/'sit' segura ao lado). A fumaça é do mundo
+  | 'cigarette' // cigarro aceso entre os dedos (pose 'drink' leva à boca; 'stand'/'sit' segura ao lado). A fumaça é do mundo
+  // --- equipe de limpeza (aditivo): carregados em pé ao lado do corpo ('stand'/'walk'/'run')
+  | 'mop'
+  | 'vacuum';
 
 export type HairStyle =
   | 'short' | 'buzz' | 'spiky' | 'side_part' | 'curly' | 'afro' | 'bob' | 'long' | 'ponytail' | 'bun' | 'pigtails'
@@ -230,7 +237,10 @@ export type FurnitureKind =
   | 'wudu_stool' // 1x1 banquinho baixo de pedra (assento) diante da torneira.
   | 'quran_shelf' // 2x1 estante baixa com Alcorões encadernados (verde/vinho, filete dourado).
   | 'arch_window' // (parede) 2 tiles. Janela em arco com treliça; à noite o mundo acende o vidro.
-  | 'prayer_times'; // (parede) 2 tiles. Quadro com os horários das orações (seis mostradores, sem texto).
+  | 'prayer_times' // (parede) 2 tiles. Quadro com os horários das orações (seis mostradores, sem texto).
+  // --- canto da limpeza (aditivo; furniture/cleaning.ts)
+  | 'janitor_shelf' // 1x1 estante alta de metal com produtos de limpeza, rolos de papel e panos dobrados.
+  | 'mop_sink'; // 1x1 tanque baixo de serviço com torneira e um mop escorrendo ao lado.
 
 export interface FurnitureDef {
   mount: 'floor' | 'wall';
@@ -323,6 +333,8 @@ export const FURNITURE: Readonly<Record<FurnitureKind, FurnitureDef>> = {
   quran_shelf: { mount: 'floor', footprint: { w: 2, h: 1 }, blocks: true },
   arch_window: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
   prayer_times: { mount: 'wall', footprint: { w: 2, h: 0 }, blocks: false },
+  janitor_shelf: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
+  mop_sink: { mount: 'floor', footprint: { w: 1, h: 1 }, blocks: true },
 };
 
 export type FloorKind =

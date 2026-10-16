@@ -107,7 +107,9 @@ export type SpotKind =
   | 'shoes' // diante da sapateira (tirar/calçar os sapatos)
   | 'headwear' // diante do cesto de topis / cabideiro de hijabs
   | 'wudu' // banquinho da ablução (assento virado para a torneira)
-  | 'prayer'; // lugar na fila (saf), virado para a qibla
+  | 'prayer' // lugar na fila (saf), virado para a qibla
+  // --- equipe de limpeza (aditivo; layout/staff.ts): só ela usa
+  | 'staff'; // canto da limpeza: banqueta de descanso, tanque de serviço ou vaga do carrinho (pelo `group`)
 
 /**
  * Ponto de interesse. O personagem anda até o tile de aproximação (tx, ty), caminhável,

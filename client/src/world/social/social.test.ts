@@ -87,7 +87,7 @@ function run(sim: Sim, clock: { now: number }, seconds: number, until?: () => bo
 }
 
 function newSim(): Sim {
-  return new Sim(art, () => ({ ...DEFAULT_WORLD_OPTIONS, liveliness: 'lively' }));
+  return new Sim(art, () => ({ ...DEFAULT_WORLD_OPTIONS, liveliness: 'lively', staff: false }));
 }
 
 const ROOMS = [room('/a', 0), room('/b', 1)];

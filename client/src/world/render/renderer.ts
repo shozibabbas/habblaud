@@ -28,6 +28,8 @@ import { Particles } from './particles';
 import { CAR_VARIANTS, carSprite, propSprite, shadowSprite } from './props';
 import { drawPodSleepers, drawRallies, drawScoreboard, drawSmoke, paintCourt } from './recreation';
 import { countBadge, fallbackIcon } from './shell-sprites';
+import { drawKitItem, StaffRenderer } from './staff';
+import type { KitItem } from '../sim/staff';
 import { decorateElevator, drawEidSparkle, drawSeasonalLights, drawSeasonalWindow, seasonalFurniture, seasonalTableTop } from './seasonal';
 import { buildAreaVis, furnitureSprites, opaqueBounds, paintShell, toWallVis, WALL_MARGIN, wallItemOrigin, wallSprites, type AreaVis, type FurnVis, type WallVis } from './scene';
 
@@ -37,12 +39,13 @@ const enum K {
   Char,
   Prop,
   Car,
+  Kit,
 }
 
 interface Ent {
   k: K;
   y: number;
-  ref: FurnVis | Character | ExteriorProp | Car | null;
+  ref: FurnVis | Character | ExteriorProp | Car | KitItem | null;
   area: AreaVis | null;
   scale: number;
 }
@@ -118,6 +121,8 @@ export class Renderer {
   private readonly roomFx = new RoomFxRenderer();
   /** Campus: tapetes, cúpula, minaretes e luzes da mesquita (render/mosque.ts). */
   private readonly mosque = new MosqueRenderer();
+  /** Equipe: kit da limpeza e o brilho do piso limpo (render/staff.ts). */
+  private readonly staff = new StaffRenderer();
   /** dt do frame atual (s), para as partículas emitidas durante o desenho. */
   private dt = 0;
   private iconCount = 0;
@@ -439,6 +444,8 @@ export class Renderer {
     const view = { x0: vx0, y0: vy0, x1: vx1, y1: vy1 };
     // alarme de CI: tom vermelho no piso (por baixo dos móveis e personagens)
     this.roomFx.drawFloor(ctx, this.sim, now, view);
+    // piso recém-limpo pela equipe: verniz e brilhinhos (por baixo dos móveis e personagens)
+    this.safe(() => this.staff.drawShine(ctx, this.sim, now, view, reducedMotion()));
 
     // ---- entidades ordenadas por profundidade
     const ents = this.ents;
@@ -512,6 +519,7 @@ export class Renderer {
       }
     }
     for (const car of this.cars) if (visible(car.x - 24, car.y - 24, 48, 28)) push(K.Car, car.y, car, null, 1);
+    for (const it of this.staff.kit(this.sim, now)) if (visible(it.x - 16, it.y - 24, 32, 28)) push(K.Kit, it.y, it, null, 1);
     ents.sort((a, b) => a.y - b.y || a.k - b.k);
 
     this.iconCount = 0;
@@ -532,6 +540,9 @@ export class Renderer {
         case K.Car:
           this.drawCar(e.ref as Car);
           break;
+        case K.Kit:
+          this.safe(() => drawKitItem(ctx, e.ref as KitItem));
+          break;
       }
     }
     // ralis (bola e placar das mesas/quadra) e a fumaça dos cigarros
@@ -547,6 +558,7 @@ export class Renderer {
     // ---- luz: noite, salas apagadas, brilhos
     this.night = this.lighting.night;
     this.drawLighting(now, vx0, vy0, vx1, vy1);
+    this.safe(() => this.staff.drawNight(ctx, this.sim, now, view, this.night));
     this.safe(() => this.mosque.drawNight(ctx, this.sim.building, this.areas, this.night, now));
     // chamado para a oração (menu Atividades): minaretes e cúpulas brilham por uns segundos
     if (this.sim.callToPrayerAt) this.safe(() => drawCallToPrayer(ctx, this.sim.building, this.sim.callToPrayerAt, now, reducedMotion()));

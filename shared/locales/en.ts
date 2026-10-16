@@ -2689,4 +2689,18 @@ export const EN: Readonly<Record<string, string>> = {
   "Pingue-pongue, tênis, fliperama e as moedinhas das apostas.": "Table tennis, tennis, arcade and the coins from bets.",
   "Trânsito": "Traffic",
   "Água do wudu, ronco nas cápsulas, isqueiro, xícaras de chá, a TV e o chamado à oração.": "Wudu water, snoring in the pods, lighters, chai cups, the TV and the call to prayer.",
+
+  // client/src/world/sim/cleaner.ts (equipe de limpeza)
+  "Corredor": "Corridor",
+  "Saguão de {0}": "{0} lobby",
+  "Área comum": "Common area",
+  "Equipe de limpeza": "Cleaning staff",
+  "Rezando": "Praying",
+  "Indo limpar: {0}": "On the way to clean: {0}",
+  "Passando o mop: {0}": "Mopping: {0}",
+  "Aspirando: {0}": "Vacuuming: {0}",
+  "Limpando: {0}": "Cleaning: {0}",
+  "Guardando o carrinho": "Putting the cart away",
+  "Descansando": "Taking a break",
+  "Faxineiros que passam pelo escritório limpando o piso de tempos em tempos. Não são agentes.": "Cleaners who come through the office mopping the floor every now and then. They're not agents.",
 };

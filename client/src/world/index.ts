@@ -16,6 +16,7 @@ import { rebaseSnapshot } from './playback';
 import { Overlay } from './render/overlay';
 import { Renderer } from './render/renderer';
 import { Sim } from './sim/sim';
+import { isStaffId } from './sim/staff';
 import { SoundCues } from './sound-cues';
 
 export * from './api';
@@ -41,7 +42,14 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
   const roomMenuCbs = new Set<(roomId: string, at: { x: number; y: number }) => void>();
   let cues = new SoundCues(sim, camera, Math.random, () => renderer.cars);
   let selection: Selection = null;
+  /**
+   * Alguém da equipe (limpeza...) clicado: só o mundo sabe (cartão no canvas). A interface nunca recebe um id de
+   * equipe, nem na seleção nem no hover: ela só conhece os agentes do store.
+   */
+  let staffPick: string | null = null;
   let hover: string | null = null;
+  /** Último hover avisado à interface (sem os de equipe). */
+  let hoverOut: string | null = null;
   let mouse: { x: number; y: number } | null = null;
   let raf = 0;
   let lastTs = 0;
@@ -117,6 +125,10 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
   const sameSelection = (a: Selection, b: Selection) => a === b || (!!a && !!b && a.type === b.type && a.id === b.id);
 
   const setSelection = (sel: Selection, focus = false) => {
+    if (sel?.type === 'agent' && isStaffId(sel.id)) {
+      staffPick = sel.id;
+      sel = null;
+    } else if (sel) staffPick = null;
     const same = sameSelection(sel, selection);
     selection = sel;
     // com "seguir selecionado" ligado, a câmera acompanha o agente escolhido (ou para de seguir)
@@ -182,14 +194,23 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     if (id === hover) return;
     hover = id;
     canvas.style.cursor = id ? 'pointer' : 'grab';
-    hoverCbs.forEach((cb) => cb(id));
+    const out = isStaffId(id) ? null : id;
+    if (out === hoverOut) return;
+    hoverOut = out;
+    hoverCbs.forEach((cb) => cb(out));
   };
 
   const detachInput = attachInput(canvas, camera, {
     pick,
-    click: (hit) => setSelection(hit),
+    click: (hit) => {
+      if (!hit) staffPick = null;
+      setSelection(hit);
+    },
     doubleClick: (hit) => {
-      if (hit?.type === 'agent') {
+      if (hit?.type === 'agent' && isStaffId(hit.id)) {
+        staffPick = hit.id;
+        focusAgent(hit.id, { follow: true });
+      } else if (hit?.type === 'agent') {
         setSelection(hit);
         focusAgent(hit.id, { follow: true });
       } else if (hit?.type === 'room') focusRoom(hit.id);
@@ -267,8 +288,10 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
       const followCh = camera.follow ? sim.chars.get(camera.follow) : undefined;
       if (camera.follow && !followCh) camera.follow = null;
       camera.update(real, followCh ? camera.centerFor(followCh.x, followCh.y - 12, camera.zoom) : null, realDt);
-      renderer.frame(now, dt, options, { agent: selection?.type === 'agent' ? selection.id : null, room: selection?.type === 'room' ? selection.id : null, hover });
-      overlay.draw(now, options, { agent: selection?.type === 'agent' ? selection.id : null, room: selection?.type === 'room' ? selection.id : null, hover });
+      if (staffPick && !sim.chars.has(staffPick)) staffPick = null;
+      const selAgent = selection?.type === 'agent' ? selection.id : staffPick;
+      renderer.frame(now, dt, options, { agent: selAgent, room: selection?.type === 'room' ? selection.id : null, hover });
+      overlay.draw(now, options, { agent: selAgent, room: selection?.type === 'room' ? selection.id : null, hover });
       renderer.pruneHeads();
       // No timelapse o mundo fica mudo: o teclado e o elevador em alta velocidade só fariam barulho.
       if (soundCbs.size && !playback) cues.update(now, (c) => soundCbs.forEach((cb) => cb(c)));
@@ -343,11 +366,15 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     debug = createDebug(sim, renderer, camera, markMoved);
     cues = new SoundCues(sim, camera, Math.random, () => renderer.cars);
     lastKey = '';
+    staffPick = null;
     setHover(null);
   };
 
   return {
-    select: (sel, opts) => setSelection(sel, !!opts?.focus),
+    select: (sel, opts) => {
+      if (!sel) staffPick = null;
+      setSelection(sel, !!opts?.focus);
+    },
     getSelection: () => selection,
     onSelect: (cb) => {
       selectCbs.add(cb);
@@ -374,7 +401,9 @@ export function createWorld(canvas: HTMLCanvasElement, store: OfficeStore): Worl
     },
     getOptions: () => ({ ...options }),
     setOptions: (o) => {
+      const staffWas = options.staff !== false;
       options = { ...options, ...o };
+      if ((options.staff !== false) !== staffWas) sim.staff.resync(playback ? worldNow : Date.now());
       if (o.followSelected !== undefined) camera.follow = o.followSelected && selection?.type === 'agent' ? selection.id : null;
     },
     setViewInsets: (ins) => {

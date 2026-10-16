@@ -13,6 +13,7 @@ import type { TileRect } from '../layout/types';
 import { planPrayerVisit } from './prayer';
 import { isSmoker, planNap, planSmoke } from './recreation';
 import type { Character } from './character';
+import { isStaff } from './staff';
 import type { Sim } from './sim';
 import type { Step } from './steps';
 import { tr } from '../../../../shared/i18n';
@@ -103,6 +104,8 @@ export function sendAll(sim: Sim, activity: SendActivity, now: number): SendAllR
   if (activity === 'desk') return recallToDesks(sim, r, now);
   const free: Character[] = [];
   for (const ch of sim.chars.values()) {
+    // a equipe não entra nas contas do menu (ver o chamado para a oração abaixo)
+    if (isStaff(ch)) continue;
     const a = availability(ch);
     if (a === 'free') free.push(ch);
     else if (activity === 'prayer' && a === 'praying') r.sent.push(ch.id);
@@ -122,6 +125,8 @@ export function sendAll(sim: Sim, activity: SendActivity, now: number): SendAllR
         // mais gente que torneiras: quem chega depois espera a vez da ablução (cada um num tile)
         const queue = new Set<number>();
         for (const ch of go) place(r, ch, planPrayerVisit(sim, ch, now, { queue }));
+        // a equipe também está no prédio: vai junto, depois dos agentes (fora das contas do resultado)
+        sim.staff.callToPrayer(now, (ch) => planPrayerVisit(sim, ch, now, { queue }));
       }
       break;
     case 'chai':
@@ -291,6 +296,7 @@ function planStroll(sim: Sim, ch: Character): boolean {
  */
 function recallToDesks(sim: Sim, r: SendAllResult, now: number): SendAllResult {
   for (const ch of sim.chars.values()) {
+    if (isStaff(ch)) continue;
     if (ch.gone || ch.leaving || ch.arriving || (ch.mode !== 'idle' && ch.mode !== 'shell')) {
       r.busy++;
       continue;

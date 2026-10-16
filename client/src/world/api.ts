@@ -24,6 +24,8 @@ export interface WorldOptions {
   daylight?: DaylightMode;
   /** Tema visual: automático (segue o calendário hijri; ver seasonalThemeFor), nenhum, Ramadã, Eid al-Fitr ou Eid al-Adha. */
   theme?: OfficeTheme;
+  /** (Opcional, aditivo) Equipe do escritório (limpeza): ausente/true = presente; false = sem equipe. */
+  staff?: boolean;
 }
 
 /** Tema que o renderer desenha: o escritório original ('none') ou um dos sazonais. */

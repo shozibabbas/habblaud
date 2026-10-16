@@ -203,6 +203,7 @@ export class SettingsPopover implements UiComponent {
         this.bubbles.row,
         this.liveliness.row,
         this.daylight.row,
+        sw('staff', tr('Equipe de limpeza'), tr('Faxineiros que passam pelo escritório limpando o piso de tempos em tempos. Não são agentes.'), flip('staff')),
       ),
       h(
         'div',

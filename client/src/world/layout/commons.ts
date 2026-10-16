@@ -10,6 +10,7 @@
 import { COL_W, CORRIDOR_H, CORRIDOR_Y, NORTH_Y, ROOM_H, SOUTH_Y, TILE } from '../constants';
 import { AreaBuilder, SEATED_SORT_BIAS } from './builder';
 import { CAFE_ID, CORE_WALLS, LOUNGE_ID, RECEPTION_ID, RESTROOM_ID } from './core';
+import { COMMONS_JANITOR_CORNER, janitorCorner } from './staff';
 import type { AreaLayout } from './types';
 
 /** Colunas do Commons. */
@@ -110,6 +111,7 @@ export function layoutCommonsRestroom(): AreaLayout {
   for (let i = 0; i < 2; i++) b.seat('bench', 'bench', 3 + i, 9, 'down', undefined, { noFurniture: true, furnitureId: bench });
   b.rug(2.5, 9.9, 3, 0.9, '#9cc3cf', 213);
   b.furn('trash_bin', 6, 10, undefined, { order: 0.6 });
+  janitorCorner(b, COMMONS_JANITOR_CORNER);
   return b.build();
 }
 

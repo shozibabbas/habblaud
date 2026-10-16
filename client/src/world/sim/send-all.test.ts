@@ -86,7 +86,7 @@ function run(sim: Sim, clock: { now: number }, seconds: number, until?: () => bo
 const crowd = (n: number, extra: Partial<Who> = {}): Who[] => Array.from({ length: n }, (_, i) => ({ id: `ag${i}`, look: i % 2 ? 'f' : 'm', room: ROOMS[i % ROOMS.length], ...extra }));
 
 function office(who: Who[], campus = true) {
-  const sim = new Sim(art, () => ({ ...DEFAULT_WORLD_OPTIONS, liveliness: 'calm' }), null);
+  const sim = new Sim(art, () => ({ ...DEFAULT_WORLD_OPTIONS, liveliness: 'calm', staff: false }), null);
   const clock = { now: T0 };
   sim.applySnapshot(snap(who, campus), clock.now);
   run(sim, clock, 0.5);

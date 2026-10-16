@@ -3,6 +3,7 @@
 import { FURNITURE, type FurnitureKind } from '../api';
 import { trim, type BufFurniture } from '../core/sprite';
 import * as C from './common';
+import * as K from './cleaning';
 import * as Q from './mosque';
 import * as O from './office';
 import * as R from './recreation';
@@ -165,6 +166,10 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
       return Q.archWindow();
     case 'prayer_times':
       return Q.prayerTimes();
+    case 'janitor_shelf':
+      return K.janitorShelf();
+    case 'mop_sink':
+      return K.mopSink();
   }
 }
 

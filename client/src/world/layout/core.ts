@@ -2,6 +2,7 @@
 import type { WallStyle } from '../../art/api';
 import { COL_W, NORTH_Y, ROOM_H, SOUTH_Y, TILE } from '../constants';
 import { AreaBuilder, SEATED_SORT_BIAS } from './builder';
+import { CORE_JANITOR_CORNER, janitorCorner } from './staff';
 import type { AreaLayout } from './types';
 
 export const RECEPTION_ID = 'core:recepcao';
@@ -112,6 +113,7 @@ export function layoutRestroom(): AreaLayout {
   b.rug(2.5, 9.9, 3, 0.9, '#9cc3cf', 203);
   b.furn('plant_small', 1, 6, 'flower', { order: 0.24 });
   b.furn('plant_small', 12, 10, 'fern', { order: 0.25 });
+  janitorCorner(b, CORE_JANITOR_CORNER);
   return b.build();
 }
 
