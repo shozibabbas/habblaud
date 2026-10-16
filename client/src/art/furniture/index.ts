@@ -2,6 +2,7 @@
 // vez e guardada em cache por quem chama (ver art/index.ts).
 import { FURNITURE, type FurnitureKind } from '../api';
 import { trim, type BufFurniture } from '../core/sprite';
+import * as E from './ceo';
 import * as C from './common';
 import * as Q from './mosque';
 import * as O from './office';
@@ -60,7 +61,7 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
     case 'binder_shelf':
       return O.binderShelf(seed);
     case 'meeting_table':
-      return O.meetingTable(seed);
+      return variant === 'oval' ? E.ovalMeetingTable(seed) : O.meetingTable(seed);
     case 'stool':
       return O.stool();
     case 'floor_lamp':
@@ -165,6 +166,24 @@ function build(kind: FurnitureKind, variant: string | undefined, state: number, 
       return Q.archWindow();
     case 'prayer_times':
       return Q.prayerTimes();
+    case 'exec_desk':
+      return E.execDesk(state, seed);
+    case 'exec_chair':
+      return E.execChair(state);
+    case 'meeting_chair':
+      return E.meetingChair(variant);
+    case 'coffee_bar':
+      return E.coffeeBar(state);
+    case 'exec_sofa':
+      return E.execSofa();
+    case 'exec_credenza':
+      return E.execCredenza();
+    case 'secretary_desk':
+      return E.secretaryDesk();
+    case 'door_plate':
+      return E.doorPlate();
+    case 'award_wall':
+      return E.awardWall();
   }
 }
 

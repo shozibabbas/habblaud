@@ -2664,6 +2664,10 @@ export const FR: Readonly<Record<string, string>> = {
   // client/src/world/render/overlay.ts (campus: mesquita)
   "Mesquita": "Mosquée",
   "Ala feminina": "Section des femmes",
+  "Diretoria": "Direction",
+  "Secretaria": "Secrétariat",
+  "   HABBLAUD_OWNER ignorado: campo \"{0}\" fora do formato (veja Configuração no README).": "   HABBLAUD_OWNER ignoré : le champ \"{0}\" n'est pas au bon format (voir Configuration dans le README).",
+  "   Diretoria: {0} ({1}), no campus do escritório combinado.": "   Direction : {0} ({1}), sur le campus du bureau combiné.",
   // menu Atividades (chamar todo mundo)
   "{0} a caminho da mesquita": "{0} en route vers la mosquée",
   "{0} indo tomar chai": "{0} partent prendre un chai",

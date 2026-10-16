@@ -49,6 +49,8 @@ services:
       HABBLAUD_MACHINE_NAME: ${HABBLAUD_MACHINE_NAME:-}
       # Conjunto de nomes dos personagens: br (padrão) ou pk.
       HABBLAUD_NAMES: ${HABBLAUD_NAMES:-}
+      # Dono do escritório (JSON: nome, cargo, look, peças e a secretária): no campus, a sala da diretoria.
+      HABBLAUD_OWNER: ${HABBLAUD_OWNER:-}
       # 0 desliga as sessões do Codex no escritório.
       HABBLAUD_CODEX: ${HABBLAUD_CODEX:-}
       # 1 liga o Novo agente pelo escritório (no Docker, quem começa a sessão é o auxiliar do host, npm run

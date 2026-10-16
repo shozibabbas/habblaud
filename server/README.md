@@ -112,6 +112,12 @@ página olhando o par; ele informa a cada 10 s (ou quando muda) quantas páginas
 (`POST /api/federation/presence`), e o par desvia os pedidos de permissão do terminal se as páginas dele mais esses
 informes somarem alguém.
 
+Dono do escritório (`HABBLAUD_OWNER`, `owner.ts`): um JSON com `name`, `title` (opcional), `look` ('f'/'m', padrão 'm'),
+`parts` (as peças do editor, validadas por `parseAppearanceParts`) e `secretary` (`name`, `look`, `parts`). Os nomes e
+o cargo passam por `parseCharacterName`; qualquer campo fora do formato ignora o valor inteiro, com um aviso na subida
+que diz qual. Vai para `meta.owner` do snapshot (o combinado mantém o do computador que o mostra); no campus, o cliente
+monta a diretoria (`client/src/world/layout/ceo.ts`).
+
 ## Versão nova
 
 `updates/checker.ts` consulta `GET https://api.github.com/repos/<dono>/<nome>/releases/latest`, sem token, 5 s depois

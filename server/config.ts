@@ -9,9 +9,11 @@ import { machineName, parsePeers, type PeerConfig } from './federation/config';
 import { parseAllowedHosts } from './http/guard';
 import { parseRemoteConfig, type RemoteConfig } from './http/remote';
 import { parseFrameAncestors } from './http/static';
+import { parseOwner } from './owner';
 import { parseGithubRepo } from './updates/checker';
 import { tr } from '../shared/i18n';
 import { parseNameSet, type NameSet } from '../shared/names';
+import type { OwnerInfo } from '../shared/types';
 
 export interface ServerConfig {
   port: number;
@@ -46,6 +48,10 @@ export interface ServerConfig {
   machineName: string;
   /** Conjunto de nomes dos personagens (HABBLAUD_NAMES: br, o padrão, ou pk). */
   nameSet: NameSet;
+  /** Dono do escritório (HABBLAUD_OWNER, JSON; ver server/owner.ts): no campus, a sala da diretoria. */
+  owner?: OwnerInfo;
+  /** HABBLAUD_OWNER ignorado: o campo fora do formato (ou "JSON"), para o aviso na subida. */
+  ownerInvalid?: string;
   /**
    * Terminal (GET /api/agents/:id/terminal) ligado: só com bind local, isto é, com o Habblaud acessível apenas
    * pelo próprio computador (ver terminalOffReason). É a trava de tudo o que mostra ou age sobre as sessões.
@@ -174,6 +180,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
   const remote = parseRemoteConfig(env, inDocker);
   const frame = parseFrameAncestors(env.HABBLAUD_FRAME_ANCESTORS);
   const peers = parsePeers(env.HABBLAUD_PEERS);
+  const owner = parseOwner(env.HABBLAUD_OWNER);
   return {
     port: Number.isFinite(port) && port > 0 && port < 65536 ? port : 4747,
     host,
@@ -191,6 +198,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     peersInvalid: peers.invalid,
     machineName: machineName(env),
     nameSet: parseNameSet(env.HABBLAUD_NAMES),
+    owner: owner.owner,
+    ownerInvalid: owner.invalid,
     terminal: terminalOffReason(env, host, inDocker) === undefined,
     messages: messagesOffReason(env, host, inDocker) === undefined,
     timeline: !env.HABBLAUD_TIMELINE?.trim() || isTruthy(env.HABBLAUD_TIMELINE),

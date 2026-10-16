@@ -1,7 +1,7 @@
 // Simulação do escritório: concilia snapshots do servidor com os personagens e salas do mundo,
 // planeja comportamentos e executa as filas de passos a cada frame.
 import { partsKey } from '../../../../shared/appearance';
-import type { AgentInfo, MachineStatus, OfficeSnapshot, Provider, RoomInfo } from '../../../../shared/types';
+import type { AgentInfo, MachineStatus, OfficeSnapshot, OwnerInfo, Provider, RoomInfo } from '../../../../shared/types';
 import type { ArtModule, Dir, RoomTheme } from '../../art/api';
 import type { WorldOptions } from '../api';
 import { COL_W, COMPACT_DELAY_MS, CORE_COLS, DISMANTLE_DELAY_MS, FOOT_DX, FOOT_DY, MISSING_DEBOUNCE_MS, RUN_SPEED, TILE, WALK_SPEED } from '../constants';
@@ -106,6 +106,13 @@ export class Sim {
   callToPrayerAt = 0;
   /** Campus: cápsulas de dormir ocupadas (furnitureId) — sim/recreation.ts. */
   readonly podBusy = new Set<string>();
+  /** Dono do escritório (meta.owner): no campus, a diretoria (layout/ceo.ts). null = sem dono. */
+  owner: OwnerInfo | null = null;
+  /**
+   * Estado visual de móveis que o comportamento controla (furnitureId -> estado), ex.: a mesa de pé da diretoria
+   * (1 = em pé) e o bar de café dela (1 = em uso). Ver render/ceo.ts.
+   */
+  readonly furnStates = new Map<string, number>();
   /** Vida social: rodas dos ociosos, personalidades e carteiras (social/social.ts). */
   readonly social: Social;
   /** Depuração: agentes forçados a encerrar e salas forçadas a sumir do snapshot. */
@@ -323,6 +330,10 @@ export class Sim {
   private syncMachines(snap: OfficeSnapshot, now: number): boolean {
     const list = snap.meta?.machines;
     const was = this.machines !== null;
+    // um dono que chega ou sai muda o campus (a diretoria aparece ou some)
+    const owner = snap.meta?.owner ?? null;
+    const ownerChanged = !!owner !== !!this.owner;
+    this.owner = owner;
     if (!list || list.length < 2) {
       if (!was) return false;
       this.machines = null;
@@ -346,7 +357,7 @@ export class Sim {
       this.places.set(m.id, p);
     }
     const sig = (ms: Map<string, MachineStatus>) => [...ms.values()].map((m) => `${m.id}:${m.name}:${m.online ? 1 : 0}`).join('|');
-    const changed = !was || sig(next) !== sig(this.machines!);
+    const changed = !was || ownerChanged || sig(next) !== sig(this.machines!);
     this.machines = next;
     if (!was) this.switchMode(now);
     return changed;
@@ -685,7 +696,7 @@ export class Sim {
       inputs.push({ ...input, cols });
     }
     return assembleCampus(
-      layoutCampus(inputs),
+      layoutCampus(inputs, { ceo: !!this.owner }),
       present.map((r) => r.layout),
       this.layoutVersion + 1,
     );

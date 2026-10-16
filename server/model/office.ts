@@ -13,6 +13,7 @@ import type {
   Notice,
   NoticeLevel,
   OfficeSnapshot,
+  OwnerInfo,
   PermissionDecision,
   PermissionRequestInfo,
   Provider,
@@ -81,6 +82,8 @@ export interface OfficeDeps {
   updates?: () => UpdateStatus;
   /** Terminais interativos (PtyManager): estado do recurso e os abertos. */
   ptys?: () => { status: PtyStatus; list: PtyInfo[] };
+  /** Dono do escritório (HABBLAUD_OWNER): vai para OfficeSnapshot.meta.owner. */
+  owner?: OwnerInfo;
   now?: () => number;
 }
 
@@ -1009,6 +1012,7 @@ export class Office {
         messages: this.deps.messages !== undefined,
         ...(ptys ? { pty: ptys.status } : {}),
         updates: this.deps.updates?.(),
+        ...(this.deps.owner ? { owner: this.deps.owner } : {}),
       },
     };
   }

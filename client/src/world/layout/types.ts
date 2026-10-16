@@ -3,7 +3,8 @@
 import type { Dir, FloorKind, FurnitureKind, WallStyle } from '../../art/api';
 
 export type AreaKind = 'reception' | 'restroom' | 'cafe' | 'lounge' | 'room' | 'corridor' | 'meeting'
-  | 'mosque'; // (aditivo) salão de oração do campus (layout/mosque.ts)
+  | 'mosque' // (aditivo) salão de oração do campus (layout/mosque.ts)
+  | 'executive'; // (aditivo) sala da diretoria do campus (layout/ceo.ts); a antessala é 'reception'
 
 /** Retângulo em tiles (coordenadas absolutas do mundo). */
 export interface TileRect {
@@ -107,7 +108,17 @@ export type SpotKind =
   | 'shoes' // diante da sapateira (tirar/calçar os sapatos)
   | 'headwear' // diante do cesto de topis / cabideiro de hijabs
   | 'wudu' // banquinho da ablução (assento virado para a torneira)
-  | 'prayer'; // lugar na fila (saf), virado para a qibla
+  | 'prayer' // lugar na fila (saf), virado para a qibla
+  // --- diretoria (aditivo; layout/ceo.ts). Só o dono e a secretária usam: ninguém mais é mandado para cá
+  | 'ceo_desk' // dono sentado à mesa (cadeira executiva)
+  | 'ceo_stand' // dono em pé à mesma mesa, com o tampo erguido (a cadeira rola para o lado)
+  | 'ceo_call' // junto à janela, andando de um lado para o outro ao telefone (dois pontos, rank 0 e 1)
+  | 'ceo_meeting' // cadeira da mesa oval do cantinho de reunião (quatro, um grupo)
+  | 'ceo_coffee' // diante do bar de chai e café
+  | 'ceo_guest' // lugar no sofá de visitas da sala (dois, um grupo)
+  | 'ceo_door' // na antessala, diante da porta de vidro da sala (bater, anunciar alguém, receber)
+  | 'secretary' // cadeira da secretária (mesa com monitor)
+  | 'visitor'; // cadeira de espera da antessala (duas, um grupo)
 
 /**
  * Ponto de interesse. O personagem anda até o tile de aproximação (tx, ty), caminhável,
@@ -176,6 +187,8 @@ export interface AreaLayout {
    * trata como gramado, com os refletores da quadra à noite); 'rest' (cápsulas) fica na penumbra.
    */
   rec?: 'games' | 'rest' | 'court' | 'smoking';
+  /** Campus: área da diretoria (layout/ceo.ts): 'office' = sala do dono, 'reception' = antessala da secretária. */
+  ceo?: 'office' | 'reception';
 }
 
 /** Elemento decorativo externo (árvore, arbusto, poste...) desenhado pelo próprio mundo. */

@@ -53,6 +53,9 @@ export function floorChunk(kind: FloorKind, cx: number, cy: number, o: FloorOpts
     case 'wood':
       paintWood(b, x0, y0, o.seed);
       break;
+    case 'walnut':
+      paintWood(b, x0, y0, o.seed, WALNUT);
+      break;
     case 'concrete':
       paintConcrete(b, x0, y0, o.seed);
       break;
@@ -186,8 +189,14 @@ const WOOD: readonly (readonly RGBA[])[] = WOOD_TONES.map((t) =>
   [t, shade(t, 0.03), shade(t, -0.075), shade(t, -0.03), shade(t, -0.1), shade(t, 0.03), shade(t, -0.12)].map(rgba),
 );
 
+/** Nogueira escura (sala da diretoria): mesmas tábuas, tons de chocolate. */
+const WALNUT_TONES = ['#6e4b35', '#684631', '#74503a', '#634330'] as const;
+const WALNUT: readonly (readonly RGBA[])[] = WALNUT_TONES.map((t) =>
+  [t, shade(t, 0.04), shade(t, -0.09), shade(t, -0.04), shade(t, -0.13), shade(t, 0.05), shade(t, -0.15)].map(rgba),
+);
+
 /** Tábuas de madeira: 4px de altura, 48px de comprimento, emendas desencontradas, veios e nós. */
-function paintWood(b: PixelBuf, x0: number, y0: number, seed: number): void {
+function paintWood(b: PixelBuf, x0: number, y0: number, seed: number, pal: readonly (readonly RGBA[])[] = WOOD): void {
   for (let py = 0; py < CHUNK_PX; py++) {
     const wy = y0 + py;
     const row = Math.floor(wy / 4);
@@ -198,7 +207,7 @@ function paintWood(b: PixelBuf, x0: number, y0: number, seed: number): void {
       const plank = Math.floor(wx / 48);
       const ix = wx - plank * 48;
       const ph = h3(row, plank, 2, seed);
-      const t = WOOD[ph % WOOD.length];
+      const t = pal[ph % pal.length];
       let k = 0;
       if (ix === 0) k = 4;
       else if (iy === 3) k = 2;

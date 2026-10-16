@@ -2648,6 +2648,10 @@ export const EN: Readonly<Record<string, string>> = {
   // client/src/world/render/overlay.ts (campus: mesquita)
   "Mesquita": "Mosque",
   "Ala feminina": "Women's section",
+  "Diretoria": "Executive office",
+  "Secretaria": "Front office",
+  "   HABBLAUD_OWNER ignorado: campo \"{0}\" fora do formato (veja Configuração no README).": "   HABBLAUD_OWNER ignored: field \"{0}\" is malformed (see Configuration in the README).",
+  "   Diretoria: {0} ({1}), no campus do escritório combinado.": "   Executive suite: {0} ({1}), on the combined office campus.",
   // menu Atividades (chamar todo mundo)
   "{0} a caminho da mesquita": "{0} going to the mosque",
   "{0} indo tomar chai": "{0} heading for chai",

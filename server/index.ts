@@ -94,6 +94,7 @@ const accounts = new AccountsService({
 const office = new Office({
   names,
   nameSet: config.nameSet,
+  owner: config.owner,
   roomAlias: (path) => roomAliases.get(path),
   version: config.version,
   // No modo dev o Vite serve o cliente direto do código-fonte: não há build para comparar.
@@ -466,6 +467,8 @@ server.listen(config.port, config.host, () => {
   for (const item of config.frameAncestorsInvalid) log.warn(tr('   HABBLAUD_FRAME_ANCESTORS: "{0}" ignorado (use http(s)://host[:porta], sem caminho nem *).', [item]));
   if (config.frameAncestors.length) log.info(tr('   Pode ser embutido em: {0}.', [config.frameAncestors.join(' ')]));
   for (const item of config.peersInvalid) log.warn(tr('   HABBLAUD_PEERS: "{0}" ignorado (use id=http://host:porta; id com letras minúsculas, números e -).', [item]));
+  if (config.ownerInvalid) log.warn(tr('   HABBLAUD_OWNER ignorado: campo "{0}" fora do formato (veja Configuração no README).', [config.ownerInvalid]));
+  if (config.owner) log.info(tr('   Diretoria: {0} ({1}), no campus do escritório combinado.', [config.owner.name, config.owner.title ?? 'CEO']));
   if (federation) log.info(tr('   Escritório combinado: {0} ({1}) + {2}.', [config.machineName, tr('este computador'), federation.peers.map((p) => `${p.id} (${p.url})`).join(', ')]));
   if (office.isDemo()) log.info(tr('   Modo demonstração ligado (agentes simulados misturados aos reais).'));
   if (config.terminal) log.info(tr('   Terminal: ligado (acesso só local).'));
