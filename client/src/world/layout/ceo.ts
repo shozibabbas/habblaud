@@ -133,7 +133,9 @@ export function layoutCeoOffice(site: CeoSite): AreaLayout {
   // a mesa de pé e a cadeira executiva (centradas na linha entre os tiles 7 e 8)
   const desk = a.furn('exec_desk', 6, 4, undefined, { order: 0.45 });
   a.seat('ceo_desk', 'exec_chair', 7, 5, 'up', undefined, { order: 0.5, dx: TILE / 2, deskId: desk });
-  a.spot('ceo_stand', 7, 5, 'up', { dx: TILE / 2, dy: -2, deskId: desk });
+  // em pé colado à borda da mesa (4 px à frente dela): com o tampo erguido, as mãos chegam ao teclado em vez de
+  // digitar no ar — vale para tudo o que ele faz ali (digitar, ligação, ler)
+  a.spot('ceo_stand', 7, 5, 'up', { dx: TILE / 2, dy: -7, deskId: desk });
   // ao telefone: anda de um lado para o outro diante da janela atrás da mesa
   a.spot('ceo_call', 7, 2, 'up', { group: 'ceo:call', rank: 0, dy: -1 });
   a.spot('ceo_call', 10, 2, 'up', { group: 'ceo:call', rank: 1, dy: -1 });
