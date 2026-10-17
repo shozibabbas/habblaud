@@ -446,6 +446,7 @@ export class Lighting {
         halo(street, prop.x, prop.y + 6, 120, 84, k);
         halo(street, prop.x, prop.y - 30, 30, 24, 0.7 * k);
       } else if (prop.kind === 'totem') halo(cool, prop.x, prop.y - 4, 34, 22, 0.6 * k);
+      else if (prop.kind === 'fountain') halo(cool, prop.x, prop.y - 24, 120, 76, 0.8 * k);
     }
     recreationHalos(scene.areas.values(), (cx, cy, w, h, a) => halo(haloSprite(FLOOD, 64), cx, cy, w, h, a), k);
     ceoHalos(this.sim, scene.areas.values(), (cx, cy, w, h, a) => halo(lamp, cx, cy, w, h, a), k);

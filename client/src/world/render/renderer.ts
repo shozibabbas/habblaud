@@ -22,6 +22,7 @@ import { buildAnim, furnitureScale, NO_ANIM, sweepDelay, type BuildAnim } from '
 import { ceoFurnState, drawCeoFacade, drawCeoFurniture } from './ceo';
 import { daylightModeOf, parseHourParam } from './daylight';
 import { RoomFxRenderer } from './github-fx';
+import { FountainRenderer, type Bird } from './fountain';
 import { Lighting } from './lighting';
 import { reducedMotion } from './github-fx';
 import { drawCallToPrayer, drawTurbahs, drawWuduWater, MosqueRenderer } from './mosque';
@@ -42,12 +43,13 @@ const enum K {
   Prop,
   Car,
   Kit,
+  Bird,
 }
 
 interface Ent {
   k: K;
   y: number;
-  ref: FurnVis | Character | ExteriorProp | Car | KitItem | null;
+  ref: FurnVis | Character | ExteriorProp | Car | KitItem | Bird | null;
   area: AreaVis | null;
   scale: number;
 }
@@ -125,6 +127,8 @@ export class Renderer {
   private readonly mosque = new MosqueRenderer();
   /** Equipe: kit da limpeza e o brilho do piso limpo (render/staff.ts). */
   private readonly staff = new StaffRenderer();
+  /** Campus: a fonte da praça e os passarinhos que vêm beber nela (render/fountain.ts). */
+  private readonly fountain = new FountainRenderer();
   /** dt do frame atual (s), para as partículas emitidas durante o desenho. */
   private dt = 0;
   private iconCount = 0;
@@ -376,6 +380,7 @@ export class Renderer {
     this.date.setTime(this.clock());
     this.dt = dt;
     this.updateCars(now, dt);
+    this.fountain.update(now, this.exterior, this.night, reducedMotion());
     const W = this.canvas.width;
     const H = this.canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -495,7 +500,7 @@ export class Renderer {
       push(K.Char, ch.depth(), ch, null, 1);
     }
     for (const prop of this.exterior.props) {
-      if (!visible(prop.x - 24, prop.y - 56, 48, 60)) continue;
+      if (prop.kind === 'fountain' ? !visible(prop.x - 48, prop.y - 90, 96, 96) : !visible(prop.x - 24, prop.y - 56, 48, 60)) continue;
       let alpha = 1;
       if (prop.whenRoom !== undefined) {
         // ex.: cerca viva diante do caminho do jardim — surge junto com a sala
@@ -525,6 +530,10 @@ export class Renderer {
     }
     for (const car of this.cars) if (visible(car.x - 24, car.y - 24, 48, 28)) push(K.Car, car.y, car, null, 1);
     for (const it of this.staff.kit(this.sim, now)) if (visible(it.x - 16, it.y - 24, 32, 28)) push(K.Kit, it.y, it, null, 1);
+    for (const bird of this.fountain.birds) {
+      const d = this.fountain.depthOf(bird, now);
+      if (d !== null) push(K.Bird, d, bird, null, 1);
+    }
     ents.sort((a, b) => a.y - b.y || a.k - b.k);
 
     this.iconCount = 0;
@@ -540,7 +549,7 @@ export class Renderer {
           this.drawCharacter(e.ref as Character, now, sel);
           break;
         case K.Prop:
-          this.drawProp(e.ref as ExteriorProp, e.scale);
+          this.drawProp(e.ref as ExteriorProp, e.scale, now);
           break;
         case K.Car:
           this.drawCar(e.ref as Car);
@@ -548,8 +557,13 @@ export class Renderer {
         case K.Kit:
           this.safe(() => drawKitItem(ctx, e.ref as KitItem));
           break;
+        case K.Bird:
+          this.fountain.drawBird(ctx, e.ref as Bird, now);
+          break;
       }
     }
+    // passarinhos voando alto, por cima das copas
+    this.safe(() => this.fountain.drawFlying(ctx, now));
     // ralis (bola e placar das mesas/quadra) e a fumaça dos cigarros
     drawRallies(ctx, this.sim, now, view);
     drawSmoke(ctx, this.sim, this.heads, now, view);
@@ -567,6 +581,7 @@ export class Renderer {
     this.drawLighting(now, vx0, vy0, vx1, vy1);
     this.safe(() => this.staff.drawNight(ctx, this.sim, now, view, this.night));
     this.safe(() => this.mosque.drawNight(ctx, this.sim.building, this.areas, this.night, now));
+    this.safe(() => this.fountain.drawNight(ctx, this.night, now));
     // chamado para a oração (menu Atividades): minaretes e cúpulas brilham por uns segundos
     if (this.sim.callToPrayerAt) this.safe(() => drawCallToPrayer(ctx, this.sim.building, this.sim.callToPrayerAt, now, reducedMotion()));
     if (this.theme !== 'none') {
@@ -1187,7 +1202,11 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawProp(prop: ExteriorProp, alpha: number): void {
+  private drawProp(prop: ExteriorProp, alpha: number, now: number): void {
+    if (prop.kind === 'fountain') {
+      this.safe(() => this.fountain.drawFountain(this.ctx, prop, now));
+      return;
+    }
     if (prop.kind === 'paving') {
       const c = this.pavingCanvas(prop);
       if (alpha < 1) this.ctx.globalAlpha = alpha;

@@ -45,7 +45,7 @@ export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
   const cx = campus.commons.x + campus.commons.w / 2;
   floors.push({ kind: 'sidewalk', x: px(cx - 1), y: px(BUILDING_H + 2), w: px(2), h: px(bottom - BUILDING_H), seed: 45 });
 
-  // praça sob o Commons (quando há uma segunda linha): cruz de caminhos, canteiros, bancos e árvores
+  // praça sob o Commons (quando há uma segunda linha): cruz de caminhos, fonte, canteiros, bancos e árvores
   if (campus.rows > 1) {
     const top = BUILDING_H + 4;
     const h = bottom - top - 1;
@@ -61,8 +61,8 @@ export function layoutCampusExterior(campus: CampusLayout): ExteriorLayout {
       props.push({ kind: 'flowers', x: px(cx + dx) + 8, y: px(midY + dy) + 10, seed: seed() });
       props.push({ kind: 'bush', x: px(cx + dx + 1) + 8, y: px(midY + dy) + 12, seed: seed() });
     }
-    props.push({ kind: 'rock', x: px(cx) - 6, y: px(midY) + 2, seed: seed() });
-    props.push({ kind: 'rock', x: px(cx) + 8, y: px(midY) + 6, seed: seed() });
+    // fonte no centro do largo (render/fountain.ts): a âncora é a borda sul da bacia, 18 px abaixo do centro
+    props.push({ kind: 'fountain', x: px(cx), y: px(midY) + 18, seed: seed() });
     for (const bx of [-12, -7, 6, 11]) props.push({ kind: 'bench', x: px(cx + bx), y: px(midY - 2) + 6, seed: seed() });
     for (let x = campus.commons.x + 3; x < campus.commons.x + campus.commons.w - 2; x += 6) {
       if (Math.abs(x - cx) < 6) continue;
